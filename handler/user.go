@@ -87,7 +87,7 @@ func CreateUser(ctx *gin.Context) {
 
 //获取用户列表
 func GetUserList(ctx *gin.Context) {
-	var form req.GetUserListForm
+	var form req.Paging
 
 	err := ctx.ShouldBind(&form)
 	if err != nil {
@@ -176,10 +176,10 @@ func Login(ctx *gin.Context) {
 		return
 	}
 
-	xsq_net.ReplyOK(ctx,gin.H{
+	xsq_net.ReplyOK(ctx, gin.H{
 		"token":  token,
 		"userId": user.Id,
-	},"")
+	}, "")
 }
 
 //修改 名称 密码 状态 组织
@@ -193,13 +193,13 @@ func ChangeUser(ctx *gin.Context) {
 		return
 	}
 	var (
-		user model.User
+		user   model.User
 		update model.User
 	)
 
 	db := global.DB
 
-	result := db.First(&user,form.Id)
+	result := db.First(&user, form.Id)
 
 	if result.Error != nil {
 		xsq_net.ReplyError(ctx, err, result.Error.Error(), 1002, form)
@@ -238,14 +238,14 @@ func ChangeUser(ctx *gin.Context) {
 		return
 	}
 
-	xsq_net.ReplyOK(ctx,gin.H{},"")
+	xsq_net.ReplyOK(ctx, gin.H{}, "")
 }
 
 //获取仓库用户数
-func GetWarehouseUserCount(ctx *gin.Context){
+func GetWarehouseUserCount(ctx *gin.Context) {
 	var (
 		count int
-		form req.AddUserForm
+		form  req.AddUserForm
 	)
 
 	err := ctx.ShouldBind(&form)
@@ -255,7 +255,7 @@ func GetWarehouseUserCount(ctx *gin.Context){
 		return
 	}
 
-	result := global.DB.Raw("SELECT COUNT(id) FROM `t_user` WHERE warehouse_id = ?",form.WarehouseId)
+	result := global.DB.Raw("SELECT COUNT(id) FROM `t_user` WHERE warehouse_id = ?", form.WarehouseId)
 
 	if result.Error != nil {
 		xsq_net.ReplyError(ctx, err, result.Error.Error(), 1002, form)
@@ -264,32 +264,7 @@ func GetWarehouseUserCount(ctx *gin.Context){
 
 	result.Scan(&count)
 
-	xsq_net.ReplyOK(ctx,gin.H{"count":count},"")
-}
-
-func Updates(ctx *gin.Context) {
-	var (
-		user model.User
-	)
-	result := global.DB.Model(&user).Updates([]model.User{
-		{
-			Base: model.Base{
-				Id: 1,
-			},
-			Name: "test1",
-		},
-		{
-			Base: model.Base{
-				Id: 2,
-			},
-			Name: "test2",
-		},
-	})
-	if result.Error != nil {
-		fmt.Println(result.Error)
-		return
-	}
-	xsq_net.ReplyOK(ctx, "", "ok")
+	xsq_net.ReplyOK(ctx, gin.H{"count": count}, "")
 }
 
 func GenderPwd(pwd string) string {

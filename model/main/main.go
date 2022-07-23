@@ -30,7 +30,7 @@ func main() {
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
 			TablePrefix:   "t_", // 表名前缀，`User` 的表名应该是 `t_users`
-			SingularTable: true,  // 使用单数表名，启用该选项，此时，`User` 的表名应该是 `t_user`
+			SingularTable: true, // 使用单数表名，启用该选项，此时，`User` 的表名应该是 `t_user`
 		},
 		Logger: logger,
 	})
@@ -64,4 +64,6 @@ func main() {
 	_ = db.Set(model.TableOptions, model.GetOptions("仓库")).AutoMigrate(&other.Warehouse{})
 
 	_ = db.Set(model.TableOptions, model.GetOptions("用户")).AutoMigrate(&model.User{})
+
+	_ = db.Set(model.TableOptions, model.GetOptions("角色")).AutoMigrate(&model.Role{})
 }

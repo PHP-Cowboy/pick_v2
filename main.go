@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
-	"go.uber.org/zap"
 	"os"
 	"os/signal"
+	"syscall"
+
+	"go.uber.org/zap"
+
 	"pick_v2/global"
 	"pick_v2/initialize"
-	"syscall"
 )
 
 func main() {

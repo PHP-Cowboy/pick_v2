@@ -18,3 +18,8 @@ type User struct {
 	Status      int    `gorm:"type:tinyint;not null;default:1;comment:状态:0:未知,1:正常,2:禁用"`
 	WarehouseId int    `gorm:"type:int(11);comment:仓库"`
 }
+
+type Role struct {
+	Base
+	Name string `gorm:"type:varchar(32);index:unique;not null;comment:角色名"`
+}
