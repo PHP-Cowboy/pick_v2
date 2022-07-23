@@ -1,0 +1,9 @@
+{
+  "port": 9531,
+  "jwt": "ghlasdfkgbnkadfjbgnksdfjsdfgnbjk",
+  "redis": {
+    "host": "",
+    "port": 0,
+    "expire": ""
+  }
+}
