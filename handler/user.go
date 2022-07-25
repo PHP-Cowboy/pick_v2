@@ -4,6 +4,7 @@ import (
 	"crypto/sha512"
 	"errors"
 	"fmt"
+	"pick_v2/utils/ecode"
 	"strconv"
 	"strings"
 
@@ -27,7 +28,7 @@ func CreateUser(ctx *gin.Context) {
 	var form req.AddUserForm
 	err := ctx.ShouldBind(&form)
 	if err != nil {
-		xsq_net.ReplyError(ctx, err, "参数不合法", 1001, form)
+		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
 		return
 	}
 
@@ -45,7 +46,7 @@ func CreateUser(ctx *gin.Context) {
 
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			xsq_net.ReplyError(ctx, err, result.Error.Error(), 1002, form)
+			xsq_net.ErrorJSON(ctx, result.Error)
 			return
 		}
 	} else {
@@ -57,7 +58,7 @@ func CreateUser(ctx *gin.Context) {
 	result = db.First(&warehouse, form.WarehouseId)
 
 	if result.Error != nil {
-		xsq_net.ReplyError(ctx, err, result.Error.Error(), 1002, form)
+		xsq_net.ErrorJSON(ctx, result.Error)
 		return
 	}
 
@@ -70,7 +71,7 @@ func CreateUser(ctx *gin.Context) {
 
 	result = db.Save(&user)
 	if result.Error != nil {
-		xsq_net.ReplyError(ctx, err, result.Error.Error(), 1002, form)
+		xsq_net.ErrorJSON(ctx, result.Error)
 		return
 	}
 
@@ -82,7 +83,7 @@ func CreateUser(ctx *gin.Context) {
 		WarehouseId: user.WarehouseId,
 	}
 
-	xsq_net.ReplyOK(ctx, userRsp, "success")
+	xsq_net.SucJson(ctx, userRsp)
 }
 
 //获取用户列表
@@ -91,7 +92,7 @@ func GetUserList(ctx *gin.Context) {
 
 	err := ctx.ShouldBind(&form)
 	if err != nil {
-		xsq_net.ReplyError(ctx, err, "参数不合法", 1001, form)
+		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
 		return
 	}
 
@@ -105,7 +106,7 @@ func GetUserList(ctx *gin.Context) {
 	result := db.Find(&users)
 
 	if result.Error != nil {
-		xsq_net.ReplyError(ctx, err, result.Error.Error(), 1002, form)
+		xsq_net.ErrorJSON(ctx, result.Error)
 		return
 	}
 
@@ -123,7 +124,7 @@ func GetUserList(ctx *gin.Context) {
 		})
 	}
 
-	xsq_net.ReplyOK(ctx, res, "")
+	xsq_net.SucJson(ctx, res)
 }
 
 //登录
@@ -133,7 +134,7 @@ func Login(ctx *gin.Context) {
 	err := ctx.ShouldBind(&form)
 
 	if err != nil {
-		xsq_net.ReplyError(ctx, err, "参数不合法", 1001, form)
+		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
 		return
 	}
 	var (
@@ -144,12 +145,12 @@ func Login(ctx *gin.Context) {
 	result := db.Where("account = ?", form.Account).First(&user)
 
 	if result.Error != nil {
-		xsq_net.ReplyError(ctx, err, result.Error.Error(), 1002, form)
+		xsq_net.ErrorJSON(ctx, result.Error)
 		return
 	}
 
 	if result.RowsAffected == 0 {
-		xsq_net.ReplyError(ctx, err, "用户未找到", 1003, form)
+		xsq_net.ErrorJSON(ctx, ecode.UserNotFound)
 		return
 	}
 
@@ -158,7 +159,7 @@ func Login(ctx *gin.Context) {
 	pwdSlice := strings.Split(user.Password, "$")
 
 	if !password.Verify(form.Password, pwdSlice[1], pwdSlice[2], options) {
-		xsq_net.ReplyError(ctx, err, "密码有误，请重试", 1004, form)
+		xsq_net.ErrorJSON(ctx, ecode.PasswordCheckFailed)
 		return
 	}
 
@@ -172,14 +173,14 @@ func Login(ctx *gin.Context) {
 	j := middlewares.NewJwt()
 	token, err := j.CreateToken(claims)
 	if err != nil {
-		xsq_net.ReplyError(ctx, err, err.Error(), 1005, form)
+		xsq_net.ErrorJSON(ctx, err)
 		return
 	}
 
-	xsq_net.ReplyOK(ctx, gin.H{
+	xsq_net.SucJson(ctx, gin.H{
 		"token":  token,
 		"userId": user.Id,
-	}, "")
+	})
 }
 
 //修改 名称 密码 状态 组织
@@ -189,7 +190,7 @@ func ChangeUser(ctx *gin.Context) {
 	err := ctx.ShouldBind(&form)
 
 	if err != nil {
-		xsq_net.ReplyError(ctx, err, "参数不合法", 1001, form)
+		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
 		return
 	}
 	var (
@@ -202,12 +203,12 @@ func ChangeUser(ctx *gin.Context) {
 	result := db.First(&user, form.Id)
 
 	if result.Error != nil {
-		xsq_net.ReplyError(ctx, err, result.Error.Error(), 1002, form)
+		xsq_net.ErrorJSON(ctx, result.Error)
 		return
 	}
 
 	if result.RowsAffected == 0 {
-		xsq_net.ReplyError(ctx, err, "用户未找到", 1003, form)
+		xsq_net.ErrorJSON(ctx, ecode.UserNotFound)
 		return
 	}
 
@@ -234,11 +235,11 @@ func ChangeUser(ctx *gin.Context) {
 	result = db.Model(&user).Updates(update)
 
 	if result.Error != nil {
-		xsq_net.ReplyError(ctx, err, result.Error.Error(), 1002, form)
+		xsq_net.ErrorJSON(ctx, result.Error)
 		return
 	}
 
-	xsq_net.ReplyOK(ctx, gin.H{}, "")
+	xsq_net.Success(ctx)
 }
 
 //获取仓库用户数
@@ -251,20 +252,20 @@ func GetWarehouseUserCount(ctx *gin.Context) {
 	err := ctx.ShouldBind(&form)
 
 	if err != nil {
-		xsq_net.ReplyError(ctx, err, "参数不合法", 1001, form)
+		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
 		return
 	}
 
 	result := global.DB.Raw("SELECT COUNT(id) FROM `t_user` WHERE warehouse_id = ?", form.WarehouseId)
 
 	if result.Error != nil {
-		xsq_net.ReplyError(ctx, err, result.Error.Error(), 1002, form)
+		xsq_net.ErrorJSON(ctx, result.Error)
 		return
 	}
 
 	result.Scan(&count)
 
-	xsq_net.ReplyOK(ctx, gin.H{"count": count}, "")
+	xsq_net.SucJson(ctx, gin.H{"count": count})
 }
 
 func GenderPwd(pwd string) string {

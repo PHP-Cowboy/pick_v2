@@ -11,3 +11,6 @@ redis:
   host: 192.168.0.1
   port: 6379
   expire: 1
+goods_api:
+  url: 'http://121.196.60.92'
+  port: 19090

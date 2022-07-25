@@ -6,6 +6,7 @@ import (
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
 	"pick_v2/model"
+	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"time"
@@ -18,18 +19,18 @@ func CreateRole(ctx *gin.Context) {
 	err := ctx.ShouldBind(&form)
 
 	if err != nil {
-		xsq_net.ReplyError(ctx, err, "参数不合法", 1000, form)
+		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
 		return
 	}
 
 	result := global.DB.Create(&model.Role{Name: form.Name})
 
 	if result.Error != nil || result.RowsAffected == 0 {
-		xsq_net.ReplyError(ctx, result.Error, result.Error.Error(), 1001, form)
+		xsq_net.ErrorJSON(ctx, result.Error)
 		return
 	}
 
-	xsq_net.ReplyOK(ctx, gin.H{}, "")
+	xsq_net.Success(ctx)
 }
 
 func ChangeRole(ctx *gin.Context) {
@@ -38,7 +39,7 @@ func ChangeRole(ctx *gin.Context) {
 	err := ctx.ShouldBind(&form)
 
 	if err != nil {
-		xsq_net.ReplyError(ctx, err, "参数不合法", 1000, form)
+		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
 		return
 	}
 
@@ -49,18 +50,18 @@ func ChangeRole(ctx *gin.Context) {
 	result := db.First(&role, form.Id)
 
 	if result.Error != nil {
-		xsq_net.ReplyError(ctx, result.Error, result.Error.Error(), 1003, form)
+		xsq_net.ErrorJSON(ctx, result.Error)
 		return
 	}
 
 	if result.RowsAffected == 0 {
-		xsq_net.ReplyError(ctx, result.Error, "角色未找到", 1003, form)
+		xsq_net.ErrorJSON(ctx, ecode.RoleNotFound)
 		return
 	}
 
 	deleteTime, err := time.ParseInLocation(timeutil.DateTime, timeutil.GetDateTime(), time.Local)
 	if err != nil {
-		xsq_net.ReplyError(ctx, err, "时间转换出错", 1004, form)
+		xsq_net.ErrorJSON(ctx, ecode.DataTransformationError)
 		return
 	}
 
@@ -72,7 +73,7 @@ func ChangeRole(ctx *gin.Context) {
 		})
 	}
 
-	xsq_net.ReplyOK(ctx, gin.H{}, "")
+	xsq_net.Success(ctx)
 }
 
 func GetRoleList(ctx *gin.Context) {
@@ -81,7 +82,7 @@ func GetRoleList(ctx *gin.Context) {
 	err := ctx.ShouldBind(&form)
 
 	if err != nil {
-		xsq_net.ReplyError(ctx, err, "参数不合法", 1000, form)
+		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
 		return
 	}
 
@@ -90,7 +91,7 @@ func GetRoleList(ctx *gin.Context) {
 	result := db.Find(&model.Role{})
 
 	if result.Error != nil {
-		xsq_net.ReplyError(ctx, err, result.Error.Error(), 1002, form)
+		xsq_net.ErrorJSON(ctx, result.Error)
 		return
 	}
 
@@ -111,5 +112,5 @@ func GetRoleList(ctx *gin.Context) {
 		})
 	}
 
-	xsq_net.ReplyOK(ctx, res, "")
+	xsq_net.Success(ctx)
 }
