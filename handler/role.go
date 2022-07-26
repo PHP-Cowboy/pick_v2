@@ -33,6 +33,7 @@ func CreateRole(ctx *gin.Context) {
 	xsq_net.Success(ctx)
 }
 
+//修改角色
 func ChangeRole(ctx *gin.Context) {
 	var form req.ChangeRoleForm
 
@@ -76,6 +77,7 @@ func ChangeRole(ctx *gin.Context) {
 	xsq_net.Success(ctx)
 }
 
+//角色列表
 func GetRoleList(ctx *gin.Context) {
 	var form req.GetRoleListForm
 

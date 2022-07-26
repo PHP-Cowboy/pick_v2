@@ -14,6 +14,6 @@ func RoleRoute(g *gin.RouterGroup) {
 		//修改角色
 		roleGroup.POST("/change", handler.ChangeRole)
 		//角色列表
-		roleGroup.POST("/list", handler.GetRoleList)
+		roleGroup.GET("/list", handler.GetRoleList)
 	}
 }

@@ -9,17 +9,18 @@ import (
 func InitRouter() *gin.Engine {
 	r := gin.Default()
 
+	//跨域
 	r.Use(middlewares.Cors())
 
 	group := r.Group("/v2")
-
+	//用户
 	router.UserRoute(group)
-
-	router.BaseRoute(group)
-
+	//角色
 	router.RoleRoute(group)
-
+	//订单商品
 	router.GoodsRoute(group)
+	//批次
+	router.BatchRoute(group)
 
 	return r
 }

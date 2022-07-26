@@ -246,7 +246,7 @@ func ChangeUser(ctx *gin.Context) {
 func GetWarehouseUserCount(ctx *gin.Context) {
 	var (
 		count int
-		form  req.AddUserForm
+		form  req.WarehouseUserCountForm
 	)
 
 	err := ctx.ShouldBind(&form)
