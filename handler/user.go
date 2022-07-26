@@ -154,6 +154,11 @@ func Login(ctx *gin.Context) {
 		return
 	}
 
+	if user.WarehouseId != form.WarehouseId {
+		xsq_net.ErrorJSON(ctx, ecode.WarehouseSelectError)
+		return
+	}
+
 	options := &password.Options{16, 100, 32, sha512.New}
 
 	pwdSlice := strings.Split(user.Password, "$")

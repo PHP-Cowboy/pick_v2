@@ -21,6 +21,8 @@ func InitRouter() *gin.Engine {
 	router.GoodsRoute(group)
 	//批次
 	router.BatchRoute(group)
+	//仓库
+	router.WarehouseRoute(group)
 
 	return r
 }

@@ -8,8 +8,9 @@ type AddUserForm struct {
 }
 
 type LoginForm struct {
-	Account  string `json:"account" form:"account"`
-	Password string `json:"password" form:"password"`
+	WarehouseId int    `form:"warehouse_id" json:"warehouse_id" binding:"required"`
+	Account     string `json:"account" form:"account"`
+	Password    string `json:"password" form:"password"`
 }
 
 type CheckPwdForm struct {
