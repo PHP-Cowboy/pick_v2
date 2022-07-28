@@ -1,21 +1,28 @@
 package request
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
+	"pick_v2/global"
 )
 
-func Request(url, method string) ([]byte, error) {
-	if method == "" {
-		method = "post"
-	}
+func Post(path string, responseData map[string]interface{}) ([]byte, error) {
 
-	method = strings.ToUpper(method)
+	cfg := global.ServerConfig
+
+	url := fmt.Sprintf("%s:%d/%s", cfg.GoodsApi.Url, cfg.GoodsApi.Port, path)
 
 	client := &http.Client{}
 
-	rq, err := http.NewRequest(method, url, nil)
+	jData, err := json.Marshal(responseData)
+	if err != nil {
+		return nil, err
+	}
+
+	rq, err := http.NewRequest("POST", url, bytes.NewReader(jData))
 
 	if err != nil {
 		return nil, err

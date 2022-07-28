@@ -7,6 +7,7 @@ import (
 	"pick_v2/utils/ecode"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/anaskhan96/go-password-encoder"
 	"github.com/gin-gonic/gin"
@@ -142,7 +143,7 @@ func Login(ctx *gin.Context) {
 	)
 
 	db := global.DB
-	result := db.Where("account = ?", form.Account).First(&user)
+	result := db.Where("account = ? and status = 1 and delete_time is null", form.Account).First(&user)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(ctx, result.Error)
@@ -169,10 +170,12 @@ func Login(ctx *gin.Context) {
 	}
 
 	claims := middlewares.CustomClaims{
-		ID:             user.Id,
-		Name:           user.Name,
-		AuthorityId:    user.RoleId,
-		StandardClaims: jwt.StandardClaims{},
+		ID:          user.Id,
+		Name:        user.Name,
+		AuthorityId: user.RoleId,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(12 * time.Hour).Unix(),
+		},
 	}
 
 	j := middlewares.NewJwt()

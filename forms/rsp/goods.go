@@ -44,5 +44,46 @@ type ApiGoodsList struct {
 	GoodsRemark      string  `json:"goods_remark"`
 	PickStatus       int     `json:"pick_status"`
 	PayAt            string  `json:"pay_at"`
-	LockCount        int     `json:"lock_count"`
+	LackCount        int     `json:"lack_count"`
+}
+
+type OrderList struct {
+	Number           string `json:"number"`
+	PayAt            string `json:"pay_time"`
+	ShopCode         string `json:"shop_code"`
+	ShopName         string `json:"shop_name"`
+	ShopType         string `json:"shop_type"`
+	DistributionType int    `json:"distribution_type"` //配送方式
+	SaleUnit         string `json:"sale_unit"`         //销售单位
+	PayCount         int    `json:"pay_count"`         //下单数量
+	Line             string `json:"line"`
+	Region           string `json:"region"`
+	OrderRemark      string `json:"order_remark"` //订单备注
+}
+
+type OrderDetail struct {
+	Number      string             `json:"number"`
+	PayAt       string             `json:"pay_time"`
+	ShopCode    string             `json:"shop_code"`
+	ShopName    string             `json:"shop_name"`
+	OrderRemark string             `json:"order_remark"` //订单备注
+	Line        string             `json:"line"`
+	Region      string             `json:"region"`
+	ShopType    string             `json:"shop_type"`
+	Detail      map[string]*Detail `json:"detail"`
+}
+
+type Detail struct {
+	Total int            `json:"total"`
+	List  []*GoodsDetail `json:"list"`
+}
+
+type GoodsDetail struct {
+	Name        string `json:"name"`
+	GoodsSpe    string `json:"goods_spe"`
+	Shelves     string `json:"shelves"`
+	PayCount    int    `json:"pay_count"`
+	CloseCount  int    `json:"close_count"`
+	LackCount   int    `json:"need_count"` //欠货数量(需出数量)
+	GoodsRemark string `json:"goods_remark"`
 }

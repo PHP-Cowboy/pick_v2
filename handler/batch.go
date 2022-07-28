@@ -24,11 +24,11 @@ func CreateBatch(c *gin.Context) {
 		condition batch.BatchCondition
 	)
 
-	payEndTime, errPayEndTime := time.ParseInLocation(timeutil.DateTime, form.PayEndTime, time.Local)
+	payEndTime, errPayEndTime := time.ParseInLocation(timeutil.TimeFormat, form.PayEndTime, time.Local)
 
-	deliveryEndTime, errDeliveryEndTime := time.ParseInLocation(timeutil.DateTime, form.DeliveryEndTime, time.Local)
+	deliveryEndTime, errDeliveryEndTime := time.ParseInLocation(timeutil.TimeFormat, form.DeliveryEndTime, time.Local)
 
-	deliveryStartTime, errDeliveryStartTime := time.ParseInLocation(timeutil.DateTime, form.DeliveryStartTime, time.Local)
+	deliveryStartTime, errDeliveryStartTime := time.ParseInLocation(timeutil.TimeFormat, form.DeliveryStartTime, time.Local)
 
 	if errPayEndTime != nil || errDeliveryEndTime != nil || errDeliveryStartTime != nil {
 		xsq_net.ErrorJSON(c, ecode.DataTransformationError)

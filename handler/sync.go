@@ -13,7 +13,7 @@ func SyncShop(c *gin.Context) {
 
 	url := ""
 
-	body, err := request.Request(url, "")
+	body, err := request.Post(url, nil)
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return
@@ -35,7 +35,7 @@ func SyncShop(c *gin.Context) {
 func SyncClassification(c *gin.Context) {
 	url := ""
 
-	body, err := request.Request(url, "")
+	body, err := request.Post(url, nil)
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return

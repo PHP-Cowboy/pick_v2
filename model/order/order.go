@@ -55,6 +55,5 @@ type OrderInfo struct {
 	GoodsRemark      string    `gorm:"type:varchar(255);comment:商品备注"`
 	PickStatus       int       `gorm:"type:tinyint;comment:拣货状态"`
 	PayAt            time.Time `gorm:"type:datetime;comment:支付时间"`
-	LockCount        int       `gorm:"type:int;comment:锁数量"`
+	LackCount        int       `gorm:"type:int;comment:欠货数量"`
 }
-

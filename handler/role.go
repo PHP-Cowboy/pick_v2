@@ -60,7 +60,7 @@ func ChangeRole(ctx *gin.Context) {
 		return
 	}
 
-	deleteTime, err := time.ParseInLocation(timeutil.DateTime, timeutil.GetDateTime(), time.Local)
+	deleteTime, err := time.ParseInLocation(timeutil.TimeFormat, timeutil.GetDateTime(), time.Local)
 	if err != nil {
 		xsq_net.ErrorJSON(ctx, ecode.DataTransformationError)
 		return
@@ -109,7 +109,7 @@ func GetRoleList(ctx *gin.Context) {
 	for _, role := range roles {
 		res.Data = append(res.Data, &rsp.Role{
 			Id:         role.Id,
-			CreateTime: role.CreateTime.Format(timeutil.DateTime),
+			CreateTime: role.CreateTime.Format(timeutil.TimeFormat),
 			Name:       role.Name,
 		})
 	}

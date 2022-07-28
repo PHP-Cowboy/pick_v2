@@ -1,12 +1,27 @@
 package timeutil
 
-import "time"
-
-const (
-	Date     = "2006-01-02"
-	DateTime = "2006-01-02 15:04:05"
+import (
+	"fmt"
+	"time"
 )
 
-func GetDateTime() string {
-	return time.Now().Format(DateTime)
+const (
+	MonthFormat     = "2006-01"
+	DateFormat      = "2006-01-02"
+	TimeFormat      = "2006-01-02 15:04:05"
+	TimeFormNoSplit = "20060102150405"
+)
+
+type Time time.Time
+
+// 实现它的json序列化方法
+func (t Time) MarshalJSON() ([]byte, error) {
+	var stamp = fmt.Sprintf("\"%s\"", time.Time(t).Format(TimeFormat))
+	return []byte(stamp), nil
+}
+
+func (t *Time) UnmarshalJSON(data []byte) error {
+	now, err := time.ParseInLocation(`"`+TimeFormat+`"`, string(data), time.Local)
+	*t = Time(now)
+	return err
 }

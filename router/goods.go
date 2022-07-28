@@ -10,6 +10,8 @@ func GoodsRoute(g *gin.RouterGroup) {
 	roleGroup := g.Group("/goods", middlewares.JWTAuth(), middlewares.IsAdminAuth())
 	{
 		//列表
-		roleGroup.POST("/list", handler.GetGoodsList)
+		roleGroup.GET("/list", handler.GetGoodsList)
+		//明细
+		roleGroup.GET("/detail", handler.GetOrderDetail)
 	}
 }
