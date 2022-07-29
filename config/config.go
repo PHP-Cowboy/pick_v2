@@ -17,9 +17,10 @@ type MysqlConfig struct {
 }
 
 type RedisConfig struct {
-	Host   string `mapstructure:"host" json:"host"`
-	Port   int    `mapstructure:"port" json:"port"`
-	Expire int    `mapstructure:"expire" json:"expire"`
+	Host     string `mapstructure:"host" json:"host"`
+	Port     int    `mapstructure:"port" json:"port"`
+	Password string `mapstructure:"password"`
+	Expire   int    `mapstructure:"expire" json:"expire"`
 }
 
 type JWTConfig struct {

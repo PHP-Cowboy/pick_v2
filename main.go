@@ -2,11 +2,10 @@ package main
 
 import (
 	"fmt"
+	"go.uber.org/zap"
 	"os"
 	"os/signal"
 	"syscall"
-
-	"go.uber.org/zap"
 
 	"pick_v2/global"
 	"pick_v2/initialize"
@@ -19,6 +18,8 @@ func main() {
 	initialize.InitConfig()
 
 	initialize.InitMysql()
+
+	initialize.InitRedis()
 
 	g := initialize.InitRouter()
 

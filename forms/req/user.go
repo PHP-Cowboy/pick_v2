@@ -13,7 +13,7 @@ type GetUserListForm struct {
 }
 
 type LoginForm struct {
-	WarehouseId int    `form:"warehouse_id" json:"warehouse_id"`
+	WarehouseId int    `form:"warehouse_id" json:"warehouse_id" binding:"required"`
 	Account     string `json:"account" form:"account"`
 	Password    string `json:"password" form:"password"`
 }

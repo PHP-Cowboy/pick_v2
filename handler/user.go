@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"context"
 	"crypto/sha512"
 	"errors"
 	"fmt"
+	"pick_v2/common/constant"
 	"pick_v2/utils/ecode"
 	"strconv"
 	"strings"
@@ -186,6 +188,7 @@ func Login(ctx *gin.Context) {
 
 	claims := middlewares.CustomClaims{
 		ID:          user.Id,
+		Account:     user.Account,
 		Name:        user.Name,
 		AuthorityId: user.RoleId,
 		StandardClaims: jwt.StandardClaims{
@@ -197,6 +200,14 @@ func Login(ctx *gin.Context) {
 	token, err := j.CreateToken(claims)
 	if err != nil {
 		xsq_net.ErrorJSON(ctx, err)
+		return
+	}
+
+	//token存入redis
+	redisKey := constant.LOGIN_PREFIX + form.Account
+	err = global.Redis.Set(context.Background(), redisKey, token, 12*60*60*time.Second).Err()
+	if err != nil {
+		xsq_net.ErrorJSON(ctx, ecode.RedisFailedToSetData)
 		return
 	}
 

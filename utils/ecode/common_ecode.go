@@ -18,12 +18,15 @@ var (
 	CommunalSessionInvalid = New(12, "session参数异常")
 	CommunalParamInvalid   = New(13, "公共参数异常")
 	UserNotLogin           = New(14, "用户未登录")
+	TokenExpired           = New(15, "token已过期")
 
 	UserNotFound            = New(1000, "用户未找到")
 	RoleNotFound            = New(1001, "角色未找到")
 	DataTransformationError = New(1002, "数据转换出错")
 	PasswordCheckFailed     = New(1003, "密码校验有误")
 	WarehouseNotFound       = New(1004, "仓库未找到")
+	RedisFailedToGetData    = New(1005, "redis获取数据失败")
+	RedisFailedToSetData    = New(1006, "redis设置数据失败")
 
 	WarehouseSelectError = New(2000, "仓库选择有误，请重试")
 )
