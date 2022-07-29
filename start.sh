@@ -1,4 +1,4 @@
-git pull
+# git pull
 
 go build -o pick_v2 main.go
 
