@@ -3,7 +3,9 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 	"pick_v2/forms/req"
+	"pick_v2/forms/rsp"
 	"pick_v2/global"
+	"pick_v2/model"
 	"pick_v2/model/batch"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
@@ -52,4 +54,51 @@ func CreateBatch(c *gin.Context) {
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 	}
+}
+
+//获取批次列表
+func GetBatchList(c *gin.Context) {
+	var (
+		form req.GetBatchListForm
+		res  rsp.GetBatchListRsp
+	)
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var batches []batch.Batch
+
+	db := global.DB
+
+	result := db.Find(&batches)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	res.Total = result.RowsAffected
+
+	db.Scopes(model.Paginate(form.Page, form.Size)).Find(&batches)
+
+	for _, b := range batches {
+		res.List = append(res.List, &rsp.Batch{
+			BatchName:         b.BatchName,
+			DeliveryStartTime: b.DeliveryStartTime.Format(timeutil.TimeFormat),
+			DeliveryEndTime:   b.DeliveryEndTime.Format(timeutil.TimeFormat),
+			ShopNum:           b.ShopNum,
+			OrderNum:          b.OrderNum,
+			UserName:          b.UserName,
+			Line:              b.Line,
+			DeliveryMethod:    b.DeliveryMethod,
+			EndTime:           b.EndTime.Format(timeutil.TimeFormat),
+			Status:            b.Status,
+			PickNum:           b.PickNum,
+			RecheckSheetNum:   b.RecheckSheetNum,
+		})
+	}
+
+	xsq_net.SucJson(c, res)
 }

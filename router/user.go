@@ -22,6 +22,6 @@ func UserRoute(g *gin.RouterGroup) {
 		//修改密码
 		userGroup.POST("/change", handler.ChangeUser)
 		//获取仓库用户数
-		userGroup.POST("/getWarehouseUserCount", handler.GetWarehouseUserCountList)
+		userGroup.GET("/getWarehouseUserCount", handler.GetWarehouseUserCountList)
 	}
 }

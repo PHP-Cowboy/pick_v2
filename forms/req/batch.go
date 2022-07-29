@@ -9,3 +9,7 @@ type CreateBatchForm struct {
 	DeliveryMethod    int    `json:"delivery_method" form:"delivery_method"`
 	Goods             string `json:"goods" form:"goods"`
 }
+
+type GetBatchListForm struct {
+	Paging
+}
