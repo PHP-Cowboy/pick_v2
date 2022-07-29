@@ -5,7 +5,6 @@ import (
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
-	"pick_v2/model"
 	"pick_v2/model/other"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/xsq_net"
@@ -13,16 +12,10 @@ import (
 
 //获取仓库列表
 func GetWarehouseList(c *gin.Context) {
-	var form req.GetWarehouseListForm
-
-	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
-		return
-	}
 
 	var (
 		warehouses []other.Warehouse
-		res        rsp.GetWarehouseListRsp
+		res        []*rsp.WarehouseList
 	)
 
 	db := global.DB
@@ -34,12 +27,8 @@ func GetWarehouseList(c *gin.Context) {
 		return
 	}
 
-	res.Total = result.RowsAffected
-
-	db.Scopes(model.Paginate(form.Page, form.Size)).Find(&warehouses)
-
 	for _, w := range warehouses {
-		res.List = append(res.List, &rsp.WarehouseList{
+		res = append(res, &rsp.WarehouseList{
 			Id:            w.Id,
 			WarehouseName: w.WarehouseName,
 			Abbreviation:  w.Abbreviation,

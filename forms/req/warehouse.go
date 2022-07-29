@@ -1,7 +1,6 @@
 package req
 
 type GetWarehouseListForm struct {
-	Paging
 }
 
 type CreateWarehouseForm struct {
