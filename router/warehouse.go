@@ -7,7 +7,7 @@ import (
 )
 
 func WarehouseRoute(g *gin.RouterGroup) {
-	roleGroup := g.Group("/warehouse", middlewares.JWTAuth(), middlewares.IsAdminAuth())
+	roleGroup := g.Group("/warehouse", middlewares.JWTAuth(), middlewares.IsSuperAdminAuth())
 	{
 		//新增仓库
 		roleGroup.POST("/create", handler.CreateWarehouse)

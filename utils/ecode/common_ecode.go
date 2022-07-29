@@ -23,6 +23,7 @@ var (
 	RoleNotFound            = New(1001, "角色未找到")
 	DataTransformationError = New(1002, "数据转换出错")
 	PasswordCheckFailed     = New(1003, "密码校验有误")
+	WarehouseNotFound       = New(1004, "仓库未找到")
 
 	WarehouseSelectError = New(2000, "仓库选择有误，请重试")
 )

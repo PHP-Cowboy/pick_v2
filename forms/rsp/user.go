@@ -9,6 +9,12 @@ type AddUserRsp struct {
 }
 
 type UserListRsp struct {
-	Total int64        `json:"total"`
+	Total int64         `json:"total"`
 	Data  []*AddUserRsp `json:"data"`
+}
+
+type GetWarehouseUserCountListRsp struct {
+	Count         int    `json:"count"`
+	WarehouseId   int    `json:"warehouse_id"`
+	WarehouseName string `json:"warehouse_name"`
 }

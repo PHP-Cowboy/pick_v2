@@ -39,6 +39,7 @@ func CreateUser(ctx *gin.Context) {
 		user      model.User
 		warehouse other.Warehouse
 		lastId    int
+		role      model.Role
 	)
 
 	character := utils.ChineseCharacterInitials(form.Name)
@@ -59,6 +60,20 @@ func CreateUser(ctx *gin.Context) {
 	result = db.First(&warehouse, form.WarehouseId)
 
 	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			xsq_net.ErrorJSON(ctx, ecode.WarehouseNotFound)
+			return
+		}
+		xsq_net.ErrorJSON(ctx, result.Error)
+		return
+	}
+
+	result = db.First(&role, form.RoleId)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			xsq_net.ErrorJSON(ctx, ecode.RoleNotFound)
+			return
+		}
 		xsq_net.ErrorJSON(ctx, result.Error)
 		return
 	}
@@ -67,7 +82,7 @@ func CreateUser(ctx *gin.Context) {
 	user.Password = GenderPwd(form.Password)
 	user.Name = form.Name
 	user.RoleId = form.RoleId
-	user.Role = ""
+	user.Role = role.Name
 	user.WarehouseId = form.WarehouseId
 
 	result = db.Save(&user)
@@ -89,7 +104,7 @@ func CreateUser(ctx *gin.Context) {
 
 //获取用户列表
 func GetUserList(ctx *gin.Context) {
-	var form req.Paging
+	var form req.GetUserListForm
 
 	err := ctx.ShouldBind(&form)
 	if err != nil {
@@ -250,11 +265,11 @@ func ChangeUser(ctx *gin.Context) {
 	xsq_net.Success(ctx)
 }
 
-//获取仓库用户数
-func GetWarehouseUserCount(ctx *gin.Context) {
+//获取仓库用户数列表
+func GetWarehouseUserCountList(ctx *gin.Context) {
 	var (
-		count int
-		form  req.WarehouseUserCountForm
+		form req.WarehouseUserCountForm
+		res  []*rsp.GetWarehouseUserCountListRsp
 	)
 
 	err := ctx.ShouldBind(&form)
@@ -264,16 +279,16 @@ func GetWarehouseUserCount(ctx *gin.Context) {
 		return
 	}
 
-	result := global.DB.Raw("SELECT COUNT(id) FROM `t_user` WHERE warehouse_id = ?", form.WarehouseId)
+	result := global.DB.Raw("SELECT COUNT(u.id) as count,w.id as warehouse_id, w.warehouse_name FROM t_warehouse as w left join `t_user` as u on u.warehouse_id = w.id GROUP BY w.id")
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(ctx, result.Error)
 		return
 	}
 
-	result.Scan(&count)
+	result.Scan(&res)
 
-	xsq_net.SucJson(ctx, gin.H{"count": count})
+	xsq_net.SucJson(ctx, res)
 }
 
 func GenderPwd(pwd string) string {

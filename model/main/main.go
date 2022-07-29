@@ -39,31 +39,31 @@ func main() {
 		panic(err)
 	}
 
-	_ = db.Set(model.TableOptions, model.GetOptions("拣货订单数据")).AutoMigrate(&order.OrderInfo{})
+	_ = db.Set(model.TableOptions, model.GetOptions("拣货订单数据表")).AutoMigrate(&order.OrderInfo{})
 
 	_ = db.Set(model.TableOptions, model.GetOptions("批次生成条件表")).AutoMigrate(&batch.BatchCondition{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("批次")).AutoMigrate(&batch.Batch{})
+	_ = db.Set(model.TableOptions, model.GetOptions("批次表")).AutoMigrate(&batch.Batch{})
 
 	_ = db.Set(model.TableOptions, model.GetOptions("预拣货列表")).AutoMigrate(&batch.PrePick{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("预拣货商品明细")).AutoMigrate(&batch.PrePickGoods{})
+	_ = db.Set(model.TableOptions, model.GetOptions("预拣货商品明细表")).AutoMigrate(&batch.PrePickGoods{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("预拣货备注明细")).AutoMigrate(&batch.PrePickRemark{})
+	_ = db.Set(model.TableOptions, model.GetOptions("预拣货备注明细表")).AutoMigrate(&batch.PrePickRemark{})
 
 	_ = db.Set(model.TableOptions, model.GetOptions("拣货列表")).AutoMigrate(&batch.Pick{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("拣货商品明细")).AutoMigrate(&batch.PickGoods{})
+	_ = db.Set(model.TableOptions, model.GetOptions("拣货商品明细表")).AutoMigrate(&batch.PickGoods{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("拣货备注明细")).AutoMigrate(&batch.PickRemark{})
+	_ = db.Set(model.TableOptions, model.GetOptions("拣货备注明细表")).AutoMigrate(&batch.PickRemark{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("店铺")).AutoMigrate(&other.Shop{})
+	_ = db.Set(model.TableOptions, model.GetOptions("店铺表")).AutoMigrate(&other.Shop{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("分类")).AutoMigrate(&other.Classification{})
+	_ = db.Set(model.TableOptions, model.GetOptions("分类表")).AutoMigrate(&other.Classification{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("仓库")).AutoMigrate(&other.Warehouse{})
+	_ = db.Set(model.TableOptions, model.GetOptions("仓库表")).AutoMigrate(&other.Warehouse{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("用户")).AutoMigrate(&model.User{})
+	_ = db.Set(model.TableOptions, model.GetOptions("用户表")).AutoMigrate(&model.User{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("角色")).AutoMigrate(&model.Role{})
+	_ = db.Set(model.TableOptions, model.GetOptions("角色表")).AutoMigrate(&model.Role{})
 }
