@@ -24,6 +24,7 @@ func CreateBatch(c *gin.Context) {
 
 	var (
 		condition batch.BatchCondition
+		batches   batch.Batch
 	)
 
 	payEndTime, errPayEndTime := time.ParseInLocation(timeutil.TimeFormat, form.PayEndTime, time.Local)
@@ -47,13 +48,20 @@ func CreateBatch(c *gin.Context) {
 
 	//todo 根据条件筛选 如果查到 调用锁单接口 同时存储相关数据
 
-	db := global.DB
+	tx := global.DB.Begin()
 
-	result := db.Save(&condition)
+	result := tx.Save(&condition)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
+		return
 	}
+
+	batches.BatchName = ""
+
+	tx.Rollback()
+
+	tx.Commit()
 }
 
 //获取批次列表

@@ -63,6 +63,10 @@ func main() {
 
 	_ = db.Set(model.TableOptions, model.GetOptions("仓库表")).AutoMigrate(&other.Warehouse{})
 
+	_ = db.Set(model.TableOptions, model.GetOptions("字典类型表")).AutoMigrate(&other.DictType{})
+
+	_ = db.Set(model.TableOptions, model.GetOptions("字典表")).AutoMigrate(&other.Dict{})
+
 	_ = db.Set(model.TableOptions, model.GetOptions("用户表")).AutoMigrate(&model.User{})
 
 	_ = db.Set(model.TableOptions, model.GetOptions("角色表")).AutoMigrate(&model.Role{})

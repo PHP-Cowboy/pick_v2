@@ -9,7 +9,7 @@ type AddUserForm struct {
 
 type GetUserListForm struct {
 	Paging
-	WarehouseId int `form:"warehouse_id" json:"warehouse_id" binding:"required"`
+	WarehouseId int `form:"warehouse_id" json:"warehouse_id"`
 }
 
 type LoginForm struct {
@@ -24,6 +24,10 @@ type CheckPwdForm struct {
 	Name        string `json:"name"`
 	Status      int    `json:"status"`
 	RoleId      int    `json:"role_id"`
+}
+
+type BatchDeleteUserForm struct {
+	Ids []int `json:"ids" binding:"required"`
 }
 
 type WarehouseUserCountForm struct {

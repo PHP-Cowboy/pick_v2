@@ -15,3 +15,7 @@ type GetRoleListForm struct {
 	Paging
 	Name string `json:"name"`
 }
+
+type BatchDeleteRoleForm struct {
+	Ids []int `json:"ids" binding:"required"`
+}

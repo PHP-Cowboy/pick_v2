@@ -23,6 +23,8 @@ func InitRouter() *gin.Engine {
 	router.BatchRoute(group)
 	//仓库
 	router.WarehouseRoute(group)
+	//字典
+	router.DictRoute(group)
 
 	return r
 }

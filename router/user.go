@@ -23,5 +23,7 @@ func UserRoute(g *gin.RouterGroup) {
 		userGroup.POST("/change", handler.ChangeUser)
 		//获取仓库用户数
 		userGroup.GET("/getWarehouseUserCount", handler.GetWarehouseUserCountList)
+		//批量删除用户
+		userGroup.POST("/batch_delete", handler.BatchDeleteUser)
 	}
 }

@@ -90,21 +90,21 @@ func GetRoleList(ctx *gin.Context) {
 
 	db := global.DB
 
-	result := db.Find(&model.Role{})
+	var (
+		roles []model.Role
+		res   rsp.GetRoleList
+	)
+
+	result := db.Where("delete_time is null").Find(&roles)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(ctx, result.Error)
 		return
 	}
 
-	var (
-		roles []model.Role
-		res   rsp.GetRoleList
-	)
-
-	db.Scopes(model.Paginate(form.Paging.Page, form.Paging.Size)).Find(&roles)
-
 	res.Total = result.RowsAffected
+
+	db.Where("delete_time is null").Scopes(model.Paginate(form.Page, form.Size)).Find(&roles)
 
 	for _, role := range roles {
 		res.Data = append(res.Data, &rsp.Role{
@@ -114,5 +114,24 @@ func GetRoleList(ctx *gin.Context) {
 		})
 	}
 
-	xsq_net.Success(ctx)
+	xsq_net.SucJson(ctx, res)
+}
+
+//批量删除角色
+func BatchDeleteRole(c *gin.Context) {
+	var form req.BatchDeleteRoleForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	result := global.DB.Model(model.Role{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"delete_time": time.Now().Format(timeutil.TimeFormat)})
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	xsq_net.Success(c)
 }

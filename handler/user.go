@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"pick_v2/common/constant"
 	"pick_v2/utils/ecode"
+	"pick_v2/utils/timeutil"
 	"strconv"
 	"strings"
 	"time"
@@ -121,7 +122,7 @@ func GetUserList(ctx *gin.Context) {
 
 	db := global.DB
 
-	result := db.Find(&users)
+	result := db.Where("delete_time is null").Find(&users)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(ctx, result.Error)
@@ -130,7 +131,7 @@ func GetUserList(ctx *gin.Context) {
 
 	res.Total = result.RowsAffected
 
-	db.Scopes(model.Paginate(form.Page, form.Size)).Find(&users)
+	db.Where("delete_time is null").Scopes(model.Paginate(form.Page, form.Size)).Find(&users)
 
 	for _, user := range users {
 		res.Data = append(res.Data, &rsp.AddUserRsp{
@@ -139,6 +140,8 @@ func GetUserList(ctx *gin.Context) {
 			Name:        user.Name,
 			Role:        user.Role,
 			WarehouseId: user.WarehouseId,
+			Status:      user.Status,
+			CreateTime:  user.CreateTime.Format(timeutil.TimeFormat),
 		})
 	}
 
@@ -187,13 +190,12 @@ func Login(ctx *gin.Context) {
 	}
 
 	claims := middlewares.CustomClaims{
-		ID:          user.Id,
-		Account:     user.Account,
-		Name:        user.Name,
-		AuthorityId: user.RoleId,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(12 * time.Hour).Unix(),
-		},
+		ID:             user.Id,
+		Account:        user.Account,
+		Name:           user.Name,
+		WarehouseId:    user.WarehouseId,
+		AuthorityId:    user.RoleId,
+		StandardClaims: jwt.StandardClaims{ExpiresAt: time.Now().Add(12 * time.Hour).Unix()},
 	}
 
 	j := middlewares.NewJwt()
@@ -274,6 +276,25 @@ func ChangeUser(ctx *gin.Context) {
 	}
 
 	xsq_net.Success(ctx)
+}
+
+//批量删除角色
+func BatchDeleteUser(c *gin.Context) {
+	var form req.BatchDeleteUserForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	result := global.DB.Model(model.User{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"delete_time": time.Now().Format(timeutil.TimeFormat)})
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	xsq_net.Success(c)
 }
 
 //获取仓库用户数列表

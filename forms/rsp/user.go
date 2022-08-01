@@ -6,6 +6,8 @@ type AddUserRsp struct {
 	Name        string `json:"name"`
 	Role        string `json:"role"`
 	WarehouseId int    `json:"warehouse_id"`
+	Status      int    `json:"status"`
+	CreateTime  string `json:"create_time"`
 }
 
 type UserListRsp struct {

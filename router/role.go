@@ -15,5 +15,7 @@ func RoleRoute(g *gin.RouterGroup) {
 		roleGroup.POST("/change", handler.ChangeRole)
 		//角色列表
 		roleGroup.GET("/list", handler.GetRoleList)
+		//批量删除角色
+		roleGroup.POST("/batch_delete", handler.BatchDeleteRole)
 	}
 }
