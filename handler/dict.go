@@ -142,7 +142,7 @@ func DictList(c *gin.Context) {
 		return
 	}
 
-	list := make([]*rsp.DictListRsp, result.RowsAffected)
+	list := make([]*rsp.DictListRsp, 0, result.RowsAffected)
 	for _, d := range dict {
 		list = append(list, &rsp.DictListRsp{
 			TypeCode:   d.TypeCode,

@@ -25,6 +25,10 @@ func InitRouter() *gin.Engine {
 	router.WarehouseRoute(group)
 	//字典
 	router.DictRoute(group)
+	//店铺
+	router.ShopRoute(group)
+	//数据同步
+	router.ClassRoute(group)
 
 	return r
 }
