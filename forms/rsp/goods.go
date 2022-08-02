@@ -1,13 +1,25 @@
 package rsp
 
-type ApiGoodsListRsp struct {
-	Code int           `json:"code"`
-	Data *ApiGoodsData `json:"data"`
+type CommodityListRsp struct {
+	Code int              `json:"code"`
+	Data []*CommodityList `json:"data"`
+	Msg  string           `json:"msg"`
 }
 
-type ApiGoodsData struct {
-	List []*ApiGoodsList `json:"list"`
+type CommodityList struct {
+	Name string `json:"name"`
+	Sku  string `json:"sku"`
 }
+
+type ApiGoodsListRsp struct {
+	Code int             `json:"code"`
+	Data []*ApiGoodsList `json:"data"`
+	Msg  string          `json:"msg"`
+}
+
+//type ApiGoodsData struct {
+//	List []*ApiGoodsList `json:"list"`
+//}
 
 type ApiGoodsList struct {
 	Id               int     `json:"id"`

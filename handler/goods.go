@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/gin-gonic/gin"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
@@ -20,14 +21,14 @@ func GetGoodsList(c *gin.Context) {
 		return
 	}
 
-	result, err := RequestGoodsList(nil)
+	result, err := RequestGoodsList(form)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
-	orderList := OrderList(result.Data.List)
+	orderList := OrderList(result.Data)
 	xsq_net.SucJson(c, orderList)
 }
 
@@ -63,6 +64,7 @@ func OrderList(goodsList []*rsp.ApiGoodsList) []*rsp.OrderList {
 	return list
 }
 
+//订单明细
 func GetOrderDetail(c *gin.Context) {
 	var form req.GetOrderDetailForm
 
@@ -71,7 +73,7 @@ func GetOrderDetail(c *gin.Context) {
 		return
 	}
 
-	result, err := RequestGoodsList(nil)
+	result, err := RequestGoodsList(form)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
@@ -82,10 +84,7 @@ func GetOrderDetail(c *gin.Context) {
 
 	var list []*rsp.ApiGoodsList
 
-	for _, l := range result.Data.List {
-		if l.Number != "QZG2207230005" {
-			continue
-		}
+	for _, l := range result.Data {
 		list = append(list, l)
 	}
 
@@ -135,7 +134,7 @@ func OrderDetail(goodsList []*rsp.ApiGoodsList) rsp.OrderDetail {
 	return result
 }
 
-func RequestGoodsList(responseData map[string]interface{}) (rsp.ApiGoodsListRsp, error) {
+func RequestGoodsList(responseData interface{}) (rsp.ApiGoodsListRsp, error) {
 	var result rsp.ApiGoodsListRsp
 
 	body, err := request.Post("api/v1/remote/pick/lack/list", responseData)
@@ -150,5 +149,35 @@ func RequestGoodsList(responseData map[string]interface{}) (rsp.ApiGoodsListRsp,
 		return result, err
 	}
 
+	if result.Code != 200 {
+		return result, errors.New(result.Msg)
+	}
+
 	return result, nil
+}
+
+//商品列表
+func CommodityList(c *gin.Context) {
+	var result rsp.CommodityListRsp
+
+	body, err := request.Post("api/v1/remote/pick/shop/sku", nil)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	err = json.Unmarshal(body, &result)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	if result.Code != 200 {
+		xsq_net.ErrorJSON(c, errors.New(result.Msg))
+		return
+	}
+
+	xsq_net.SucJson(c, result.Data)
 }

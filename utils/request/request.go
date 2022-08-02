@@ -9,8 +9,8 @@ import (
 	"pick_v2/global"
 )
 
-func Post(path string, responseData map[string]interface{}) ([]byte, error) {
-
+func Post(path string, responseData interface{}) ([]byte, error) {
+	fmt.Println(responseData)
 	cfg := global.ServerConfig
 
 	url := fmt.Sprintf("%s:%d/%s", cfg.GoodsApi.Url, cfg.GoodsApi.Port, path)
