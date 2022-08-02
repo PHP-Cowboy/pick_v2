@@ -33,6 +33,7 @@ type Batch struct {
 	Status            int       `gorm:"type:tinyint;comment:状态"`
 	PickNum           int       `gorm:"type:tinyint;comment:拣货单"`
 	RecheckSheetNum   int       `gorm:"type:tinyint;comment:复核单数量"`
+	Sort              int       `gorm:"type:int(11) unsigned;comment:排序"`
 }
 
 //预拣货列表

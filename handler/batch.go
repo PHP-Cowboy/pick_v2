@@ -5,9 +5,11 @@ import (
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
+	"pick_v2/middlewares"
 	"pick_v2/model"
 	"pick_v2/model/batch"
 	"pick_v2/utils/ecode"
+	"pick_v2/utils/helper"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"time"
@@ -24,7 +26,6 @@ func CreateBatch(c *gin.Context) {
 
 	var (
 		condition batch.BatchCondition
-		batches   batch.Batch
 	)
 
 	payEndTime, errPayEndTime := time.ParseInLocation(timeutil.TimeFormat, form.PayEndTime, time.Local)
@@ -42,11 +43,11 @@ func CreateBatch(c *gin.Context) {
 	condition.PayEndTime = payEndTime
 	condition.DeliveryEndTime = deliveryEndTime
 	condition.DeliveryStartTime = deliveryStartTime
-	condition.DeliveryMethod = form.DeliveryMethod
-	condition.Line = form.Line
-	condition.Goods = form.Goods
+	condition.DeliveryMethod = form.DeType
+	condition.Line = form.Lines
+	condition.Goods = form.Sku
 
-	//todo 根据条件筛选 如果查到 调用锁单接口 同时存储相关数据
+	//根据条件筛选 同时存储相关数据
 
 	tx := global.DB.Begin()
 
@@ -57,9 +58,47 @@ func CreateBatch(c *gin.Context) {
 		return
 	}
 
-	batches.BatchName = ""
+	claims, ok := c.Get("claims")
 
-	tx.Rollback()
+	if !ok {
+		xsq_net.ErrorJSON(c, ecode.DataNotExist)
+		return
+	}
+
+	userInfo := claims.(*middlewares.CustomClaims)
+
+	batches := batch.Batch{
+		WarehouseId:       form.WarehouseId,
+		BatchName:         form.Lines + helper.GetDeliveryMethod(form.DeType),
+		DeliveryStartTime: deliveryStartTime,
+		DeliveryEndTime:   deliveryEndTime,
+		ShopNum:           0,
+		OrderNum:          0,
+		UserName:          userInfo.Name,
+		Line:              form.Lines,
+		DeliveryMethod:    form.DeType,
+		Status:            0,
+		PickNum:           0,
+		RecheckSheetNum:   0,
+		Sort:              0,
+	}
+
+	result = tx.Save(&batches)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//goodsRes, err := RequestGoodsList(form)
+	//if err != nil {
+	//	return
+	//}
+	//
+	//for _, goods := range goodsRes {
+	//
+	//}
 
 	tx.Commit()
 }

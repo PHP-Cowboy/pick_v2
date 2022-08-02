@@ -2,7 +2,7 @@ package req
 
 type GetGoodsListForm struct {
 	Paging
-	PickStatus   int    `json:"pick_status" form:"pick_status" validate:"required,oneof=0 1 2"`
+	PickSta      int    `json:"pick_sta" form:"pick_sta" validate:"required,oneof=0 1 2"`
 	Number       string `json:"number" form:"number"`
 	ShopId       int    `json:"shop_id" form:"shop_id"`
 	Sku          string `json:"sku" form:"sku"`
@@ -15,6 +15,7 @@ type GetGoodsListForm struct {
 	HasRemark    bool   `json:"has_remark" form:"has_remark"`
 	PayStartTime string `json:"pay_start_time" form:"pay_start_time"`
 	PayEndTime   string `json:"pay_end_time"  form:"pay_end_time"`
+	Index        int    `json:"index"`
 }
 
 type GetOrderDetailForm struct {

@@ -20,6 +20,8 @@ func GetGoodsList(c *gin.Context) {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
+	//商品系统接口页数为index
+	form.Index = form.Page
 
 	result, err := RequestGoodsList(form)
 
@@ -180,4 +182,14 @@ func CommodityList(c *gin.Context) {
 	}
 
 	xsq_net.SucJson(c, result.Data)
+}
+
+//订单出货记录
+func OrderShippingRecord(c *gin.Context) {
+
+}
+
+//订单出货记录明细
+func ShippingRecordDetail(c *gin.Context) {
+
 }

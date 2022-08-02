@@ -10,7 +10,7 @@ import (
 )
 
 func Post(path string, responseData interface{}) ([]byte, error) {
-	fmt.Println(responseData)
+
 	cfg := global.ServerConfig
 
 	url := fmt.Sprintf("%s:%d/%s", cfg.GoodsApi.Url, cfg.GoodsApi.Port, path)
