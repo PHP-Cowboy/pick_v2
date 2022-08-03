@@ -36,31 +36,29 @@ func GetGoodsList(c *gin.Context) {
 
 func OrderList(goodsList []*rsp.ApiGoods) []*rsp.OrderList {
 
-	res := make(map[string]*rsp.OrderList, 0)
+	res := make(map[string]struct{}, 0)
 
-	for _, list := range goodsList {
-		if _, ok := res[list.Number]; ok {
+	list := make([]*rsp.OrderList, 0, 16)
+
+	for _, goods := range goodsList {
+		if _, ok := res[goods.Number]; ok {
 			continue
 		}
-		res[list.Number] = &rsp.OrderList{
-			Number:           list.Number,
-			PayAt:            list.PayAt,
-			ShopCode:         list.ShopCode,
-			ShopName:         list.ShopName,
-			ShopType:         list.ShopType,
-			DistributionType: list.DistributionType,
-			SaleUnit:         list.SaleUnit,
-			PayCount:         list.PayCount,
-			Line:             list.Line,
-			Region:           list.Province + list.City + list.District,
-			OrderRemark:      list.OrderRemark,
-		}
-	}
+		res[goods.Number] = struct{}{}
 
-	list := make([]*rsp.OrderList, 0, len(res))
-
-	for _, r := range res {
-		list = append(list, r)
+		list = append(list, &rsp.OrderList{
+			Number:           goods.Number,
+			PayAt:            goods.PayAt,
+			ShopCode:         goods.ShopCode,
+			ShopName:         goods.ShopName,
+			ShopType:         goods.ShopType,
+			DistributionType: goods.DistributionType,
+			SaleUnit:         goods.SaleUnit,
+			PayCount:         goods.PayCount,
+			Line:             goods.Line,
+			Region:           goods.Province + goods.City + goods.District,
+			OrderRemark:      goods.OrderRemark,
+		})
 	}
 
 	return list
