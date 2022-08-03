@@ -11,6 +11,7 @@ import (
 	"pick_v2/model/order"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/helper"
+	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"strconv"
 )
@@ -25,24 +26,6 @@ func CreateBatch(c *gin.Context) {
 	}
 
 	tx := global.DB.Begin()
-
-	condition := batch.BatchCondition{
-		WarehouseId:       form.WarehouseId,
-		PayEndTime:        form.PayEndTime,
-		DeliveryStartTime: form.DeliveryStartTime,
-		DeliveryEndTime:   form.DeliveryEndTime,
-		Line:              form.Lines,
-		DeliveryMethod:    form.DeType,
-		Sku:               form.Sku,
-	}
-
-	//筛选条件保存
-	result := tx.Save(&condition)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
 
 	claims, ok := c.Get("claims")
 
@@ -70,10 +53,30 @@ func CreateBatch(c *gin.Context) {
 		Sort:            0,
 	}
 
-	result = tx.Save(&batches)
+	result := tx.Save(&batches)
 
 	if result.Error != nil {
 		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	condition := batch.BatchCondition{
+		BatchId:           batches.Id,
+		WarehouseId:       form.WarehouseId,
+		PayEndTime:        form.PayEndTime,
+		DeliveryStartTime: form.DeliveryStartTime,
+		DeliveryEndTime:   form.DeliveryEndTime,
+		Line:              form.Lines,
+		DeliveryMethod:    form.DeType,
+		Sku:               form.Sku,
+		Goods:             form.Goods,
+	}
+
+	//筛选条件保存
+	result = tx.Save(&condition)
+
+	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
@@ -299,6 +302,39 @@ type Ret struct {
 	NeedC     int
 	ShopId    int
 	GoodsType string
+}
+
+//预拣池基础信息
+func GetBase(c *gin.Context) {
+
+	var (
+		form      req.GetBaseForm
+		batchCond batch.BatchCondition
+	)
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	result := global.DB.Where("batch_id = (?)", form.BatchId).First(&batchCond)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	ret := rsp.GetBaseRsp{
+		CreateTime:        batchCond.CreateTime.Format(timeutil.TimeFormat),
+		PayEndTime:        batchCond.PayEndTime,
+		DeliveryStartTime: batchCond.DeliveryStartTime,
+		DeliveryEndTime:   batchCond.DeliveryEndTime,
+		DeliveryMethod:    batchCond.DeliveryMethod,
+		Line:              batchCond.Line,
+		Goods:             batchCond.Goods,
+	}
+
+	xsq_net.SucJson(c, ret)
 }
 
 //预拣池列表

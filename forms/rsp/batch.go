@@ -57,3 +57,13 @@ type Remark struct {
 	OrderRemark string `json:"order_remark"`
 	GoodsRemark string `json:"goods_remark"`
 }
+
+type GetBaseRsp struct {
+	CreateTime        string `json:"create_time"`
+	PayEndTime        string `json:"pay_end_time"`
+	DeliveryStartTime string `json:"delivery_start_time"`
+	DeliveryEndTime   string `json:"delivery_end_time"`
+	DeliveryMethod    int    `json:"delivery_method"`
+	Line              string `json:"line"`
+	Goods             string `json:"goods"`
+}

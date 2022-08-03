@@ -13,6 +13,8 @@ func BatchRoute(g *gin.RouterGroup) {
 		batchGroup.GET("/list", handler.GetBatchList)
 		//创建批次
 		batchGroup.POST("/create", handler.CreateBatch)
+		//预拣池基础信息
+		batchGroup.GET("/base", handler.GetBase)
 		//预拣池列表
 		batchGroup.GET("/pre_pick_list", handler.GetPrePickList)
 		//预拣货明细

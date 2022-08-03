@@ -21,6 +21,10 @@ type GetPrePickListForm struct {
 	Paging
 }
 
+type GetBaseForm struct {
+	BatchId int `json:"batch_id" form:"batch_id"`
+}
+
 type GetPrePickDetailForm struct {
 	PrePickId int `json:"pre_pick_id" form:"pre_pick_id"`
 }
