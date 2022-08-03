@@ -9,8 +9,18 @@ type CreateBatchForm struct {
 	DeType            int    `json:"de_type" form:"de_type" validate:"oneof=1 2 3 4 5"` //1-公司配送 2-用户自提 3-三方物流 4-快递配送 5-首批物料|设备单
 	Sku               string `json:"sku" form:"sku"`
 	Goods             string `json:"goods" form:"goods"`
+	BatchNumber       string
 }
 
 type GetBatchListForm struct {
 	Paging
+	Status int `json:"status" form:"status" validate:"required"` //进行中，已结束
+}
+
+type GetPrePickListForm struct {
+	Paging
+}
+
+type GetPrePickDetailForm struct {
+	PrePickId int `json:"pre_pick_id" form:"pre_pick_id"`
 }

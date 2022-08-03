@@ -7,11 +7,15 @@ import (
 )
 
 func BatchRoute(g *gin.RouterGroup) {
-	roleGroup := g.Group("/batch", middlewares.JWTAuth(), middlewares.IsAdminAuth())
+	batchGroup := g.Group("/batch", middlewares.JWTAuth(), middlewares.IsAdminAuth())
 	{
 		//列表
-		roleGroup.POST("/list", handler.GetBatchList)
+		batchGroup.GET("/list", handler.GetBatchList)
 		//创建批次
-		roleGroup.POST("/create", handler.CreateBatch)
+		batchGroup.POST("/create", handler.CreateBatch)
+		//预拣池列表
+		batchGroup.GET("/pre_pick_list", handler.GetPrePickList)
+		//预拣货明细
+		batchGroup.GET("/pre_pick_detail", handler.GetPrePickDetail)
 	}
 }

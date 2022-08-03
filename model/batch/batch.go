@@ -8,47 +8,45 @@ import (
 //
 type BatchCondition struct {
 	model.Base
-	WarehouseId       int       `gorm:"type:int(11);comment:仓库"`
-	PayEndTime        time.Time `gorm:"type:datetime;comment:支付截止时间"`
-	DeliveryStartTime time.Time `gorm:"type:datetime;comment:发货起始时间"`
-	DeliveryEndTime   time.Time `gorm:"type:datetime;comment:发货截止时间"`
-	Line              string    `gorm:"type:varchar(255);comment:线路;default:null"`
-	DeliveryMethod    int       `gorm:"type:tinyint;not null;comment:配送方式"`
-	Goods             string    `gorm:"type:varchar(255);default:null;comment:商品"`
+	WarehouseId       int    `gorm:"type:int(11);comment:仓库"`
+	PayEndTime        string `gorm:"type:datetime;comment:支付截止时间"`
+	DeliveryStartTime string `gorm:"type:datetime;default:null;comment:发货起始时间"`
+	DeliveryEndTime   string `gorm:"type:datetime;comment:发货截止时间"`
+	Line              string `gorm:"type:varchar(255);comment:线路;default:null"`
+	DeliveryMethod    int    `gorm:"type:tinyint;not null;comment:配送方式"`
+	Sku               string `gorm:"type:varchar(255);default:null;comment:商品sku"`
 }
 
 //批次
 type Batch struct {
 	model.Base
-	WarehouseId       int       `gorm:"type:int(11);comment:仓库"`
-	BatchName         string    `gorm:"type:varchar(64);comment:批次名称"`
-	DeliveryStartTime time.Time `gorm:"type:datetime;comment:发货起始时间"`
-	DeliveryEndTime   time.Time `gorm:"type:datetime;comment:发货截止时间"`
-	ShopNum           int       `gorm:"type:int(11);comment:门店数量"`
-	OrderNum          int       `gorm:"type:int(11);comment:订单数量"`
-	UserName          string    `gorm:"type:varchar(32);comment:用户名称"`
-	Line              string    `gorm:"type:varchar(255);comment:所属路线"`
-	DeliveryMethod    int       `gorm:"type:tinyint;not null;comment:配送方式"`
-	EndTime           time.Time `gorm:"type:datetime;comment:结束时间"`
-	Status            int       `gorm:"type:tinyint;comment:状态"`
-	PickNum           int       `gorm:"type:tinyint;comment:拣货单"`
-	RecheckSheetNum   int       `gorm:"type:tinyint;comment:复核单数量"`
-	Sort              int       `gorm:"type:int(11) unsigned;comment:排序"`
+	WarehouseId       int    `gorm:"type:int(11);comment:仓库"`
+	BatchName         string `gorm:"type:varchar(64);comment:批次名称"`
+	DeliveryStartTime string `gorm:"type:datetime;default:null;comment:发货起始时间"`
+	DeliveryEndTime   string `gorm:"type:datetime;comment:发货截止时间"`
+	ShopNum           int    `gorm:"type:int(11);comment:门店数量"`
+	OrderNum          int    `gorm:"type:int(11);comment:订单数量"`
+	UserName          string `gorm:"type:varchar(32);comment:用户名称"`
+	Line              string `gorm:"type:varchar(255);comment:所属路线"`
+	DeliveryMethod    int    `gorm:"type:tinyint;not null;comment:配送方式"`
+	EndTime           string `gorm:"type:datetime;comment:结束时间"`
+	Status            int    `gorm:"type:tinyint;comment:状态"`
+	PickNum           int    `gorm:"type:tinyint;comment:拣货单"`
+	RecheckSheetNum   int    `gorm:"type:tinyint;comment:复核单数量"`
+	Sort              int    `gorm:"type:int(11) unsigned;comment:排序"`
 }
 
 //预拣货列表
 type PrePick struct {
 	model.Base
-	WarehouseId    int    `gorm:"type:int(11);comment:仓库"`
-	BatchId        int    `gorm:"type:int(11) unsigned;comment:批次表id"`
-	ShopCode       string `gorm:"type:varchar(255);not null;comment:店铺编号"`
-	ShopName       string `gorm:"type:varchar(64);not null;comment:店铺名称"`
-	Line           string `gorm:"type:varchar(255);not null;comment:线路"`
-	NormalNeed     int    `gorm:"type:int;not null;comment:常温需拣"`
-	NormalPicked   int    `gorm:"type:int;not null;comment:常温已拣"`
-	FreezingNeed   int    `gorm:"type:int;not null;comment:冷冻需拣"`
-	FreezingPicked int    `gorm:"type:int;not null;comment:冷冻已拣"`
-	Status         int    `gorm:"type:tinyint;comment:状态"`
+	WarehouseId int    `gorm:"type:int(11);comment:仓库"`
+	BatchId     int    `gorm:"type:int(11) unsigned;comment:批次表id"`
+	ShopId      int    `gorm:"type:int(11);comment:店铺id"`
+	ShopCode    string `gorm:"type:varchar(255);not null;comment:店铺编号"`
+	ShopName    string `gorm:"type:varchar(64);not null;comment:店铺名称"`
+	Line        string `gorm:"type:varchar(255);not null;comment:线路"`
+	OrderNum    int    `gorm:"type:int(11);comment:订单数量"`
+	Status      int    `gorm:"type:tinyint;comment:状态"`
 }
 
 //预拣货商品明细
@@ -56,8 +54,10 @@ type PrePickGoods struct {
 	model.Base
 	WarehouseId int    `gorm:"type:int(11);comment:仓库"`
 	BatchId     int    `gorm:"type:int(11) unsigned;comment:批次表id"`
-	PrePickId   int    `gorm:"type:int(11) unsigned;comment:预拣货表id"`
+	ShopId      int    `gorm:"type:int(11);comment:店铺id"`
+	PrePickId   int    `gorm:"type:int(11) unsigned;index;comment:预拣货表id"`
 	GoodsName   string `gorm:"type:varchar(64);comment:商品名称"`
+	GoodsType   string `gorm:"type:varchar(64);comment:商品类型"`
 	GoodsSpe    string `gorm:"type:varchar(128);comment:商品规格"`
 	Shelves     string `gorm:"type:varchar(64);comment:货架"`
 	NeedNum     int    `gorm:"type:int;not null;comment:需拣数量"`
@@ -71,7 +71,8 @@ type PrePickRemark struct {
 	model.Base
 	WarehouseId int    `gorm:"type:int(11);comment:仓库"`
 	BatchId     int    `gorm:"type:int(11) unsigned;comment:批次表id"`
-	PrePickId   int    `gorm:"type:int(11) unsigned;comment:预拣货表id"`
+	ShopId      int    `gorm:"type:int(11);comment:店铺id"`
+	PrePickId   int    `gorm:"type:int(11) unsigned;index;comment:预拣货表id"`
 	Number      string `gorm:"type:varchar(64);comment:订单编号"`
 	OrderRemark string `gorm:"type:varchar(512);comment:订单备注"`
 	GoodsRemark string `gorm:"type:varchar(255);comment:商品备注"`

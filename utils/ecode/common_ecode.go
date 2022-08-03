@@ -27,6 +27,8 @@ var (
 	WarehouseNotFound       = New(1004, "仓库未找到")
 	RedisFailedToGetData    = New(1005, "redis获取数据失败")
 	RedisFailedToSetData    = New(1006, "redis设置数据失败")
+	NoOrderFound            = New(1007, "未查询到订单")
+	MapKeyNotExist          = New(1008, "map key not exist")
 
 	WarehouseSelectError = New(2000, "仓库选择有误，请重试")
 )

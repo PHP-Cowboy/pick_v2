@@ -134,7 +134,7 @@ func GetUserList(ctx *gin.Context) {
 	db.Where("delete_time is null").Scopes(model.Paginate(form.Page, form.Size)).Find(&users)
 
 	for _, user := range users {
-		res.Data = append(res.Data, &rsp.AddUserRsp{
+		res.List = append(res.List, &rsp.AddUserRsp{
 			Id:          user.Id,
 			Account:     user.Account,
 			Name:        user.Name,

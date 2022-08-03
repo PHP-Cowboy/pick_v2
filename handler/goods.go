@@ -30,11 +30,11 @@ func GetGoodsList(c *gin.Context) {
 		return
 	}
 
-	orderList := OrderList(result.Data)
-	xsq_net.SucJson(c, orderList)
+	orderList := OrderList(result.Data.List)
+	xsq_net.SucJson(c, gin.H{"list": orderList, "total": result.Data.Count})
 }
 
-func OrderList(goodsList []*rsp.ApiGoodsList) []*rsp.OrderList {
+func OrderList(goodsList []*rsp.ApiGoods) []*rsp.OrderList {
 
 	res := make(map[string]*rsp.OrderList, 0)
 
@@ -84,9 +84,9 @@ func GetOrderDetail(c *gin.Context) {
 
 	//OrderDetail(result.Data.List)
 
-	var list []*rsp.ApiGoodsList
+	var list []*rsp.ApiGoods
 
-	for _, l := range result.Data {
+	for _, l := range result.Data.List {
 		list = append(list, l)
 	}
 
@@ -95,7 +95,7 @@ func GetOrderDetail(c *gin.Context) {
 
 }
 
-func OrderDetail(goodsList []*rsp.ApiGoodsList) rsp.OrderDetail {
+func OrderDetail(goodsList []*rsp.ApiGoods) rsp.OrderDetail {
 
 	var result rsp.OrderDetail
 

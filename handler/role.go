@@ -107,7 +107,7 @@ func GetRoleList(ctx *gin.Context) {
 	db.Where("delete_time is null").Scopes(model.Paginate(form.Page, form.Size)).Find(&roles)
 
 	for _, role := range roles {
-		res.Data = append(res.Data, &rsp.Role{
+		res.List = append(res.List, &rsp.Role{
 			Id:         role.Id,
 			CreateTime: role.CreateTime.Format(timeutil.TimeFormat),
 			Name:       role.Name,

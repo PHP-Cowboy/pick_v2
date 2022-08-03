@@ -12,16 +12,17 @@ type CommodityList struct {
 }
 
 type ApiGoodsListRsp struct {
-	Code int             `json:"code"`
-	Data []*ApiGoodsList `json:"data"`
-	Msg  string          `json:"msg"`
+	Code int          `json:"code"`
+	Data ApiGoodsData `json:"data"`
+	Msg  string       `json:"msg"`
 }
 
-//type ApiGoodsData struct {
-//	List []*ApiGoodsList `json:"list"`
-//}
+type ApiGoodsData struct {
+	List  []*ApiGoods `json:"list"`
+	Count int         `json:"count"`
+}
 
-type ApiGoodsList struct {
+type ApiGoods struct {
 	Id               int     `json:"id"`
 	ShopId           int     `json:"shop_id"`
 	ShopName         string  `json:"shop_name"`

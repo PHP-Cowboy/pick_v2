@@ -2,7 +2,7 @@ package rsp
 
 type GetRoleList struct {
 	Total int64   `json:"total"`
-	Data  []*Role `json:"data"`
+	List  []*Role `json:"list"`
 }
 
 type Role struct {
