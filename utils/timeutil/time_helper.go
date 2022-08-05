@@ -76,6 +76,14 @@ func GetDateTimeStartByDate(dateTimeString string, formFormat, toFormat string) 
 	return FormatTimeToMinDateTime(t, toFormat), nil
 }
 
+func GetDateTimeByDateTimeString(dateTimeString string, formFormat, toFormat string) (string, error) {
+	t, err := time.Parse(formFormat, dateTimeString)
+	if err != nil {
+		return "", err
+	}
+	return t.Format(toFormat), nil
+}
+
 //日期格式的字符串转当天 23:59:59 的日期时间格式字符串
 //例如 2020-10-26 转 2020-10-26 23:59:59
 // dateTimeSting 时间

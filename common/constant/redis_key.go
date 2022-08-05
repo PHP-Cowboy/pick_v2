@@ -1,5 +1,6 @@
 package constant
 
 var (
-	LOGIN_PREFIX = "loginPrefix"
+	LOGIN_PREFIX  = "LoginPrefix"
+	BATCH_TOPPING = "BatchTopping"
 )

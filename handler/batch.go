@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"context"
 	"github.com/gin-gonic/gin"
+	"pick_v2/common/constant"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
@@ -14,6 +16,7 @@ import (
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"strconv"
+	"strings"
 )
 
 //生成拣货批次
@@ -34,6 +37,16 @@ func CreateBatch(c *gin.Context) {
 		return
 	}
 
+	if len(form.Goods) > 0 {
+		var sku, goodsName string
+		for _, good := range form.Goods {
+			sku = good.Sku + ","
+			goodsName = good.Name + ","
+		}
+		form.Sku = strings.TrimRight(sku, ",")
+		form.GoodsName = strings.TrimRight(goodsName, ",")
+	}
+
 	userInfo := claims.(*middlewares.CustomClaims)
 
 	//批次数据
@@ -43,6 +56,7 @@ func CreateBatch(c *gin.Context) {
 		DeliveryEndTime: form.DeliveryEndTime,
 		ShopNum:         0,
 		OrderNum:        0,
+		GoodsNum:        0,
 		UserName:        userInfo.Name,
 		Line:            form.Lines,
 		DeliveryMethod:  form.DeType,
@@ -70,7 +84,7 @@ func CreateBatch(c *gin.Context) {
 		Line:              form.Lines,
 		DeliveryMethod:    form.DeType,
 		Sku:               form.Sku,
-		Goods:             form.Goods,
+		Goods:             form.GoodsName,
 	}
 
 	//筛选条件保存
@@ -105,6 +119,7 @@ func CreateBatch(c *gin.Context) {
 	//订单相关数据
 	for _, goods := range goodsRes.Data.List {
 		orders = append(orders, order.OrderInfo{
+			BatchId:          batches.Id,
 			ShopId:           goods.ShopId,
 			ShopName:         goods.ShopName,
 			ShopType:         goods.ShopType,
@@ -144,6 +159,7 @@ func CreateBatch(c *gin.Context) {
 		prePickGoods = append(prePickGoods, &batch.PrePickGoods{
 			WarehouseId: form.WarehouseId,
 			BatchId:     batches.Id,
+			Number:      goods.Number,
 			PrePickId:   0,
 			ShopId:      goods.ShopId,
 			GoodsName:   goods.Name,
@@ -259,9 +275,60 @@ func GetBatchList(c *gin.Context) {
 		return
 	}
 
-	var batches []batch.Batch
+	var (
+		batches      []batch.Batch
+		batchIdSlice []int
+	)
 
 	db := global.DB
+
+	//子表数据
+	if form.GoodsName != "" || form.Number != "" || form.ShopId > 0 {
+		var batchIds []struct {
+			BatchId int
+		}
+
+		preGoodsRes := global.DB.Model(batch.PrePickGoods{}).
+			Where(batch.PrePickGoods{
+				GoodsName: form.GoodsName,
+				Number:    form.Number,
+				ShopId:    form.ShopId,
+			}).
+			Select("batch_id").
+			Find(&batchIds)
+
+		if preGoodsRes.Error != nil {
+			xsq_net.ErrorJSON(c, preGoodsRes.Error)
+			return
+		}
+
+		//利用map键唯一，去重
+		uMap := make(map[int]struct{}, 0)
+		for _, b := range batchIds {
+			_, ok := uMap[b.BatchId]
+			if ok {
+				continue
+			}
+			uMap[b.BatchId] = struct{}{}
+			batchIdSlice = append(batchIdSlice, b.BatchId)
+		}
+	}
+
+	if form.Line != "" {
+		db = db.Where("line like ?", form.Line+"%")
+	}
+
+	if len(batchIdSlice) > 0 {
+		db = db.Where("id in (?)", batchIdSlice)
+	}
+
+	if form.CreateTime != "" {
+		db = db.Where("create_time <= ?", form.CreateTime)
+	}
+
+	if form.EndTime != "" {
+		db = db.Where("end_time <= ?", form.EndTime)
+	}
 
 	result := db.Where(map[string]interface{}{"status": form.Status}).Find(&batches)
 
@@ -272,20 +339,30 @@ func GetBatchList(c *gin.Context) {
 
 	res.Total = result.RowsAffected
 
-	db.Where(map[string]interface{}{"status": form.Status}).Scopes(model.Paginate(form.Page, form.Size)).Find(&batches)
+	db.Scopes(model.Paginate(form.Page, form.Size)).Order("sort desc").Find(&batches)
 
 	list := make([]*rsp.Batch, 0, len(batches))
 	for _, b := range batches {
+		endTime, errEndTime := timeutil.GetDateTimeByDateTimeString(b.EndTime, timeutil.TimeZoneFormat, timeutil.TimeFormat)
+		//deliveryStartTime, errDeliveryStartTime := timeutil.GetDateTimeByDateTimeString(b.DeliveryStartTime, timeutil.TimeZoneFormat, timeutil.TimeFormat)
+		deliveryEndTime, errDeliveryEndTime := timeutil.GetDateTimeByDateTimeString(b.DeliveryEndTime, timeutil.TimeZoneFormat, timeutil.TimeFormat)
+
+		if errEndTime != nil || errDeliveryEndTime != nil {
+			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+			return
+		}
 		list = append(list, &rsp.Batch{
+			Id:                b.Id,
 			BatchName:         b.BatchName,
 			DeliveryStartTime: b.DeliveryStartTime,
-			DeliveryEndTime:   b.DeliveryEndTime,
+			DeliveryEndTime:   deliveryEndTime,
 			ShopNum:           b.ShopNum,
 			OrderNum:          b.OrderNum,
+			GoodsNum:          b.GoodsNum,
 			UserName:          b.UserName,
 			Line:              b.Line,
 			DeliveryMethod:    b.DeliveryMethod,
-			EndTime:           b.EndTime,
+			EndTime:           endTime,
 			Status:            b.Status,
 			PickNum:           b.PickNum,
 			RecheckSheetNum:   b.RecheckSheetNum,
@@ -317,18 +394,27 @@ func GetBase(c *gin.Context) {
 		return
 	}
 
-	result := global.DB.Where("batch_id = (?)", form.BatchId).First(&batchCond)
+	result := global.DB.Where("batch_id = ?", form.BatchId).First(&batchCond)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
+	payEndTime, errPayEndTime := timeutil.GetDateTimeByDateTimeString(batchCond.PayEndTime, timeutil.TimeZoneFormat, timeutil.TimeFormat)
+	//deliveryStartTime, errDeliveryStartTime := timeutil.GetDateTimeByDateTimeString(batchCond.DeliveryStartTime, timeutil.TimeZoneFormat, timeutil.TimeFormat)
+	deliveryEndTime, errDeliveryEndTime := timeutil.GetDateTimeByDateTimeString(batchCond.DeliveryEndTime, timeutil.TimeZoneFormat, timeutil.TimeFormat)
+
+	if errPayEndTime != nil || errDeliveryEndTime != nil {
+		xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+		return
+	}
+
 	ret := rsp.GetBaseRsp{
 		CreateTime:        batchCond.CreateTime.Format(timeutil.TimeFormat),
-		PayEndTime:        batchCond.PayEndTime,
+		PayEndTime:        payEndTime,
 		DeliveryStartTime: batchCond.DeliveryStartTime,
-		DeliveryEndTime:   batchCond.DeliveryEndTime,
+		DeliveryEndTime:   deliveryEndTime,
 		DeliveryMethod:    batchCond.DeliveryMethod,
 		Line:              batchCond.Line,
 		Goods:             batchCond.Goods,
@@ -397,6 +483,7 @@ func GetPrePickList(c *gin.Context) {
 
 	for _, pick := range prePicks {
 		res.List = append(res.List, &rsp.PrePick{
+			Id:           pick.Id,
 			ShopCode:     pick.ShopCode,
 			ShopName:     pick.ShopName,
 			Line:         pick.Line,
@@ -473,9 +560,189 @@ func GetPrePickDetail(c *gin.Context) {
 
 //置顶
 func Topping(c *gin.Context) {
+	var form req.ToppingForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
 	//redis
+	redis := global.Redis
+
+	redisKey := constant.BATCH_TOPPING
+
+	val, err := redis.Do(context.Background(), "incr", redisKey).Result()
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	sort := int(val.(int64))
+
+	result := global.DB.Model(batch.Batch{}).Where("id = ?", form.Id).Update("sort", sort)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	xsq_net.Success(c)
 }
 
-//暂停
+//批次池内单数量
+func GetPoolNum(c *gin.Context) {
+	var res rsp.GetPoolNumRsp
 
-//结束
+	res = rsp.GetPoolNumRsp{
+		PrePickNum:  100,
+		PickNum:     100,
+		ToReviewNum: 100,
+		CompleteNum: 100,
+	}
+
+	xsq_net.SucJson(c, res)
+}
+
+//批量拣货
+func BatchPick(c *gin.Context) {
+	var form req.BatchPickForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	warehouseId := c.GetInt("warehouseId")
+
+	db := global.DB
+
+	var (
+		prePick        []batch.PrePick
+		prePickGoods   []batch.PrePickGoods
+		prePickRemarks []batch.PrePickRemark
+	)
+
+	result := db.Where("id in (?)", form.Ids).Find(&prePick)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = db.Where("pre_pick_id in (?)", form.Ids).Find(&prePickGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	prePickGoodsMap := make(map[int][]batch.PrePickGoods, 0)
+
+	for _, goods := range prePickGoods {
+		prePickGoodsMap[goods.PrePickId] = append(prePickGoodsMap[goods.PrePickId], goods)
+	}
+
+	result = db.Where("pre_pick_id in (?)", form.Ids).Find(&prePickRemarks)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	prePickRemarksMap := make(map[int][]batch.PrePickRemark, 0)
+
+	for _, remark := range prePickRemarks {
+		prePickRemarksMap[remark.PrePickId] = append(prePickRemarksMap[remark.PrePickId], remark)
+	}
+
+	var (
+		pickGoods  []batch.PickGoods
+		pickRemark []batch.PickRemark
+	)
+
+	tx := db.Begin()
+
+	for _, pre := range prePick {
+		pick := batch.Pick{
+			WarehouseId:    warehouseId,
+			BatchId:        pre.BatchId,
+			ShopCode:       pre.ShopCode,
+			ShopName:       pre.ShopName,
+			Line:           pre.Line,
+			ShopNum:        0,
+			OrderNum:       pre.OrderNum,
+			NeedNum:        0,
+			PickUser:       "",
+			ReviewUser:     "",
+			TakeOrdersTime: nil,
+			Sort:           0,
+			Version:        0,
+		}
+
+		result = tx.Save(&pick)
+
+		if result.Error != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+
+		for _, goods := range prePickGoodsMap[pre.Id] {
+			pickGoods = append(pickGoods, batch.PickGoods{
+				WarehouseId: warehouseId,
+				BatchId:     pre.BatchId,
+				PickId:      pick.Id,
+				GoodsName:   goods.GoodsName,
+				GoodsSpe:    goods.GoodsSpe,
+				Shelves:     goods.Shelves,
+				NeedNum:     goods.NeedNum,
+			})
+		}
+
+		result = tx.Save(&pickGoods)
+
+		if result.Error != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+
+		for _, remark := range prePickRemarksMap[pre.Id] {
+			pickRemark = append(pickRemark, batch.PickRemark{
+				WarehouseId: warehouseId,
+				BatchId:     pre.BatchId,
+				PickId:      pick.Id,
+				Number:      remark.Number,
+				OrderRemark: remark.OrderRemark,
+				GoodsRemark: remark.GoodsRemark,
+				ShopName:    remark.ShopName,
+				Line:        remark.Line,
+			})
+		}
+
+		if len(pickRemark) > 0 {
+			result = tx.Save(&pickRemark)
+
+			if result.Error != nil {
+				tx.Rollback()
+				xsq_net.ErrorJSON(c, result.Error)
+				return
+			}
+		}
+	}
+
+	tx.Commit()
+
+	xsq_net.Success(c)
+}
+
+//合并拣货
+func MergePick(c *gin.Context) {
+	var form req.MergePickForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+}

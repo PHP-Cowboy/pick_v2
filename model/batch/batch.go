@@ -28,6 +28,7 @@ type Batch struct {
 	DeliveryEndTime   string `gorm:"type:datetime;comment:发货截止时间"`
 	ShopNum           int    `gorm:"type:int(11);comment:门店数量"`
 	OrderNum          int    `gorm:"type:int(11);comment:订单数量"`
+	GoodsNum          int    `gorm:"type:int(11);comment:商品数量"`
 	UserName          string `gorm:"type:varchar(32);comment:用户名称"`
 	Line              string `gorm:"type:varchar(255);comment:所属路线"`
 	DeliveryMethod    int    `gorm:"type:tinyint;not null;comment:配送方式"`
@@ -56,6 +57,7 @@ type PrePickGoods struct {
 	model.Base
 	WarehouseId int    `gorm:"type:int(11);comment:仓库"`
 	BatchId     int    `gorm:"type:int(11) unsigned;comment:批次表id"`
+	Number      string `gorm:"type:varchar(32);comment:订单编号"`
 	ShopId      int    `gorm:"type:int(11);comment:店铺id"`
 	PrePickId   int    `gorm:"type:int(11) unsigned;index;comment:预拣货表id"`
 	GoodsName   string `gorm:"type:varchar(64);comment:商品名称"`
@@ -85,19 +87,19 @@ type PrePickRemark struct {
 //拣货列表
 type Pick struct {
 	model.Base
-	WarehouseId    int       `gorm:"type:int(11);comment:仓库"`
-	BatchId        int       `gorm:"type:int(11) unsigned;comment:批次表id"`
-	ShopCode       string    `gorm:"type:varchar(255);not null;comment:店铺编号"`
-	ShopName       string    `gorm:"type:varchar(64);not null;comment:店铺名称"`
-	Line           string    `gorm:"type:varchar(255);not null;comment:线路"`
-	ShopNum        int       `gorm:"type:int;not null;comment:门店数"`
-	OrderNum       int       `gorm:"type:int;not null;comment:订单数"`
-	NeedNum        int       `gorm:"type:int;not null;comment:需拣数量"`
-	PickUser       string    `gorm:"type:varchar(32);default:'';comment:拣货人"`
-	ReviewUser     string    `gorm:"type:varchar(32);default:'';comment:复核人"`
-	TakeOrdersTime time.Time `gorm:"type:datetime;not null;comment:接单时间"`
-	IsTop          bool      `gorm:"not null;default:0;comment:是否置顶:0:否,1:是"`
-	Version        int       `gorm:"type:tinyint(1);default:0;comment:版本"`
+	WarehouseId    int        `gorm:"type:int(11);comment:仓库"`
+	BatchId        int        `gorm:"type:int(11) unsigned;comment:批次表id"`
+	ShopCode       string     `gorm:"type:varchar(255);not null;comment:店铺编号"`
+	ShopName       string     `gorm:"type:varchar(64);not null;comment:店铺名称"`
+	Line           string     `gorm:"type:varchar(255);not null;comment:线路"`
+	ShopNum        int        `gorm:"type:int;not null;comment:门店数"`
+	OrderNum       int        `gorm:"type:int;not null;comment:订单数"`
+	NeedNum        int        `gorm:"type:int;not null;comment:需拣数量"`
+	PickUser       string     `gorm:"type:varchar(32);default:'';comment:拣货人"`
+	ReviewUser     string     `gorm:"type:varchar(32);default:'';comment:复核人"`
+	TakeOrdersTime *time.Time `gorm:"type:datetime;default:null;comment:接单时间"`
+	Sort           int        `gorm:"type:int(11) unsigned;comment:排序"`
+	Version        int        `gorm:"type:tinyint(1);default:0;comment:版本"`
 }
 
 //拣货商品明细

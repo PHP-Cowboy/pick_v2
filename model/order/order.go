@@ -22,7 +22,8 @@ type Order struct {
 
 type OrderInfo struct {
 	model.Base
-	ShopId           int
+	BatchId          int    `gorm:"type:int(11);not null;index;comment:批次id"`
+	ShopId           int    `gorm:"type:int(11);not null;comment:店铺id"`
 	ShopName         string `gorm:"type:varchar(64);not null;comment:店铺名称"`
 	ShopType         string `gorm:"type:varchar(64);not null;comment:店铺类型"`
 	ShopCode         string `gorm:"type:varchar(255);not null;comment:店铺编号"`

@@ -133,14 +133,19 @@ func GetUserList(ctx *gin.Context) {
 
 	db.Where("delete_time is null").Scopes(model.Paginate(form.Page, form.Size)).Find(&users)
 
+	status := false
+
 	for _, user := range users {
-		res.List = append(res.List, &rsp.AddUserRsp{
+		if user.Status == 1 {
+			status = true
+		}
+		res.List = append(res.List, &rsp.User{
 			Id:          user.Id,
 			Account:     user.Account,
 			Name:        user.Name,
 			Role:        user.Role,
 			WarehouseId: user.WarehouseId,
-			Status:      user.Status,
+			Status:      status,
 			CreateTime:  user.CreateTime.Format(timeutil.TimeFormat),
 		})
 	}
@@ -214,8 +219,9 @@ func Login(ctx *gin.Context) {
 	}
 
 	xsq_net.SucJson(ctx, gin.H{
-		"token":  token,
-		"userId": user.Id,
+		"token":       token,
+		"userId":      user.Id,
+		"warehouseId": user.WarehouseId,
 	})
 }
 

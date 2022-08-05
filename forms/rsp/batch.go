@@ -6,11 +6,13 @@ type GetBatchListRsp struct {
 }
 
 type Batch struct {
+	Id                int    `json:"id"`
 	BatchName         string `json:"batch_name"`
 	DeliveryStartTime string `json:"delivery_start_time"`
 	DeliveryEndTime   string `json:"delivery_end_time"`
 	ShopNum           int    `json:"shop_num"`
 	OrderNum          int    `json:"order_num"`
+	GoodsNum          int    `json:"goods_num"`
 	UserName          string `json:"user_name"`
 	Line              string `json:"line"`
 	DeliveryMethod    int    `json:"delivery_method"`
@@ -26,6 +28,7 @@ type GetPrePickListRsp struct {
 }
 
 type PrePick struct {
+	Id           int                  `json:"id"`
 	ShopCode     string               `json:"shop_code"`
 	ShopName     string               `json:"shop_name"`
 	Line         string               `json:"line"`
@@ -66,4 +69,11 @@ type GetBaseRsp struct {
 	DeliveryMethod    int    `json:"delivery_method"`
 	Line              string `json:"line"`
 	Goods             string `json:"goods"`
+}
+
+type GetPoolNumRsp struct {
+	PrePickNum  int `json:"pre_pick_num"`
+	PickNum     int `json:"pick_num"`
+	ToReviewNum int `json:"to_review_num"`
+	CompleteNum int `json:"complete_num"`
 }
