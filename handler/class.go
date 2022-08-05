@@ -167,3 +167,23 @@ func ClassNameList(c *gin.Context) {
 
 	xsq_net.SucJson(c, res)
 }
+
+func GoodsClassList(c *gin.Context) {
+	var (
+		class []other.Classification
+		res   []*rsp.GoodsClassListRsp
+	)
+
+	ret := global.DB.Find(&class)
+
+	if ret.Error != nil {
+		xsq_net.ErrorJSON(c, ret.Error)
+		return
+	}
+
+	for _, cl := range class {
+		res = append(res, &rsp.GoodsClassListRsp{GoodsClass: cl.GoodsClass})
+	}
+
+	xsq_net.SucJson(c, res)
+}

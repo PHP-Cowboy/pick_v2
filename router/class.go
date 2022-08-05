@@ -11,6 +11,8 @@ func ClassRoute(g *gin.RouterGroup) {
 	{
 		//分类名称列表
 		group.GET("/class_name_list", handler.ClassNameList)
+		//商品分类
+		group.GET("/goods_class_list", handler.GoodsClassList)
 	}
 
 	syncGroup := g.Group("/class", middlewares.JWTAuth(), middlewares.IsSuperAdminAuth())

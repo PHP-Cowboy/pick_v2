@@ -47,8 +47,14 @@ type ToppingForm struct {
 }
 
 type BatchPickForm struct {
-	Ids []int `json:"ids"`
+	Ids []int `json:"ids" validate:"required"`
 }
 
 type MergePickForm struct {
+	BatchId     int    `json:"batch_id" validate:"required"`
+	Ids         []int  `json:"ids" validate:"required"`
+	Type        int    `json:"type" validate:"required,oneof=1 2 3"`
+	TypeParam   string `json:"type_param" validate:"required"`
+	TaskName    string `json:"task_name" validate:"required"`
+	WarehouseId int    `json:"warehouse_id"`
 }

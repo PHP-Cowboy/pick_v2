@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"github.com/gin-gonic/gin"
 	"pick_v2/common/constant"
 	"pick_v2/forms/req"
@@ -17,6 +18,7 @@ import (
 	"pick_v2/utils/xsq_net"
 	"strconv"
 	"strings"
+	"time"
 )
 
 //生成拣货批次
@@ -49,18 +51,27 @@ func CreateBatch(c *gin.Context) {
 
 	userInfo := claims.(*middlewares.CustomClaims)
 
+	deliveryEndTime, errDeliveryEndTime := time.ParseInLocation(timeutil.TimeFormat, form.DeliveryEndTime, time.Local)
+	deliveryStartTime, errDeliveryStartTime := time.ParseInLocation(timeutil.TimeFormat, form.DeliveryStartTime, time.Local)
+	payEndTime, errPayEndTime := time.ParseInLocation(timeutil.TimeFormat, form.PayEndTime, time.Local)
+
+	if errDeliveryEndTime != nil || errDeliveryStartTime != nil || errPayEndTime != nil {
+		xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+		return
+	}
+
 	//批次数据
 	batches := batch.Batch{
 		WarehouseId:     form.WarehouseId,
 		BatchName:       form.Lines + helper.GetDeliveryMethod(form.DeType),
-		DeliveryEndTime: form.DeliveryEndTime,
+		DeliveryEndTime: &deliveryEndTime,
 		ShopNum:         0,
 		OrderNum:        0,
 		GoodsNum:        0,
 		UserName:        userInfo.Name,
 		Line:            form.Lines,
 		DeliveryMethod:  form.DeType,
-		EndTime:         form.PayEndTime,
+		EndTime:         &payEndTime,
 		Status:          0,
 		PickNum:         0,
 		RecheckSheetNum: 0,
@@ -78,9 +89,9 @@ func CreateBatch(c *gin.Context) {
 	condition := batch.BatchCondition{
 		BatchId:           batches.Id,
 		WarehouseId:       form.WarehouseId,
-		PayEndTime:        form.PayEndTime,
-		DeliveryStartTime: form.DeliveryStartTime,
-		DeliveryEndTime:   form.DeliveryEndTime,
+		PayEndTime:        &payEndTime,
+		DeliveryStartTime: &deliveryStartTime,
+		DeliveryEndTime:   &deliveryEndTime,
 		Line:              form.Lines,
 		DeliveryMethod:    form.DeType,
 		Sku:               form.Sku,
@@ -159,6 +170,7 @@ func CreateBatch(c *gin.Context) {
 		prePickGoods = append(prePickGoods, &batch.PrePickGoods{
 			WarehouseId: form.WarehouseId,
 			BatchId:     batches.Id,
+			OrderInfoId: goods.Id,
 			Number:      goods.Number,
 			PrePickId:   0,
 			ShopId:      goods.ShopId,
@@ -176,6 +188,7 @@ func CreateBatch(c *gin.Context) {
 			prePickRemark = append(prePickRemark, &batch.PrePickRemark{
 				WarehouseId: form.WarehouseId,
 				BatchId:     batches.Id,
+				OrderInfoId: goods.Id,
 				ShopId:      goods.ShopId,
 				Number:      goods.Number,
 				OrderRemark: goods.OrderRemark,
@@ -343,26 +356,24 @@ func GetBatchList(c *gin.Context) {
 
 	list := make([]*rsp.Batch, 0, len(batches))
 	for _, b := range batches {
-		endTime, errEndTime := timeutil.GetDateTimeByDateTimeString(b.EndTime, timeutil.TimeZoneFormat, timeutil.TimeFormat)
-		//deliveryStartTime, errDeliveryStartTime := timeutil.GetDateTimeByDateTimeString(b.DeliveryStartTime, timeutil.TimeZoneFormat, timeutil.TimeFormat)
-		deliveryEndTime, errDeliveryEndTime := timeutil.GetDateTimeByDateTimeString(b.DeliveryEndTime, timeutil.TimeZoneFormat, timeutil.TimeFormat)
 
-		if errEndTime != nil || errDeliveryEndTime != nil {
-			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
-			return
+		deliveryStartTime := ""
+		if b.DeliveryStartTime != nil {
+			deliveryStartTime = b.DeliveryStartTime.Format(timeutil.TimeFormat)
 		}
+
 		list = append(list, &rsp.Batch{
 			Id:                b.Id,
 			BatchName:         b.BatchName,
-			DeliveryStartTime: b.DeliveryStartTime,
-			DeliveryEndTime:   deliveryEndTime,
+			DeliveryStartTime: deliveryStartTime,
+			DeliveryEndTime:   b.DeliveryEndTime.Format(timeutil.TimeFormat),
 			ShopNum:           b.ShopNum,
 			OrderNum:          b.OrderNum,
 			GoodsNum:          b.GoodsNum,
 			UserName:          b.UserName,
 			Line:              b.Line,
 			DeliveryMethod:    b.DeliveryMethod,
-			EndTime:           endTime,
+			EndTime:           b.EndTime.Format(timeutil.TimeFormat),
 			Status:            b.Status,
 			PickNum:           b.PickNum,
 			RecheckSheetNum:   b.RecheckSheetNum,
@@ -401,20 +412,16 @@ func GetBase(c *gin.Context) {
 		return
 	}
 
-	payEndTime, errPayEndTime := timeutil.GetDateTimeByDateTimeString(batchCond.PayEndTime, timeutil.TimeZoneFormat, timeutil.TimeFormat)
-	//deliveryStartTime, errDeliveryStartTime := timeutil.GetDateTimeByDateTimeString(batchCond.DeliveryStartTime, timeutil.TimeZoneFormat, timeutil.TimeFormat)
-	deliveryEndTime, errDeliveryEndTime := timeutil.GetDateTimeByDateTimeString(batchCond.DeliveryEndTime, timeutil.TimeZoneFormat, timeutil.TimeFormat)
-
-	if errPayEndTime != nil || errDeliveryEndTime != nil {
-		xsq_net.ErrorJSON(c, ecode.DataTransformationError)
-		return
+	deliveryStartTime := ""
+	if batchCond.DeliveryStartTime != nil {
+		deliveryStartTime = batchCond.DeliveryStartTime.Format(timeutil.TimeFormat)
 	}
 
 	ret := rsp.GetBaseRsp{
 		CreateTime:        batchCond.CreateTime.Format(timeutil.TimeFormat),
-		PayEndTime:        payEndTime,
-		DeliveryStartTime: batchCond.DeliveryStartTime,
-		DeliveryEndTime:   deliveryEndTime,
+		PayEndTime:        batchCond.PayEndTime.Format(timeutil.TimeFormat),
+		DeliveryStartTime: deliveryStartTime,
+		DeliveryEndTime:   batchCond.DeliveryEndTime.Format(timeutil.TimeFormat),
 		DeliveryMethod:    batchCond.DeliveryMethod,
 		Line:              batchCond.Line,
 		Goods:             batchCond.Goods,
@@ -616,7 +623,6 @@ func BatchPick(c *gin.Context) {
 	warehouseId := c.GetInt("warehouseId")
 
 	db := global.DB
-
 	var (
 		prePick        []batch.PrePick
 		prePickGoods   []batch.PrePickGoods
@@ -667,6 +673,8 @@ func BatchPick(c *gin.Context) {
 		pick := batch.Pick{
 			WarehouseId:    warehouseId,
 			BatchId:        pre.BatchId,
+			PrePickIds:     strconv.Itoa(pre.Id),
+			TaskName:       pre.ShopName,
 			ShopCode:       pre.ShopCode,
 			ShopName:       pre.ShopName,
 			Line:           pre.Line,
@@ -690,13 +698,14 @@ func BatchPick(c *gin.Context) {
 
 		for _, goods := range prePickGoodsMap[pre.Id] {
 			pickGoods = append(pickGoods, batch.PickGoods{
-				WarehouseId: warehouseId,
-				BatchId:     pre.BatchId,
-				PickId:      pick.Id,
-				GoodsName:   goods.GoodsName,
-				GoodsSpe:    goods.GoodsSpe,
-				Shelves:     goods.Shelves,
-				NeedNum:     goods.NeedNum,
+				WarehouseId:    warehouseId,
+				BatchId:        pre.BatchId,
+				PickId:         pick.Id,
+				PrePickGoodsId: goods.Id,
+				GoodsName:      goods.GoodsName,
+				GoodsSpe:       goods.GoodsSpe,
+				Shelves:        goods.Shelves,
+				NeedNum:        goods.NeedNum,
 			})
 		}
 
@@ -710,14 +719,15 @@ func BatchPick(c *gin.Context) {
 
 		for _, remark := range prePickRemarksMap[pre.Id] {
 			pickRemark = append(pickRemark, batch.PickRemark{
-				WarehouseId: warehouseId,
-				BatchId:     pre.BatchId,
-				PickId:      pick.Id,
-				Number:      remark.Number,
-				OrderRemark: remark.OrderRemark,
-				GoodsRemark: remark.GoodsRemark,
-				ShopName:    remark.ShopName,
-				Line:        remark.Line,
+				WarehouseId:     warehouseId,
+				BatchId:         pre.BatchId,
+				PickId:          pick.Id,
+				PrePickRemarkId: remark.Id,
+				Number:          remark.Number,
+				OrderRemark:     remark.OrderRemark,
+				GoodsRemark:     remark.GoodsRemark,
+				ShopName:        remark.ShopName,
+				Line:            remark.Line,
 			})
 		}
 
@@ -730,6 +740,31 @@ func BatchPick(c *gin.Context) {
 				return
 			}
 		}
+	}
+
+	//批量更新
+	result = tx.Model(batch.PrePick{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"status": 1})
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = tx.Model(batch.PrePickGoods{}).Where("pre_pick_id in (?)", form.Ids).Updates(map[string]interface{}{"status": 1})
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = tx.Model(batch.PrePickRemark{}).Where("pre_pick_id in (?)", form.Ids).Updates(map[string]interface{}{"status": 1})
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
 	}
 
 	tx.Commit()
@@ -745,4 +780,470 @@ func MergePick(c *gin.Context) {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
+
+	form.WarehouseId = c.GetInt("warehouseId")
+
+	var err error
+
+	switch form.Type {
+	case 1:
+		err = ByAllOrder(form)
+		break
+	case 2:
+		err = ByClassification(form)
+		break
+	case 3:
+		err = ByGoods(form)
+		break
+	default:
+		err = errors.New("类型不合法")
+	}
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+}
+
+//全单拣货
+func ByAllOrder(form req.MergePickForm) error {
+	var (
+		prePickGoods   []batch.PrePickGoods
+		prePickRemarks []batch.PrePickRemark
+		pickGoods      []batch.PickGoods
+		pickRemarks    []batch.PickRemark
+	)
+
+	db := global.DB
+
+	prePickIds := ""
+
+	for _, id := range form.Ids {
+		prePickIds = strconv.Itoa(id) + ","
+	}
+
+	prePickIds = strings.TrimRight(prePickIds, ",")
+
+	result := db.Where("pre_pick_id in (?) and status = 0", form.Ids).Find(&prePickGoods)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	result = db.Where("pre_pick_id in (?) and status = 0", form.Ids).Find(&prePickRemarks)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	tx := db.Begin()
+
+	pick := batch.Pick{
+		WarehouseId:    form.WarehouseId,
+		BatchId:        form.BatchId,
+		PrePickIds:     prePickIds,
+		TaskName:       form.TaskName,
+		ShopCode:       "",
+		ShopName:       form.TaskName,
+		Line:           "",
+		ShopNum:        0,
+		OrderNum:       0,
+		NeedNum:        0,
+		PickUser:       "",
+		ReviewUser:     "",
+		TakeOrdersTime: nil,
+		Sort:           0,
+		Version:        0,
+	}
+
+	result = tx.Save(&pick)
+
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	var (
+		prePickGoodsIds, prePickRemarksIds []int
+	)
+
+	for _, goods := range prePickGoods {
+		//更新预拣货池商品使用
+		prePickGoodsIds = append(prePickGoodsIds, goods.Id)
+
+		pickGoods = append(pickGoods, batch.PickGoods{
+			WarehouseId:    form.WarehouseId,
+			BatchId:        form.BatchId,
+			PickId:         pick.Id,
+			PrePickGoodsId: goods.Id,
+			GoodsName:      goods.GoodsName,
+			GoodsSpe:       goods.GoodsSpe,
+			Shelves:        goods.Shelves,
+			NeedNum:        goods.NeedNum,
+		})
+	}
+
+	result = tx.Save(&pickGoods)
+
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	for _, remark := range prePickRemarks {
+		//更新预拣货池商品备注使用
+		prePickRemarksIds = append(prePickRemarksIds, remark.Id)
+
+		pickRemarks = append(pickRemarks, batch.PickRemark{
+			WarehouseId:     form.WarehouseId,
+			BatchId:         form.BatchId,
+			PickId:          pick.Id,
+			PrePickRemarkId: remark.Id,
+			Number:          remark.Number,
+			OrderRemark:     remark.OrderRemark,
+			GoodsRemark:     remark.GoodsRemark,
+			ShopName:        remark.ShopName,
+			Line:            remark.Line,
+		})
+	}
+
+	result = tx.Save(&pickRemarks)
+
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	//全单拣货，全部状态更新
+	result = tx.Model(batch.PrePick{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"status": 1})
+
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	//可能没查到相关数据
+	if len(prePickGoodsIds) > 0 {
+		result = tx.Model(batch.PrePickGoods{}).Where("id in (?)", prePickGoodsIds).Updates(map[string]interface{}{"status": 1})
+
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+	}
+
+	if len(prePickRemarksIds) > 0 {
+		result = tx.Model(batch.PrePickRemark{}).Where("id in (?)", prePickRemarksIds).Updates(map[string]interface{}{"status": 1})
+
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+	}
+
+	tx.Commit()
+
+	return nil
+}
+
+//按分类拣货
+func ByClassification(form req.MergePickForm) error {
+	var (
+		prePickGoods   []batch.PrePickGoods
+		prePickRemarks []batch.PrePickRemark
+
+		pickGoods   []batch.PickGoods
+		pickRemarks []batch.PickRemark
+	)
+
+	db := global.DB
+
+	var (
+		prePickIds string
+		prePickGoodsIds,
+		orderInfoIds,
+		prePickRemarksIds []int
+	)
+
+	//查全部数据，程序过滤出 goods_type = form.TypeParam 的数据 并计算是否更新 pre_pick 表状态
+	result := db.Where("pre_pick_id in (?) and status = 0", form.Ids).Find(&prePickGoods)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return errors.New("仓库分类:" + form.TypeParam + "数据未找到")
+	}
+
+	tx := db.Begin()
+
+	pick := batch.Pick{
+		WarehouseId:    form.WarehouseId,
+		BatchId:        form.BatchId,
+		PrePickIds:     prePickIds,
+		TaskName:       form.TaskName,
+		ShopCode:       "",
+		ShopName:       form.TaskName,
+		Line:           "",
+		ShopNum:        0,
+		OrderNum:       0,
+		NeedNum:        0,
+		PickUser:       "",
+		ReviewUser:     "",
+		TakeOrdersTime: nil,
+		Sort:           0,
+		Version:        0,
+	}
+
+	result = tx.Save(&pick)
+
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	for _, goods := range prePickGoods {
+
+		//只保留相关仓库类型数据
+		if goods.GoodsType != form.TypeParam {
+			continue
+		}
+
+		prePickGoodsIds = append(prePickGoodsIds, goods.Id)
+
+		orderInfoIds = append(orderInfoIds, goods.Id)
+
+		pickGoods = append(pickGoods, batch.PickGoods{
+			WarehouseId:    form.WarehouseId,
+			BatchId:        form.BatchId,
+			PickId:         pick.Id,
+			PrePickGoodsId: goods.Id,
+			GoodsName:      goods.GoodsName,
+			GoodsSpe:       goods.GoodsSpe,
+			Shelves:        goods.Shelves,
+			NeedNum:        goods.NeedNum,
+		})
+	}
+
+	// 待拣货商品表数据 全部是 form.TypeParam 类型的时，更新 预拣货表状态
+	if len(prePickGoods) == len(prePickGoodsIds) {
+		//待优化 如果两个待拣货单，其中一个的仓库类型完成另一个未完成，这时这里就无法更新已完成的那个的状态
+		//更新预拣货池预拣货表状态
+		result = tx.Model(batch.PrePick{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"status": 1})
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+	}
+
+	result = tx.Save(&pickGoods)
+
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	//更新预拣货池商品相关数据状态
+	result = tx.Model(batch.PrePickGoods{}).Where("id in (?)", prePickGoodsIds).Updates(map[string]interface{}{"status": 1})
+
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	result = db.Where("order_info_id in (?)", orderInfoIds).Find(&prePickRemarks)
+
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	if len(prePickRemarks) > 0 {
+		for _, remark := range prePickRemarks {
+
+			prePickRemarksIds = append(prePickRemarksIds, remark.Id)
+
+			pickRemarks = append(pickRemarks, batch.PickRemark{
+				WarehouseId:     form.WarehouseId,
+				BatchId:         form.BatchId,
+				PickId:          pick.Id,
+				PrePickRemarkId: remark.Id,
+				Number:          remark.Number,
+				OrderRemark:     remark.OrderRemark,
+				GoodsRemark:     remark.GoodsRemark,
+				ShopName:        remark.ShopName,
+				Line:            remark.Line,
+			})
+		}
+
+		result = tx.Save(&pickRemarks)
+
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+
+		//更新预拣货池备注相关数据状态
+		result = tx.Model(batch.PrePickRemark{}).Where("id in (?)", prePickRemarksIds).Updates(map[string]interface{}{"status": 1})
+
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+	}
+
+	return nil
+}
+
+//按单品拣货
+func ByGoods(form req.MergePickForm) error {
+	var (
+		prePickGoods   []batch.PrePickGoods
+		prePickRemarks []batch.PrePickRemark
+
+		pickGoods   []batch.PickGoods
+		pickRemarks []batch.PickRemark
+	)
+
+	db := global.DB
+
+	var (
+		prePickIds string
+		prePickGoodsIds,
+		orderInfoIds,
+		prePickRemarksIds []int
+	)
+
+	//查全部数据，程序过滤出 goods_name = form.TypeParam 的数据 并计算是否更新 pre_pick 表状态
+	result := db.Where("pre_pick_id in (?) and status = 0", form.Ids).Find(&prePickGoods)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return errors.New("仓库分类:" + form.TypeParam + "数据未找到")
+	}
+
+	tx := db.Begin()
+
+	pick := batch.Pick{
+		WarehouseId:    form.WarehouseId,
+		BatchId:        form.BatchId,
+		PrePickIds:     prePickIds,
+		TaskName:       form.TaskName,
+		ShopCode:       "",
+		ShopName:       form.TaskName,
+		Line:           "",
+		ShopNum:        0,
+		OrderNum:       0,
+		NeedNum:        0,
+		PickUser:       "",
+		ReviewUser:     "",
+		TakeOrdersTime: nil,
+		Sort:           0,
+		Version:        0,
+	}
+
+	result = tx.Save(&pick)
+
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	for _, goods := range prePickGoods {
+
+		//只保留相关商品数据
+		if goods.GoodsType != form.TypeParam {
+			continue
+		}
+
+		prePickGoodsIds = append(prePickGoodsIds, goods.Id)
+
+		orderInfoIds = append(orderInfoIds, goods.Id)
+
+		pickGoods = append(pickGoods, batch.PickGoods{
+			WarehouseId:    form.WarehouseId,
+			BatchId:        form.BatchId,
+			PickId:         pick.Id,
+			PrePickGoodsId: goods.Id,
+			GoodsName:      goods.GoodsName,
+			GoodsSpe:       goods.GoodsSpe,
+			Shelves:        goods.Shelves,
+			NeedNum:        goods.NeedNum,
+		})
+	}
+
+	// 待拣货商品表数据 全部是 form.TypeParam 类型的时，更新 预拣货表状态
+	if len(prePickGoods) == len(prePickGoodsIds) {
+		//待优化 如果两个待拣货单，其中一个的仓库类型完成另一个未完成，这时这里就无法更新已完成的那个的状态
+		//更新预拣货池预拣货表状态
+		result = tx.Model(batch.PrePick{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"status": 1})
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+	}
+
+	result = tx.Save(&pickGoods)
+
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	//更新预拣货池商品相关数据状态
+	result = tx.Model(batch.PrePickGoods{}).Where("id in (?)", prePickGoodsIds).Updates(map[string]interface{}{"status": 1})
+
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	result = db.Where("order_info_id in (?)", orderInfoIds).Find(&prePickRemarks)
+
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	if len(prePickRemarks) > 0 {
+		for _, remark := range prePickRemarks {
+
+			prePickRemarksIds = append(prePickRemarksIds, remark.Id)
+
+			pickRemarks = append(pickRemarks, batch.PickRemark{
+				WarehouseId:     form.WarehouseId,
+				BatchId:         form.BatchId,
+				PickId:          pick.Id,
+				PrePickRemarkId: remark.Id,
+				Number:          remark.Number,
+				OrderRemark:     remark.OrderRemark,
+				GoodsRemark:     remark.GoodsRemark,
+				ShopName:        remark.ShopName,
+				Line:            remark.Line,
+			})
+		}
+
+		result = tx.Save(&pickRemarks)
+
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+
+		//更新预拣货池备注相关数据状态
+		result = tx.Model(batch.PrePickRemark{}).Where("id in (?)", prePickRemarksIds).Updates(map[string]interface{}{"status": 1})
+
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+	}
+
+	return nil
 }

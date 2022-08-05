@@ -14,3 +14,7 @@ type Class struct {
 type ClassNameListRsp struct {
 	WarehouseClass string `json:"warehouse_class"`
 }
+
+type GoodsClassListRsp struct {
+	GoodsClass string `json:"goods_class"`
+}
