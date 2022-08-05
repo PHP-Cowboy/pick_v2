@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
+	"github.com/patrickmn/go-cache"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
+	"pick_v2/global"
+	"pick_v2/model/other"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/request"
 	"pick_v2/utils/xsq_net"
+	"time"
 )
 
 //获取待拣货订单商品列表
@@ -190,4 +194,57 @@ func OrderShippingRecord(c *gin.Context) {
 //订单出货记录明细
 func ShippingRecordDetail(c *gin.Context) {
 
+}
+
+//商品分类转仓库分类
+func ShopClassToWarehouseClass(shopClass string) (val string, err error) {
+
+	goodsClassMap, ok := goCache.Get("goodsClassMap")
+
+	mp := make(map[string]string, 0)
+
+	if !ok {
+		mp, err = Cache()
+		if err != nil {
+			return "", err
+		}
+	} else {
+		mp = goodsClassMap.(map[string]string)
+	}
+
+	val, ok = mp[shopClass]
+
+	if !ok {
+		return "", errors.New("key:" + shopClass + "未找到")
+	}
+	return val, nil
+}
+
+var goCache *cache.Cache
+
+func init() {
+	//创建一个默认过期时间为24小时的缓存
+	//每12小时清洗一次过期物品
+	goCache = cache.New(24*time.Hour, 12*time.Hour)
+}
+
+func Cache() (map[string]string, error) {
+
+	var class []other.Classification
+
+	result := global.DB.Find(&class)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	mp := make(map[string]string, 0)
+
+	for _, cl := range class {
+		mp[cl.GoodsClass] = cl.WarehouseClass
+	}
+
+	goCache.Set("goodsClassMap", mp, cache.DefaultExpiration)
+
+	return mp, nil
 }
