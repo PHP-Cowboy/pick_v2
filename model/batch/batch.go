@@ -116,7 +116,10 @@ type PickGoods struct {
 	BatchId        int    `gorm:"type:int(11) unsigned;comment:批次表id"`
 	PickId         int    `gorm:"type:int(11) unsigned;comment:拣货表id"`
 	PrePickGoodsId int    `gorm:"type:int(11);comment:预拣货商品表id"`
+	Number         string `gorm:"type:varchar(64);comment:订单编号"`
+	ShopId         int    `gorm:"type:int(11);comment:店铺id"`
 	GoodsName      string `gorm:"type:varchar(64);comment:商品名称"`
+	GoodsType      string `gorm:"type:varchar(64);comment:商品类型"`
 	GoodsSpe       string `gorm:"type:varchar(128);comment:商品规格"`
 	Shelves        string `gorm:"type:varchar(64);comment:货架"`
 	NeedNum        int    `gorm:"type:int;not null;comment:需拣数量"`
@@ -127,7 +130,7 @@ type PickRemark struct {
 	model.Base
 	WarehouseId     int    `gorm:"type:int(11);comment:仓库"`
 	BatchId         int    `gorm:"type:int(11) unsigned;comment:批次表id"`
-	PickId          int    `gorm:"type:int(11) unsigned;comment:预拣货表id"`
+	PickId          int    `gorm:"type:int(11) unsigned;comment:拣货表id"`
 	PrePickRemarkId int    `gorm:"type:int(11);comment:预拣货备注表id"`
 	Number          string `gorm:"type:varchar(64);comment:订单编号"`
 	OrderRemark     string `gorm:"type:varchar(512);comment:订单备注"`

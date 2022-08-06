@@ -45,6 +45,7 @@ type ApiGoods struct {
 	Sku              string  `json:"sku"`
 	GoodsSpe         string  `json:"goods_spe"`
 	GoodsType        string  `json:"goods_type"`
+	SecondType       string  `json:"second_type"`
 	Shelves          string  `json:"shelves"`
 	OriginalPrice    int     `json:"original_price"`
 	DiscountPrice    float64 `json:"discount_price"`

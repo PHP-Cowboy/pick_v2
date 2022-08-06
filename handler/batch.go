@@ -12,6 +12,7 @@ import (
 	"pick_v2/model"
 	"pick_v2/model/batch"
 	"pick_v2/model/order"
+	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/helper"
 	"pick_v2/utils/timeutil"
@@ -51,11 +52,24 @@ func CreateBatch(c *gin.Context) {
 
 	userInfo := claims.(*middlewares.CustomClaims)
 
+	var (
+		deliveryStartTime    time.Time
+		errDeliveryStartTime error
+	)
+
+	if form.DeliveryStartTime != "" {
+		deliveryStartTime, errDeliveryStartTime = time.ParseInLocation(timeutil.TimeFormat, form.DeliveryStartTime, time.Local)
+		if errDeliveryStartTime != nil {
+			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+			return
+		}
+	}
+
 	deliveryEndTime, errDeliveryEndTime := time.ParseInLocation(timeutil.TimeFormat, form.DeliveryEndTime, time.Local)
-	deliveryStartTime, errDeliveryStartTime := time.ParseInLocation(timeutil.TimeFormat, form.DeliveryStartTime, time.Local)
+
 	payEndTime, errPayEndTime := time.ParseInLocation(timeutil.TimeFormat, form.PayEndTime, time.Local)
 
-	if errDeliveryEndTime != nil || errDeliveryStartTime != nil || errPayEndTime != nil {
+	if errDeliveryEndTime != nil || errPayEndTime != nil {
 		xsq_net.ErrorJSON(c, ecode.DataTransformationError)
 		return
 	}
@@ -127,8 +141,21 @@ func CreateBatch(c *gin.Context) {
 		shopMap       = make(map[int]int, 0)
 	)
 
+	mp, err := cache.GetClassification()
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
 	//订单相关数据
 	for _, goods := range goodsRes.Data.List {
+		goodsType, ok := mp[goods.SecondType]
+
+		if !ok {
+			xsq_net.ErrorJSON(c, errors.New("商品类型:"+goods.SecondType+"数据未同步"))
+			return
+		}
 		orders = append(orders, order.OrderInfo{
 			BatchId:          batches.Id,
 			ShopId:           goods.ShopId,
@@ -151,7 +178,7 @@ func CreateBatch(c *gin.Context) {
 			Name:             goods.Name,
 			Sku:              goods.Sku,
 			GoodsSpe:         goods.GoodsSpe,
-			GoodsType:        goods.GoodsType,
+			GoodsType:        goodsType,
 			Shelves:          goods.Shelves,
 			OriginalPrice:    goods.OriginalPrice,
 			DiscountPrice:    int(goods.DiscountPrice * 100),
@@ -175,7 +202,7 @@ func CreateBatch(c *gin.Context) {
 			PrePickId:   0,
 			ShopId:      goods.ShopId,
 			GoodsName:   goods.Name,
-			GoodsType:   goods.GoodsType,
+			GoodsType:   goodsType,
 			GoodsSpe:    goods.GoodsSpe,
 			Shelves:     goods.Shelves,
 			NeedNum:     0,
@@ -199,7 +226,7 @@ func CreateBatch(c *gin.Context) {
 			})
 		}
 
-		_, ok := shopMap[goods.ShopId]
+		_, ok = shopMap[goods.ShopId]
 		if ok {
 			continue
 		}
@@ -488,8 +515,10 @@ func GetPrePickList(c *gin.Context) {
 		}
 	}
 
+	list := make([]*rsp.PrePick, 0, len(prePicks))
+
 	for _, pick := range prePicks {
-		res.List = append(res.List, &rsp.PrePick{
+		list = append(list, &rsp.PrePick{
 			Id:           pick.Id,
 			ShopCode:     pick.ShopCode,
 			ShopName:     pick.ShopName,
@@ -497,6 +526,8 @@ func GetPrePickList(c *gin.Context) {
 			CategoryInfo: typeMap[pick.ShopId],
 		})
 	}
+
+	res.List = list
 
 	xsq_net.SucJson(c, res)
 
@@ -706,6 +737,9 @@ func BatchPick(c *gin.Context) {
 				GoodsSpe:       goods.GoodsSpe,
 				Shelves:        goods.Shelves,
 				NeedNum:        goods.NeedNum,
+				Number:         goods.Number,
+				ShopId:         goods.ShopId,
+				GoodsType:      goods.GoodsType,
 			})
 		}
 
@@ -879,9 +913,12 @@ func ByAllOrder(form req.MergePickForm) error {
 			PickId:         pick.Id,
 			PrePickGoodsId: goods.Id,
 			GoodsName:      goods.GoodsName,
+			GoodsType:      goods.GoodsType,
 			GoodsSpe:       goods.GoodsSpe,
 			Shelves:        goods.Shelves,
 			NeedNum:        goods.NeedNum,
+			Number:         goods.Number,
+			ShopId:         goods.ShopId,
 		})
 	}
 
@@ -892,28 +929,30 @@ func ByAllOrder(form req.MergePickForm) error {
 		return result.Error
 	}
 
-	for _, remark := range prePickRemarks {
-		//更新预拣货池商品备注使用
-		prePickRemarksIds = append(prePickRemarksIds, remark.Id)
+	if len(prePickRemarks) > 0 {
+		for _, remark := range prePickRemarks {
+			//更新预拣货池商品备注使用
+			prePickRemarksIds = append(prePickRemarksIds, remark.Id)
 
-		pickRemarks = append(pickRemarks, batch.PickRemark{
-			WarehouseId:     form.WarehouseId,
-			BatchId:         form.BatchId,
-			PickId:          pick.Id,
-			PrePickRemarkId: remark.Id,
-			Number:          remark.Number,
-			OrderRemark:     remark.OrderRemark,
-			GoodsRemark:     remark.GoodsRemark,
-			ShopName:        remark.ShopName,
-			Line:            remark.Line,
-		})
-	}
+			pickRemarks = append(pickRemarks, batch.PickRemark{
+				WarehouseId:     form.WarehouseId,
+				BatchId:         form.BatchId,
+				PickId:          pick.Id,
+				PrePickRemarkId: remark.Id,
+				Number:          remark.Number,
+				OrderRemark:     remark.OrderRemark,
+				GoodsRemark:     remark.GoodsRemark,
+				ShopName:        remark.ShopName,
+				Line:            remark.Line,
+			})
+		}
 
-	result = tx.Save(&pickRemarks)
+		result = tx.Save(&pickRemarks)
 
-	if result.Error != nil {
-		tx.Rollback()
-		return result.Error
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
 	}
 
 	//全单拣货，全部状态更新
@@ -1022,9 +1061,12 @@ func ByClassification(form req.MergePickForm) error {
 			PickId:         pick.Id,
 			PrePickGoodsId: goods.Id,
 			GoodsName:      goods.GoodsName,
+			GoodsType:      goods.GoodsType,
 			GoodsSpe:       goods.GoodsSpe,
 			Shelves:        goods.Shelves,
 			NeedNum:        goods.NeedNum,
+			Number:         goods.Number,
+			ShopId:         goods.ShopId,
 		})
 	}
 
@@ -1158,7 +1200,7 @@ func ByGoods(form req.MergePickForm) error {
 	for _, goods := range prePickGoods {
 
 		//只保留相关商品数据
-		if goods.GoodsType != form.TypeParam {
+		if goods.GoodsName != form.TypeParam {
 			continue
 		}
 
@@ -1172,9 +1214,12 @@ func ByGoods(form req.MergePickForm) error {
 			PickId:         pick.Id,
 			PrePickGoodsId: goods.Id,
 			GoodsName:      goods.GoodsName,
+			GoodsType:      goods.GoodsType,
 			GoodsSpe:       goods.GoodsSpe,
 			Shelves:        goods.Shelves,
 			NeedNum:        goods.NeedNum,
+			Number:         goods.Number,
+			ShopId:         goods.ShopId,
 		})
 	}
 
