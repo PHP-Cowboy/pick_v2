@@ -22,6 +22,8 @@ func Post(path string, responseData interface{}) ([]byte, error) {
 		return nil, err
 	}
 
+	fmt.Println(string(jData))
+
 	rq, err := http.NewRequest("POST", url, bytes.NewReader(jData))
 
 	if err != nil {

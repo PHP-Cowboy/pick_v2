@@ -49,17 +49,20 @@ func OrderList(goodsList []*rsp.ApiGoods) []*rsp.OrderList {
 		res[goods.Number] = struct{}{}
 
 		list = append(list, &rsp.OrderList{
-			Number:           goods.Number,
-			PayAt:            goods.PayAt,
-			ShopCode:         goods.ShopCode,
-			ShopName:         goods.ShopName,
-			ShopType:         goods.ShopType,
-			DistributionType: goods.DistributionType,
-			SaleUnit:         goods.SaleUnit,
-			PayCount:         goods.PayCount,
-			Line:             goods.Line,
-			Region:           goods.Province + goods.City + goods.District,
-			OrderRemark:      goods.OrderRemark,
+			Number:            goods.Number,
+			PayAt:             goods.PayAt,
+			ShopCode:          goods.ShopCode,
+			ShopName:          goods.ShopName,
+			ShopType:          goods.ShopType,
+			DistributionType:  goods.DistributionType,
+			SaleUnit:          goods.SaleUnit,
+			PayCount:          goods.PayCount,
+			OutCount:          goods.OutCount,
+			LackCount:         goods.LackCount,
+			Line:              goods.Line,
+			Region:            goods.Province + goods.City + goods.District,
+			OrderRemark:       goods.OrderRemark,
+			LatestPickingTime: goods.LatestPickingTime,
 		})
 	}
 
@@ -81,8 +84,6 @@ func GetOrderDetail(c *gin.Context) {
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
-
-	//OrderDetail(result.Data.List)
 
 	var (
 		mp   = make(map[string]string, 0)
@@ -155,6 +156,7 @@ func OrderDetail(goodsList []*rsp.ApiGoods) rsp.OrderDetail {
 }
 
 func RequestGoodsList(responseData interface{}) (rsp.ApiGoodsListRsp, error) {
+
 	var result rsp.ApiGoodsListRsp
 
 	body, err := request.Post("api/v1/remote/pick/lack/list", responseData)
