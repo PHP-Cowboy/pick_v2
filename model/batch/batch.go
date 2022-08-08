@@ -102,8 +102,9 @@ type Pick struct {
 	OrderNum       int        `gorm:"type:int;not null;comment:订单数"`
 	NeedNum        int        `gorm:"type:int;not null;comment:需拣数量"`
 	PickUser       string     `gorm:"type:varchar(32);default:'';comment:拣货人"`
-	ReviewUser     string     `gorm:"type:varchar(32);default:'';comment:复核人"`
 	TakeOrdersTime *time.Time `gorm:"type:datetime;default:null;comment:接单时间"`
+	ReviewUser     string     `gorm:"type:varchar(32);default:'';comment:复核人"`
+	ReviewTime     *time.Time `gorm:"type:datetime;default:null;comment:复核时间"`
 	Sort           int        `gorm:"type:int(11) unsigned;comment:排序"`
 	Version        int        `gorm:"type:tinyint(1);default:0;comment:版本"`
 	Status         int        `gorm:"type:tinyint;comment:状态"`
@@ -123,6 +124,7 @@ type PickGoods struct {
 	GoodsSpe       string `gorm:"type:varchar(128);comment:商品规格"`
 	Shelves        string `gorm:"type:varchar(64);comment:货架"`
 	NeedNum        int    `gorm:"type:int;not null;comment:需拣数量"`
+	CompleteNum    int    `gorm:"type:int;not null;default:0;comment:已拣数量"`
 }
 
 //拣货备注明细

@@ -221,6 +221,7 @@ func Login(ctx *gin.Context) {
 	xsq_net.SucJson(ctx, gin.H{
 		"token":       token,
 		"userId":      user.Id,
+		"account":     user.Account,
 		"warehouseId": user.WarehouseId,
 	})
 }

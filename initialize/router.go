@@ -31,6 +31,8 @@ func InitRouter() *gin.Engine {
 	router.ShopRoute(group)
 	//数据同步
 	router.ClassRoute(group)
+	//拣货员
+	router.PickerRoute(group)
 
 	return r
 }

@@ -101,3 +101,21 @@ func GetDateTimeEndByDate(dateTimeString, formFormat, toFormat string) (string, 
 func DiffDays(startDateTime, endDateTime time.Time) int64 {
 	return int64(math.Abs(endDateTime.Sub(startDateTime).Hours() / 24))
 }
+
+//获取当前日期前后 days 天 months月 years年 日期
+func GetTimeAroundByNum(days, months, years int) string {
+	t := time.Now().AddDate(years, months, days)
+	return GetZeroTime(t).Format(TimeFormat)
+}
+
+//获取当前日期前后 days 天 日期
+func GetTimeAroundByDays(days int) string {
+	t := time.Now().AddDate(0, 0, days)
+	return GetZeroTime(t).Format(TimeFormat)
+}
+
+//获取当前日期前后 days 天 日期
+func GetTimeAroundByMonths(months int) string {
+	t := time.Now().AddDate(0, months, 0)
+	return GetZeroTime(t).Format(TimeFormat)
+}

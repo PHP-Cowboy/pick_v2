@@ -44,10 +44,11 @@ type GetPickDetailRsp struct {
 }
 
 type PickGoods struct {
-	GoodsName string `json:"goods_name"`
-	GoodsSpe  string `json:"goods_spe"`
-	Shelves   string `json:"shelves"`
-	NeedNum   int    `json:"need_num"`
+	GoodsName   string `json:"goods_name"`
+	GoodsSpe    string `json:"goods_spe"`
+	Shelves     string `json:"shelves"`
+	NeedNum     int    `json:"need_num"`
+	CompleteNum int    `json:"complete_num"`
 }
 
 type PickRemark struct {
