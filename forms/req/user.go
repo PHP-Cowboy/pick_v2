@@ -32,3 +32,7 @@ type BatchDeleteUserForm struct {
 
 type WarehouseUserCountForm struct {
 }
+
+type GetPickerListReq struct {
+	RoleId int `json:"role_id"`
+}

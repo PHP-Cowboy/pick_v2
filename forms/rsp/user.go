@@ -30,3 +30,8 @@ type GetWarehouseUserCountListRsp struct {
 	WarehouseId   int    `json:"warehouse_id"`
 	WarehouseName string `json:"warehouse_name"`
 }
+
+type GetPickerListRsp struct {
+	Id   int    `json:"id"`
+	Name string `json:"name"`
+}

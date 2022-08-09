@@ -20,8 +20,8 @@ type Goods struct {
 
 type GetBatchListForm struct {
 	Paging
-	Status         int    `json:"status" form:"status" validate:"required"` //进行中，已结束
-	ShopId         int    `json:"shop_id" form:"shop_id"`                   //店铺
+	Status         int    `json:"status" form:"status" binding:"required"` //进行中，已结束
+	ShopId         int    `json:"shop_id" form:"shop_id"`                  //店铺
 	GoodsName      string `json:"goods_name" form:"goods_name"`
 	Number         string `json:"number" form:"number"`
 	Line           string `json:"line" form:"line"`
@@ -49,18 +49,18 @@ type ToppingForm struct {
 }
 
 type BatchPickForm struct {
-	BatchId     int      `json:"batch_id" validate:"required"`
-	Ids         []int    `json:"ids" validate:"required"`
-	Type        int      `json:"type" validate:"required,oneof=1 2 3"`
-	TypeParam   []string `json:"type_param" validate:"required"`
+	BatchId     int      `json:"batch_id" binding:"required"`
+	Ids         []int    `json:"ids" binding:"required"`
+	Type        int      `json:"type" binding:"required,oneof=1 2 3"`
+	TypeParam   []string `json:"type_param" binding:"required"`
 	WarehouseId int      `json:"warehouse_id"`
 }
 
 type MergePickForm struct {
-	BatchId     int      `json:"batch_id" validate:"required"`
-	Ids         []int    `json:"ids" validate:"required"`
-	Type        int      `json:"type" validate:"required,oneof=1 2 3"`
-	TypeParam   []string `json:"type_param" validate:"required"`
-	TaskName    string   `json:"task_name" validate:"required"`
+	BatchId     int      `json:"batch_id" binding:"required"`
+	Ids         []int    `json:"ids" binding:"required"`
+	Type        int      `json:"type" binding:"required,oneof=1 2 3"`
+	TypeParam   []string `json:"type_param" binding:"required"`
+	TaskName    string   `json:"task_name" binding:"required"`
 	WarehouseId int      `json:"warehouse_id"`
 }

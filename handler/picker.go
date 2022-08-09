@@ -84,6 +84,7 @@ func CompletePick(c *gin.Context) {
 		return
 	}
 
+	// todo 这里需要做并发处理
 	var (
 		pick      batch.Pick
 		pickGoods []batch.PickGoods
@@ -99,6 +100,11 @@ func CompletePick(c *gin.Context) {
 			return
 		}
 		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	if pick.Status == 1 {
+		xsq_net.ErrorJSON(c, ecode.OrderPickingCompleted)
 		return
 	}
 
@@ -247,12 +253,18 @@ func PickingRecord(c *gin.Context) {
 			outNum = num
 		}
 
+		reviewStatus := "未复核"
+		if p.ReviewTime != nil {
+			reviewStatus = "已复核"
+		}
+
 		list = append(list, rsp.PickingRecord{
 			Id:             p.Id,
 			TaskName:       p.TaskName,
 			TakeOrdersTime: p.TakeOrdersTime.Format(timeutil.TimeFormat),
 			ReviewUser:     p.ReviewUser,
 			OutNum:         outNum,
+			ReviewStatus:   reviewStatus,
 		})
 	}
 
@@ -317,11 +329,13 @@ func PickingRecordDetail(c *gin.Context) {
 		completeTotal += goods.CompleteNum
 		needTotal += goods.NeedNum
 		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.PickGoods{
+			Id:          goods.Id,
 			GoodsName:   goods.GoodsName,
 			GoodsSpe:    goods.GoodsSpe,
 			Shelves:     goods.Shelves,
 			NeedNum:     goods.NeedNum,
 			CompleteNum: goods.CompleteNum,
+			Unit:        goods.Unit,
 		})
 	}
 

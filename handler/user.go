@@ -163,6 +163,9 @@ func Login(ctx *gin.Context) {
 		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
 		return
 	}
+
+	form.Account = strings.Trim(form.Account, " ")
+
 	var (
 		user model.User
 	)
@@ -334,4 +337,35 @@ func GenderPwd(pwd string) string {
 	options := &password.Options{16, 100, 32, sha512.New}
 	salt, encodedPwd := password.Encode(pwd, options)
 	return fmt.Sprintf("pbkdf2-sha512$%s$%s", salt, encodedPwd)
+}
+
+//获取拣货员列表
+func GetPickerList(c *gin.Context) {
+
+	var (
+		form  req.GetPickerListReq
+		users []model.User
+		res   []rsp.GetPickerListRsp
+	)
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	result := global.DB.Model(&model.User{}).Where("role_id = 3").Find(&users)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	for _, u := range users {
+		res = append(res, rsp.GetPickerListRsp{
+			Id:   u.Id,
+			Name: u.Name,
+		})
+	}
+
+	xsq_net.SucJson(c, res)
 }

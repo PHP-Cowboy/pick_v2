@@ -33,6 +33,8 @@ func InitRouter() *gin.Engine {
 	router.ClassRoute(group)
 	//拣货员
 	router.PickerRoute(group)
+	//复核员
+	router.ReviewerRoute(group)
 
 	return r
 }

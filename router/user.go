@@ -13,6 +13,12 @@ func UserRoute(g *gin.RouterGroup) {
 		group.POST("/login", handler.Login)
 	}
 
+	loginGroup := g.Group("/user", middlewares.JWTAuth())
+	{
+		//获取拣货员列表
+		loginGroup.GET("/picker_list", handler.GetPickerList)
+	}
+
 	userGroup := g.Group("/user", middlewares.JWTAuth(), middlewares.IsSuperAdminAuth())
 	{
 		//用户列表
@@ -25,5 +31,6 @@ func UserRoute(g *gin.RouterGroup) {
 		userGroup.GET("/getWarehouseUserCount", handler.GetWarehouseUserCountList)
 		//批量删除用户
 		userGroup.POST("/batch_delete", handler.BatchDeleteUser)
+
 	}
 }
