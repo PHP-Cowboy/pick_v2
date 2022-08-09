@@ -40,6 +40,23 @@ type PickCount struct {
 	PickedCount int `json:"picked_count"`
 }
 
+type Ret struct {
+	OutC      int
+	NeedC     int
+	ShopId    int
+	GoodsType string
+}
+
+type BatchPoolNum struct {
+	Count  int `json:"count"`
+	Status int `json:"status"`
+}
+
+type GetBatchPoolNumRsp struct {
+	Ongoing  int `json:"ongoing"`
+	Finished int `json:"finished"`
+}
+
 type GetPrePickDetailRsp struct {
 	Goods      map[string][]PrePickGoods `json:"goods"`
 	RemarkList []Remark                  `json:"remark_list"`

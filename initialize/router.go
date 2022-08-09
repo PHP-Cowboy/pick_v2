@@ -35,6 +35,8 @@ func InitRouter() *gin.Engine {
 	router.PickerRoute(group)
 	//复核员
 	router.ReviewerRoute(group)
+	//菜单
+	router.MenuRoute(group)
 
 	return r
 }

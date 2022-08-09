@@ -23,3 +23,24 @@ type Role struct {
 	Base
 	Name string `gorm:"type:varchar(32);unique;not null;comment:角色名"`
 }
+
+type UserRole struct {
+	Base
+	UserId int `gorm:"not null;comment:用户id"`
+	RoleId int `gorm:"not null;comment:角色id"`
+}
+
+type Menu struct {
+	Base
+	Type  int    `gorm:"comment:1:菜单,2:功能"`
+	Title string `gorm:"comment:菜单名称"`
+	Path  string `gorm:"comment:路由地址"`
+	PId   int    `gorm:"上级权限id"`
+	Sort  int    `gorm:"排序"`
+}
+
+type RoleMenu struct {
+	Base
+	RoleId int `gorm:"not null;comment:角色id"`
+	MenuId int `gorm:"not null;comment:菜单id"`
+}

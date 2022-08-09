@@ -412,11 +412,40 @@ func GetBatchList(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-type Ret struct {
-	OutC      int
-	NeedC     int
-	ShopId    int
-	GoodsType string
+//批次池数量
+func GetBatchPoolNum(c *gin.Context) {
+	var (
+		batchPool []rsp.BatchPoolNum
+		res       rsp.GetBatchPoolNumRsp
+		ongoing   int
+		finished  int
+	)
+
+	result := global.DB.Model(&batch.Batch{}).
+		Select("count(id) as count, status").
+		Group("status").
+		Find(&batchPool)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	for _, bp := range batchPool {
+		switch bp.Status {
+		case 0: //进行中
+			ongoing = bp.Count
+			break
+		case 1: //已结束
+			finished = bp.Count
+			break
+		}
+	}
+
+	res.Ongoing = ongoing
+	res.Finished = finished
+
+	xsq_net.SucJson(c, res)
 }
 
 //预拣池基础信息
@@ -492,7 +521,7 @@ func GetPrePickList(c *gin.Context) {
 		prePickIds = append(prePickIds, pick.Id)
 	}
 
-	retCount := []Ret{}
+	retCount := []rsp.Ret{}
 
 	result = db.Model(&batch.PrePickGoods{}).
 		Select("SUM(out_count) as outC, SUM(need_num) AS needC, shop_id, goods_type").

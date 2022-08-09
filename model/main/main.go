@@ -70,4 +70,8 @@ func main() {
 	_ = db.Set(model.TableOptions, model.GetOptions("用户表")).AutoMigrate(&model.User{})
 
 	_ = db.Set(model.TableOptions, model.GetOptions("角色表")).AutoMigrate(&model.Role{})
+
+	_ = db.Set(model.TableOptions, model.GetOptions("菜单表")).AutoMigrate(&model.Menu{})
+
+	_ = db.Set(model.TableOptions, model.GetOptions("角色菜单权限表")).AutoMigrate(&model.RoleMenu{})
 }
