@@ -24,6 +24,10 @@ type PickingRecordRsp struct {
 type PickingRecord struct {
 	Id             int    `json:"id"`
 	TaskName       string `json:"task_name"`
+	ShopCode       string `json:"shop_code"`
+	ShopNum        int    `json:"shop_num"`
+	OrderNum       int    `json:"order_num"`
+	NeedNum        int    `json:"need_num"`
 	TakeOrdersTime string `json:"take_orders_time"`
 	ReviewUser     string `json:"review_user"`
 	OutNum         int    `json:"out_num"`

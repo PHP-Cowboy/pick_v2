@@ -261,6 +261,10 @@ func PickingRecord(c *gin.Context) {
 		list = append(list, rsp.PickingRecord{
 			Id:             p.Id,
 			TaskName:       p.TaskName,
+			ShopCode:       p.ShopCode,
+			ShopNum:        p.ShopNum,
+			OrderNum:       p.OrderNum,
+			NeedNum:        p.NeedNum,
 			TakeOrdersTime: p.TakeOrdersTime.Format(timeutil.TimeFormat),
 			ReviewUser:     p.ReviewUser,
 			OutNum:         outNum,
