@@ -72,8 +72,13 @@ type GetBaseRsp struct {
 }
 
 type GetPoolNumRsp struct {
-	PrePickNum  int `json:"pre_pick_num"`
-	PickNum     int `json:"pick_num"`
-	ToReviewNum int `json:"to_review_num"`
-	CompleteNum int `json:"complete_num"`
+	PrePickNum  int64 `json:"pre_pick_num"`
+	PickNum     int   `json:"pick_num"`
+	ToReviewNum int   `json:"to_review_num"`
+	CompleteNum int   `json:"complete_num"`
+}
+
+type PoolNumCount struct {
+	Count  int `json:"count"`
+	Status int `json:"status"`
 }

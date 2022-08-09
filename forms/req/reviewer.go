@@ -12,6 +12,7 @@ type ReviewDetailReq struct {
 
 type ConfirmDeliveryReq struct {
 	Id             int                    `json:"id"`
+	Num            int                    `json:"num" binding:"required"`
 	CompleteReview []CompleteReviewDetail `json:"complete_review"`
 }
 

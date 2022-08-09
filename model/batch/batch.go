@@ -102,6 +102,7 @@ type Pick struct {
 	OrderNum       int        `gorm:"type:int;not null;comment:订单数"`
 	NeedNum        int        `gorm:"type:int;not null;comment:需拣数量"`
 	ReviewNum      int        `gorm:"type:int;not null;comment:复核数量"`
+	Num            int        `gorm:"type:int;not null;comment:件数"`
 	PickUser       string     `gorm:"type:varchar(32);default:'';comment:拣货人"`
 	TakeOrdersTime *time.Time `gorm:"type:datetime;default:null;comment:接单时间"`
 	ReviewUser     string     `gorm:"type:varchar(32);default:'';comment:复核人"`

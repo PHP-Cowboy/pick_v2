@@ -13,6 +13,7 @@ import (
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
+	"time"
 )
 
 //复核列表 通过状态区分是否已完成
@@ -270,8 +271,10 @@ func ConfirmDelivery(c *gin.Context) {
 
 	tx := db.Begin()
 
+	now := time.Now()
+
 	//更新主表
-	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Update("status", 2)
+	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2, "review_time": &now, "input_num": form.Num})
 
 	if result.Error != nil {
 		tx.Rollback()

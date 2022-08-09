@@ -630,13 +630,50 @@ func Topping(c *gin.Context) {
 
 //批次池内单数量
 func GetPoolNum(c *gin.Context) {
-	var res rsp.GetPoolNumRsp
+	var (
+		res                               rsp.GetPoolNumRsp
+		count                             int64
+		poolNumCount                      []rsp.PoolNumCount
+		pickNum, toReviewNum, completeNum int
+	)
+
+	db := global.DB
+
+	result := db.Model(&batch.PrePick{}).Select("id").Where("status = 0").Count(&count)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = db.Model(&batch.Pick{}).
+		Select("count(id) as count, status").
+		Group("status").
+		Find(&poolNumCount)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	for _, pc := range poolNumCount {
+		switch pc.Status {
+		case 0: //待拣货
+			pickNum = pc.Count
+			break
+		case 1: //待复核
+			toReviewNum = pc.Count
+			break
+		case 2: //已完成
+			completeNum = pc.Count
+		}
+	}
 
 	res = rsp.GetPoolNumRsp{
-		PrePickNum:  100,
-		PickNum:     100,
-		ToReviewNum: 100,
-		CompleteNum: 100,
+		PrePickNum:  count,
+		PickNum:     pickNum,
+		ToReviewNum: toReviewNum,
+		CompleteNum: completeNum,
 	}
 
 	xsq_net.SucJson(c, res)
