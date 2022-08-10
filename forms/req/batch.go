@@ -21,7 +21,7 @@ type Goods struct {
 
 type GetBatchListForm struct {
 	Paging
-	Status         int    `json:"status" form:"status" binding:"required"` //进行中，已结束
+	Status         *int   `json:"status" form:"status" binding:"required"` //进行中，已结束
 	ShopId         int    `json:"shop_id" form:"shop_id"`                  //店铺
 	GoodsName      string `json:"goods_name" form:"goods_name"`
 	Number         string `json:"number" form:"number"`

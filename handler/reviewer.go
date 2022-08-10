@@ -274,7 +274,7 @@ func ConfirmDelivery(c *gin.Context) {
 	now := time.Now()
 
 	//更新主表
-	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2, "review_time": &now, "input_num": form.Num})
+	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2, "review_time": &now, "num": form.Num})
 
 	if result.Error != nil {
 		tx.Rollback()
