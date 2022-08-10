@@ -2,6 +2,7 @@ package req
 
 type CreateBatchForm struct {
 	WarehouseId       int     `json:"warehouse_id" form:"warehouse_id"`
+	Number            string  `json:"number"`
 	Lines             string  `json:"lines" form:"lines"`
 	PayEndTime        string  `json:"pay_end_time"  form:"pay_end_time"`
 	DeliveryStartTime string  `json:"delivery_start_time" form:"delivery_start_time"`

@@ -19,7 +19,7 @@ func GetGoodsList(c *gin.Context) {
 	var form req.GetGoodsListForm
 
 	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 	//商品系统接口页数为index
