@@ -148,8 +148,30 @@ func CreateBatch(c *gin.Context) {
 		return
 	}
 
+	var (
+		shopNum, orderNum, goodsNum int
+		shopMp                      = make(map[int]struct{}, 0)
+		orderMp                     = make(map[string]struct{}, 0)
+	)
+
 	//订单相关数据
 	for _, goods := range goodsRes.Data.List {
+		_, sOk := shopMp[goods.ShopId]
+
+		if !sOk {
+			shopMp[goods.ShopId] = struct{}{}
+			shopNum++
+		}
+
+		_, orderOk := orderMp[goods.Number]
+
+		if !orderOk {
+			orderMp[goods.Number] = struct{}{}
+			orderNum++
+		}
+
+		goodsNum += goods.LackCount
+
 		goodsType, ok := mp[goods.SecondType]
 
 		if !ok {
@@ -297,6 +319,14 @@ func CreateBatch(c *gin.Context) {
 			xsq_net.ErrorJSON(c, result.Error)
 			return
 		}
+	}
+
+	result = tx.Model(&batch.Batch{}).Where("id = ?", batches.Id).Updates(map[string]interface{}{"goods_num": goodsNum, "shop_num": shopNum, "order_num": orderNum})
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
 	}
 
 	tx.Commit()
