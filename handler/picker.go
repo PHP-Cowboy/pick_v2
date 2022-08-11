@@ -16,11 +16,12 @@ import (
 	"time"
 )
 
-//接单拣货
+// 接单拣货
 func ReceivingOrders(c *gin.Context) {
 	var (
-		res  rsp.ReceivingOrdersRsp
-		pick batch.Pick
+		res     rsp.ReceivingOrdersRsp
+		pick    batch.Pick
+		batches batch.Batch
 	)
 
 	db := global.DB
@@ -56,6 +57,17 @@ func ReceivingOrders(c *gin.Context) {
 	}
 
 	if result.RowsAffected > 0 {
+		result = db.First(&batches, pick.Id)
+		if result.Error != nil {
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+
+		if batches.Status != 0 {
+			xsq_net.ErrorJSON(c, errors.New("批次不在进行中"))
+			return
+		}
+
 		res.Id = pick.Id
 
 		now := time.Now()
@@ -75,7 +87,7 @@ func ReceivingOrders(c *gin.Context) {
 	}
 }
 
-//完成拣货
+// 完成拣货
 func CompletePick(c *gin.Context) {
 	var form req.CompletePickForm
 
@@ -169,7 +181,7 @@ func CompletePick(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-//剩余数量 放拣货池那边
+// 剩余数量 放拣货池那边
 func RemainingQuantity(c *gin.Context) {
 	var form req.ReceivingOrdersForm
 
@@ -179,7 +191,7 @@ func RemainingQuantity(c *gin.Context) {
 	}
 }
 
-//拣货记录
+// 拣货记录
 func PickingRecord(c *gin.Context) {
 	var (
 		form      req.PickingRecordForm
@@ -230,27 +242,40 @@ func PickingRecord(c *gin.Context) {
 		return
 	}
 
-	pickGoodsMp := make(map[int]int, 0)
+	type Goods struct {
+		CompleteNum      int
+		DistributionType int
+	}
+
+	pickGoodsMp := make(map[int]Goods, 0)
 
 	for _, pg := range pickGoods {
 		_, ok := pickGoodsMp[pg.PickId]
 
+		g := Goods{
+			CompleteNum:      pg.CompleteNum,
+			DistributionType: pg.DistributionType,
+		}
+
 		if !ok {
-			pickGoodsMp[pg.PickId] = pg.CompleteNum
+			pickGoodsMp[pg.PickId] = g
 		} else {
-			pickGoodsMp[pg.PickId] += pg.CompleteNum
+			g.CompleteNum += pickGoodsMp[pg.PickId].CompleteNum
+			pickGoodsMp[pg.PickId] = g
 		}
 	}
 
 	list := make([]rsp.PickingRecord, 0)
 
 	for _, p := range pick {
-		num, ok := pickGoodsMp[p.Id]
+		pgMp, ok := pickGoodsMp[p.Id]
 
 		outNum := 0
+		distributionType := 0
 
 		if ok {
-			outNum = num
+			outNum = pgMp.CompleteNum
+			distributionType = pgMp.DistributionType
 		}
 
 		reviewStatus := "未复核"
@@ -259,16 +284,17 @@ func PickingRecord(c *gin.Context) {
 		}
 
 		list = append(list, rsp.PickingRecord{
-			Id:             p.Id,
-			TaskName:       p.TaskName,
-			ShopCode:       p.ShopCode,
-			ShopNum:        p.ShopNum,
-			OrderNum:       p.OrderNum,
-			NeedNum:        p.NeedNum,
-			TakeOrdersTime: p.TakeOrdersTime.Format(timeutil.TimeFormat),
-			ReviewUser:     p.ReviewUser,
-			OutNum:         outNum,
-			ReviewStatus:   reviewStatus,
+			Id:               p.Id,
+			TaskName:         p.TaskName,
+			ShopCode:         p.ShopCode,
+			ShopNum:          p.ShopNum,
+			OrderNum:         p.OrderNum,
+			NeedNum:          p.NeedNum,
+			TakeOrdersTime:   p.TakeOrdersTime.Format(timeutil.TimeFormat),
+			ReviewUser:       p.ReviewUser,
+			OutNum:           outNum,
+			ReviewStatus:     reviewStatus,
+			DistributionType: distributionType,
 		})
 	}
 
@@ -277,7 +303,7 @@ func PickingRecord(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-//拣货记录明细
+// 拣货记录明细
 func PickingRecordDetail(c *gin.Context) {
 	var (
 		form req.PickingRecordDetailForm

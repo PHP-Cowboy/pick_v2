@@ -19,6 +19,15 @@ type Goods struct {
 	Name string `json:"name" form:"name"`
 }
 
+type StopPickForm struct {
+	Id     int  `json:"id" binding:"required"`
+	Status *int `json:"status" binding:"required,oneof=0 2"`
+}
+
+type EndBatchForm struct {
+	Id int `json:"id" binding:"required"`
+}
+
 type GetBatchListForm struct {
 	Paging
 	Status         *int   `json:"status" form:"status" binding:"required"` //进行中，已结束

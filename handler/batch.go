@@ -22,7 +22,7 @@ import (
 	"time"
 )
 
-//生成拣货批次
+// 生成拣货批次
 func CreateBatch(c *gin.Context) {
 	var form req.CreateBatchForm
 
@@ -195,20 +195,21 @@ func CreateBatch(c *gin.Context) {
 		})
 
 		prePickGoods = append(prePickGoods, &batch.PrePickGoods{
-			WarehouseId: form.WarehouseId,
-			BatchId:     batches.Id,
-			OrderInfoId: goods.Id,
-			Number:      goods.Number,
-			PrePickId:   0,
-			ShopId:      goods.ShopId,
-			GoodsName:   goods.Name,
-			GoodsType:   goodsType,
-			GoodsSpe:    goods.GoodsSpe,
-			Shelves:     goods.Shelves,
-			NeedNum:     0,
-			CloseNum:    goods.CloseCount,
-			OutCount:    goods.OutCount,
-			NeedOutNum:  0,
+			WarehouseId:      form.WarehouseId,
+			BatchId:          batches.Id,
+			OrderInfoId:      goods.Id,
+			Number:           goods.Number,
+			PrePickId:        0,
+			ShopId:           goods.ShopId,
+			DistributionType: goods.DistributionType,
+			GoodsName:        goods.Name,
+			GoodsType:        goodsType,
+			GoodsSpe:         goods.GoodsSpe,
+			Shelves:          goods.Shelves,
+			NeedNum:          0,
+			CloseNum:         goods.CloseCount,
+			OutCount:         goods.OutCount,
+			NeedOutNum:       0,
 		})
 
 		if goods.GoodsRemark != "" || goods.OrderRemark != "" {
@@ -303,7 +304,74 @@ func CreateBatch(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-//获取批次列表
+// 结束拣货批次
+func EndBatch(c *gin.Context) {
+	var form req.EndBatchForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var (
+		batches batch.Batch
+	)
+
+	db := global.DB
+
+	result := db.First(&batches, form.Id)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//todo 请求接口 释放锁单
+
+	xsq_net.Success(c)
+}
+
+// 变更批次状态
+func ChangeBatch(c *gin.Context) {
+	//todo 把状态为0的更新为停止拣货，其他的正常操作
+	var form req.StopPickForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var batches batch.Batch
+
+	db := global.DB
+
+	result := db.First(&batches, form.Id)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//默认为更新为进行中
+	updateStatus := 0
+
+	if *form.Status == 0 {
+		//如果传递过来的是进行中，则更新为暂停
+		updateStatus = 2
+	}
+
+	//查询条件是传递过来的值
+	result = db.Model(&batch.Batch{}).Where("id = ? and status = ?", form.Id, form.Status).Update("status", updateStatus)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	xsq_net.Success(c)
+}
+
+// 获取批次列表
 func GetBatchList(c *gin.Context) {
 	var (
 		form req.GetBatchListForm
@@ -412,7 +480,7 @@ func GetBatchList(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-//批次池数量
+// 批次池数量
 func GetBatchPoolNum(c *gin.Context) {
 	var (
 		batchPool []rsp.BatchPoolNum
@@ -448,7 +516,7 @@ func GetBatchPoolNum(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-//预拣池基础信息
+// 预拣池基础信息
 func GetBase(c *gin.Context) {
 
 	var (
@@ -486,7 +554,7 @@ func GetBase(c *gin.Context) {
 	xsq_net.SucJson(c, ret)
 }
 
-//预拣池列表
+// 预拣池列表
 func GetPrePickList(c *gin.Context) {
 	var (
 		form req.GetPrePickListForm
@@ -562,7 +630,7 @@ func GetPrePickList(c *gin.Context) {
 
 }
 
-//预拣货明细
+// 预拣货明细
 func GetPrePickDetail(c *gin.Context) {
 	var (
 		form req.GetPrePickDetailForm
@@ -625,7 +693,7 @@ func GetPrePickDetail(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-//置顶
+// 置顶
 func Topping(c *gin.Context) {
 	var form req.ToppingForm
 
@@ -657,7 +725,7 @@ func Topping(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-//批次池内单数量
+// 批次池内单数量
 func GetPoolNum(c *gin.Context) {
 	var (
 		res                               rsp.GetPoolNumRsp
@@ -708,7 +776,7 @@ func GetPoolNum(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-//批量拣货
+// 批量拣货
 func BatchPick(c *gin.Context) {
 	var (
 		form req.BatchPickForm
@@ -887,7 +955,7 @@ func BatchPickAll(form req.BatchPickForm) error {
 	return nil
 }
 
-//批量拣货-按照分类
+// 批量拣货-按照分类
 func BatchPickByClassification(form req.BatchPickForm) error {
 	db := global.DB
 	var (
@@ -1234,7 +1302,7 @@ func BatchPickByGoods(form req.BatchPickForm) error {
 	return nil
 }
 
-//合并拣货
+// 合并拣货
 func MergePick(c *gin.Context) {
 	var form req.MergePickForm
 
@@ -1269,7 +1337,7 @@ func MergePick(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-//全单拣货
+// 全单拣货
 func ByAllOrder(form req.MergePickForm) error {
 	var (
 		prePickGoods   []batch.PrePickGoods
@@ -1421,7 +1489,7 @@ func ByAllOrder(form req.MergePickForm) error {
 	return nil
 }
 
-//按分类拣货
+// 按分类拣货
 func ByClassification(form req.MergePickForm) error {
 	var (
 		prePickGoods   []batch.PrePickGoods
@@ -1587,7 +1655,7 @@ func ByClassification(form req.MergePickForm) error {
 	return nil
 }
 
-//按单品拣货
+// 按单品拣货
 func ByGoods(form req.MergePickForm) error {
 	var (
 		prePickGoods   []batch.PrePickGoods

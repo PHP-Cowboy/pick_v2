@@ -14,17 +14,7 @@ import (
 	"pick_v2/utils/xsq_net"
 )
 
-//停止拣货
-func StopPick() {
-
-}
-
-//终止拣货
-func TerminatePick() {
-
-}
-
-//置顶
+// 置顶
 func PickTopping(c *gin.Context) {
 	var form req.PickToppingForm
 
@@ -56,7 +46,7 @@ func PickTopping(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-//拣货池列表
+// 拣货池列表
 func PickList(c *gin.Context) {
 	var form req.PickListForm
 
@@ -136,7 +126,7 @@ func PickList(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-//拣货明细
+// 拣货明细
 func GetPickDetail(c *gin.Context) {
 	var (
 		form req.GetPickDetailForm

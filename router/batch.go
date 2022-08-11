@@ -13,6 +13,10 @@ func BatchRoute(g *gin.RouterGroup) {
 		batchGroup.GET("/list", handler.GetBatchList)
 		//创建批次
 		batchGroup.POST("/create", handler.CreateBatch)
+		//停止拣货
+		batchGroup.POST("/change", handler.ChangeBatch)
+		//结束批次
+		batchGroup.POST("/end", handler.EndBatch)
 		//批次池数量
 		batchGroup.GET("/batch_pool_num", handler.GetBatchPoolNum)
 		//预拣池基础信息

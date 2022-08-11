@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"pick_v2/common/constant"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
@@ -11,12 +13,14 @@ import (
 	"pick_v2/model"
 	"pick_v2/model/batch"
 	"pick_v2/utils/ecode"
+	"pick_v2/utils/str_util"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
+	"strconv"
 	"time"
 )
 
-//复核列表 通过状态区分是否已完成
+// 复核列表 通过状态区分是否已完成
 func ReviewList(c *gin.Context) {
 	var (
 		form          req.ReviewListReq
@@ -83,7 +87,7 @@ func ReviewList(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-//复核明细
+// 复核明细
 func ReviewDetail(c *gin.Context) {
 	var (
 		form req.ReviewDetailReq
@@ -197,7 +201,7 @@ func ReviewDetail(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-//确认出库
+// 确认出库
 func ConfirmDelivery(c *gin.Context) {
 	var (
 		form req.ConfirmDeliveryReq
@@ -269,12 +273,29 @@ func ConfirmDelivery(c *gin.Context) {
 		pickGoods[k].ReviewNum = num
 	}
 
-	tx := db.Begin()
-
 	now := time.Now()
 
+	dateStr := strconv.Itoa(now.Year()) + now.Format("01") + strconv.Itoa(now.Day())
+
+	//redis
+	redis := global.Redis
+
+	redisKey := constant.DELIVERY_ORDER_NO + dateStr
+
+	val, err := redis.Do(context.Background(), "incr", redisKey).Result()
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	number := strconv.Itoa(int(val.(int64)))
+
+	deliveryOrderNo := str_util.StrPad(number, 3, "0", 0)
+
+	tx := db.Begin()
+
 	//更新主表
-	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2, "review_time": &now, "num": form.Num})
+	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2, "review_time": &now, "num": form.Num, "delivery_order_no": deliveryOrderNo})
 
 	if result.Error != nil {
 		tx.Rollback()
@@ -289,6 +310,8 @@ func ConfirmDelivery(c *gin.Context) {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
+
+	//todo 判断批次是否结束，如果已结束则推送到u8 推订货系统告知订单出货情况
 
 	tx.Commit()
 
