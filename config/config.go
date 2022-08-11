@@ -1,11 +1,12 @@
 package config
 
 type ServerConfig struct {
-	Port      int            `mapstructure:"port" json:"port"`
-	MysqlInfo MysqlConfig    `mapstructure:"mysql" json:"mysql"`
-	JwtInfo   JWTConfig      `mapstructure:"jwt" json:"jwt"`
-	RedisInfo RedisConfig    `mapstructure:"redis" json:"redis"`
-	GoodsApi  GoodsApiConfig `mapstructure:"goods_api" json:"goods_api"`
+	Port       int            `mapstructure:"port" json:"port"`
+	MysqlInfo  MysqlConfig    `mapstructure:"mysql" json:"mysql"`
+	JwtInfo    JWTConfig      `mapstructure:"jwt" json:"jwt"`
+	RedisInfo  RedisConfig    `mapstructure:"redis" json:"redis"`
+	GoodsApi   GoodsApiConfig `mapstructure:"goods_api" json:"goods_api"`
+	YongSender string         `mapstructure:"yong_sender" json:"yong_sender"`
 }
 
 type MysqlConfig struct {
