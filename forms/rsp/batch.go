@@ -63,13 +63,14 @@ type GetPrePickDetailRsp struct {
 }
 
 type PrePickGoods struct {
-	GoodsName  string `json:"goods_name"`
-	GoodsSpe   string `json:"goods_spe"`
-	Shelves    string `json:"shelves"`
-	NeedNum    int    `json:"need_num"`
-	CloseNum   int    `json:"close_num"`
-	OutCount   int    `json:"out_count"`
-	NeedOutNum int    `json:"need_out_num"`
+	GoodsName   string `json:"goods_name"`
+	GoodsSpe    string `json:"goods_spe"`
+	Shelves     string `json:"shelves"`
+	NeedNum     int    `json:"need_num"`
+	CloseNum    int    `json:"close_num"`
+	OutCount    int    `json:"out_count"`
+	NeedOutNum  int    `json:"need_out_num"`
+	GoodsRemark string `json:"goods_remark"`
 }
 
 type Remark struct {
@@ -98,4 +99,38 @@ type GetPoolNumRsp struct {
 type PoolNumCount struct {
 	Count  int `json:"count"`
 	Status int `json:"status"`
+}
+
+type PrintCallGetRsp struct {
+	ShopName    string             `json:"shop_name"`    //门店名称
+	JHNumber    string             `json:"jh_number"`    //拣货订单号
+	PickName    string             `json:"pick_name"`    //拣货人
+	ShopType    string             `json:"shop_type"`    //门店类型
+	CheckName   string             `json:"check_name"`   //复核员
+	HouseName   string             `json:"house_name"`   //仓库编码
+	Delivery    string             `json:"delivery"`     //配送方式
+	OrderRemark string             `json:"order_remark"` //订单备注
+	Consignee   string             `json:"consignee"`    //收件人
+	Shop_code   string             `json:"shop_code"`    //门店编码
+	Packages    int                `json:"packages"`     //件数
+	Phone       string             `json:"phone"`        //收货电话
+	PriType     int                `json:"pri_type"`     // 1-全部打印 2-打印箱单 3-打印出库单 第一次全打，后边的前段选
+	GoodsList   []CallGetGoodsView `json:"goods_list"`   //商品信息
+}
+
+type CallGetGoodsView struct {
+	SaleNumber  string         `json:"sale_number"`
+	Date        string         `json:"date"`
+	OrderRemark string         `json:"order_remark"`
+	List        []CallGetGoods `json:"list"`
+}
+
+type CallGetGoods struct {
+	GoodsName    string `json:"goods_name"`
+	GoodsSpe     string `json:"goods_spe"`
+	GoodsCount   int    `json:"sale_count"`     //订量
+	RealOutCount int    `json:"real_out_count"` //出量
+	GoodsUnit    string `json:"goods_unit"`     //主计量单位
+	Price        int64  `json:"price"`
+	LackCount    int    `json:"lack_count"` //欠货数量
 }

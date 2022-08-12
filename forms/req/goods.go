@@ -1,6 +1,6 @@
 package req
 
-//pay_range,batch_number,de_start,de_end
+// pay_range,batch_number,de_start,de_end
 type GetGoodsListForm struct {
 	Paging
 	PickSta      *int   `json:"pick_sta" form:"pick_sta" binding:"required,oneof=0 1 2"`
@@ -21,4 +21,31 @@ type GetGoodsListForm struct {
 
 type GetOrderDetailForm struct {
 	Number string `json:"number" form:"number" binding:"required"`
+}
+
+type OrderShippingRecordReq struct {
+	DeliveryOrderNo []string `json:"delivery_order_no" form:"delivery_order_no"`
+}
+
+type ShippingRecordDetailReq struct {
+	Id int `json:"id" form:"id"`
+}
+
+type CompleteOrderReq struct {
+	Paging
+	Number         string `json:"number"` //订单号
+	ShopId         int    `json:"shop_id"`
+	Sku            string `json:"sku"`
+	Line           string `json:"line"`
+	DeliveryMethod int    `json:"delivery_method"`
+	ShopType       string `json:"shop_type"` //门店类型
+	Province       string `json:"province"`
+	City           string `json:"city"`
+	District       string `json:"district"`
+	IsRemark       int    `json:"is_remark"`
+	PayAt          string `json:"pay_at"`
+}
+
+type CompleteOrderDetailReq struct {
+	Number string `json:"number" form:"number" binding:"required"` //订单号
 }

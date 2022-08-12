@@ -137,7 +137,7 @@ func CompletePick(c *gin.Context) {
 	pickGoodsMap := make(map[int]int, len(form.CompletePick))
 
 	for _, cp := range form.CompletePick {
-		pickGoodsMap[cp.PickGoodsId] = cp.CompleteNum
+		pickGoodsMap[cp.Id] = cp.CompleteNum
 	}
 
 	result = db.Where("pick_id = ?", form.PickId).Find(&pickGoods)
@@ -159,16 +159,23 @@ func CompletePick(c *gin.Context) {
 
 	tx := db.Begin()
 
-	//更新主表
-	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Update("status", 1)
+	status := 1
 
-	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
+	if form.Type == 2 { //无需拣货
+		status = 2
+	} else {
+		//正常拣货的更新拣货数量，无需拣货不更新
+		result = tx.Save(&pickGoods)
+
+		if result.Error != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
 	}
 
-	result = tx.Save(&pickGoods)
+	//更新主表
+	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Update("status", status)
 
 	if result.Error != nil {
 		tx.Rollback()
@@ -201,6 +208,11 @@ func PickingRecord(c *gin.Context) {
 		pickIds   []int
 	)
 
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
 	claims, ok := c.Get("claims")
 
 	if !ok {
@@ -215,7 +227,15 @@ func PickingRecord(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Where("pick_user = ? and take_orders_time >= ?", userInfo.Name, towDaysAgo).Find(&pick)
+	local := db.Where("pick_user = ? and take_orders_time >= ?", userInfo.Name, towDaysAgo)
+
+	if form.Status == 0 {
+		local.Where("status = ?", form.Status)
+	} else {
+		local.Where("status != 0")
+	}
+
+	result := local.Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -224,7 +244,7 @@ func PickingRecord(c *gin.Context) {
 
 	res.Total = result.RowsAffected
 
-	result = db.Where("pick_user = ? and take_orders_time >= ?", userInfo.Name, towDaysAgo).Scopes(model.Paginate(form.Page, form.Size)).Find(&pick)
+	result = local.Scopes(model.Paginate(form.Page, form.Size)).Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -295,6 +315,7 @@ func PickingRecord(c *gin.Context) {
 			OutNum:           outNum,
 			ReviewStatus:     reviewStatus,
 			DistributionType: distributionType,
+			IsRemark:         false,
 		})
 	}
 

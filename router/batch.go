@@ -15,6 +15,8 @@ func BatchRoute(g *gin.RouterGroup) {
 		batchGroup.POST("/create", handler.CreateBatch)
 		//停止拣货
 		batchGroup.POST("/change", handler.ChangeBatch)
+		//当前批次是否有接单
+		batchGroup.GET("/is_pick", handler.IsPick)
 		//结束批次
 		batchGroup.POST("/end", handler.EndBatch)
 		//批次池数量

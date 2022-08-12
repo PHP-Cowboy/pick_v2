@@ -58,3 +58,40 @@ type OrderInfo struct {
 	PayAt            string `gorm:"type:datetime;comment:支付时间"`
 	LackCount        int    `gorm:"type:int;comment:欠货数量"`
 }
+
+// 完成订单表
+type CompleteOrder struct {
+	model.Base
+	Number         string    `gorm:"type:varchar(64);unique;comment:订单编号"`
+	OrderRemark    string    `gorm:"type:varchar(512);comment:订单备注"`
+	ShopId         int       `gorm:"type:int(11);not null;comment:店铺id"`
+	ShopName       string    `gorm:"type:varchar(64);not null;comment:店铺名称"`
+	ShopType       string    `gorm:"type:varchar(64);not null;comment:店铺类型"`
+	ShopCode       string    `gorm:"type:varchar(255);not null;comment:店铺编号"`
+	Line           string    `gorm:"type:varchar(255);not null;comment:线路"`
+	DeliveryMethod int       `gorm:"type:tinyint;not null;comment:配送方式"`
+	PayCount       int       `gorm:"comment:下单数量"`
+	CloseCount     int       `gorm:"type:int;comment:关闭数量"`
+	OutCount       int       `gorm:"type:int;comment:出库数量"`
+	Province       string    `gorm:"type:varchar(64);comment:省"`
+	City           string    `gorm:"type:varchar(64);comment:市"`
+	District       string    `gorm:"type:varchar(64);comment:区"`
+	PickTime       time.Time `gorm:"type:datetime;not null;comment:最近拣货时间"`
+	PayAt          string    `gorm:"type:datetime;comment:支付时间"`
+}
+
+// 完成订单明细表
+type CompleteOrderDetail struct {
+	model.Base
+	Number          string `gorm:"type:varchar(64);index;comment:订单编号"`
+	Name            string `gorm:"type:varchar(64);comment:商品名称"`
+	Sku             string `gorm:"type:varchar(64);comment:sku"`
+	GoodsSpe        string `gorm:"type:varchar(128);comment:商品规格"`
+	GoodsType       string `gorm:"type:varchar(64);comment:商品类型"`
+	Shelves         string `gorm:"type:varchar(64);comment:货架"`
+	PayCount        int    `gorm:"comment:下单数量"`
+	CloseCount      int    `gorm:"type:int;comment:关闭数量"`
+	ReviewCount     int    `gorm:"type:int;comment:出库数量"`
+	GoodsRemark     string `gorm:"type:varchar(255);comment:商品备注"`
+	DeliveryOrderNo string `gorm:"type:varchar(16);comment:出库单号"`
+}

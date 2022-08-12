@@ -105,3 +105,51 @@ type GoodsDetail struct {
 	LackCount   int    `json:"need_count"` //欠货数量(需出数量)
 	GoodsRemark string `json:"goods_remark"`
 }
+
+type OrderShippingRecordRsp struct {
+	List []OrderShippingRecord `json:"list"`
+}
+
+type OrderShippingRecord struct {
+	Id              int    `json:"id"`
+	TakeOrdersTime  string `json:"take_orders_time"`
+	PickUser        string `json:"pick_user"`
+	ReviewUser      string `json:"review_user"`
+	ReviewTime      string `json:"review_time"`
+	ReviewNum       int    `json:"review_num"`
+	DeliveryOrderNo string `json:"delivery_order_no"`
+}
+
+type ShippingRecordDetailRsp struct {
+}
+
+type CompleteOrderRsp struct {
+	Total int64           `json:"total"`
+	List  []CompleteOrder `json:"list"`
+}
+
+type CompleteOrder struct {
+	Number      string `json:"number"`
+	PayAt       string `json:"pay_at"`
+	ShopCode    string `json:"shop_code"`
+	ShopName    string `json:"shop_name"`
+	ShopType    string `json:"shop_type"`
+	PayCount    int    `json:"pay_count"`
+	OutCount    int    `json:"out_count"`
+	CloseCount  int    `json:"close_count"`
+	Line        string `json:"line"`
+	Region      string `json:"region"`
+	PickTime    string `json:"pick_time"`
+	OrderRemark string `json:"order_remark"`
+}
+
+type CompleteOrderDetailRsp struct {
+	ShopName    string                    `json:"shop_name"`
+	ShopCode    string                    `json:"shop_code"`
+	Line        string                    `json:"line"`
+	Region      string                    `json:"regin"`
+	ShopType    string                    `json:"shop_type"`
+	Number      string                    `json:"number"`
+	OrderRemark string                    `json:"order_remark"`
+	Goods       map[string][]PrePickGoods `json:"goods"`
+}

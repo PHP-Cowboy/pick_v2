@@ -74,4 +74,9 @@ func main() {
 	_ = db.Set(model.TableOptions, model.GetOptions("菜单表")).AutoMigrate(&model.Menu{})
 
 	_ = db.Set(model.TableOptions, model.GetOptions("角色菜单权限表")).AutoMigrate(&model.RoleMenu{})
+
+	_ = db.Set(model.TableOptions, model.GetOptions("完成订单表")).AutoMigrate(&order.CompleteOrder{})
+
+	_ = db.Set(model.TableOptions, model.GetOptions("完成订单明细表")).AutoMigrate(&order.CompleteOrderDetail{})
+
 }

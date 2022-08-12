@@ -2,7 +2,7 @@ package handler
 
 import (
 	"go.uber.org/zap"
-	"io/ioutil"
+	"io"
 	"math"
 	"net/http"
 	"pick_v2/global"
@@ -16,7 +16,10 @@ import (
 )
 
 type PickGoodsView struct {
-	SaleNumber   string      `json:"sale_number"`   //销售单号
+	SaleNumber   string      `json:"sale_number"` //销售单号
+	ShopId       int64       `json:"shop_id"`
+	ShopName     string      `json:"shop_name"`
+	HouseCode    string      `json:"houseCode"`
 	Date         string      `json:"date"`          //日期
 	Remark       string      `json:"remark"`        //备注
 	DeliveryType int         `json:"delivery_type"` //配送方式 0-暂无 1-公司配送 2-用户自提 3-三方物流
@@ -25,34 +28,16 @@ type PickGoodsView struct {
 }
 
 type PickGoods struct {
-	GoodsLogId   int64  `json:"goods_log_id"`
-	GoodsName    string `json:"goods_name"`   //
-	Sku          string `json:"sku"`          //
-	Price        int64  `json:"price"`        //
-	NoTaxPrice   int64  `json:"no_tax_price"` //
-	GoodsSpe     string `json:"goods_spe"`    //
-	Shelves      string `json:"shelves"`      //
-	GoodsCount   int    `json:"goods_count"`  //
-	PickCount    int    `json:"pick_count"`
+	GoodsName    string `json:"goods_name"`     //
+	Sku          string `json:"sku"`            //
+	Price        int64  `json:"price"`          //
+	GoodsSpe     string `json:"goods_spe"`      //
+	Shelves      string `json:"shelves"`        //
 	RealOutCount int    `json:"real_out_count"` //
-	GoodsType    string `json:"goods_type"`     //商品分类
 	MasterCode   string `json:"master_code"`    //主计量单位编码
-	SlaveCode    string `json:"slave_code"`     //辅计量单位编码
-	GoodsUnit    string `json:"goods_unit"`     //主计量单位
-	SlaveUnit    string `json:"slave_unit"`     //辅计量单位
-	BeforeCount  int    `json:"before_count"`   //复核数修改前数量
-}
-
-type SyncOrder struct {
-	PickIdCh   chan int64
-	ShopIdCh   chan int64
-	xmlModelCh chan xmlModel
-}
-
-type xmlModel struct {
-	Id       int64
-	SendTime time.Time
-	xml      string
+	SlaveCode    string `json:"slave_code"`     //辅计量单位编码 sale_code
+	GoodsUnit    string `json:"goods_unit"`     //主计量单位 goods_unit
+	SlaveUnit    string `json:"slave_unit"`     //辅计量单位 sale_unit
 }
 
 func SendShopXml(xml string) string {
@@ -79,7 +64,7 @@ func SendShopXml(xml string) string {
 	}
 	defer response.Body.Close()
 
-	rspBody, err = ioutil.ReadAll(response.Body)
+	rspBody, err = io.ReadAll(response.Body)
 	if err != nil {
 		zap.S().Info("请求用友失败2", err)
 		return ""

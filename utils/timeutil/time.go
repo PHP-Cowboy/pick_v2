@@ -8,6 +8,7 @@ import (
 const (
 	MonthFormat     = "2006-01"
 	DateFormat      = "2006-01-02"
+	DateIntFormat   = "20060102"
 	TimeFormat      = "2006-01-02 15:04:05"
 	TimeFormNoSplit = "20060102150405"
 	TimeZoneFormat  = "2006-01-02T15:04:05+08:00"

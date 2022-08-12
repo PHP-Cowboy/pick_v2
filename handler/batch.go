@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
 	"pick_v2/common/constant"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
@@ -15,6 +17,7 @@ import (
 	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/helper"
+	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"strconv"
@@ -344,7 +347,9 @@ func EndBatch(c *gin.Context) {
 	}
 
 	var (
-		batches batch.Batch
+		batches   batch.Batch
+		pickGoods []batch.PickGoods
+		orderInfo []order.OrderInfo
 	)
 
 	db := global.DB
@@ -356,9 +361,118 @@ func EndBatch(c *gin.Context) {
 		return
 	}
 
+	if batches.Status != 2 {
+		xsq_net.ErrorJSON(c, errors.New("请先停止拣货"))
+		return
+	}
+
+	//修改批次状态为已结束
+	result = db.Model(&batch.Batch{}).Where("id = ?", batches.Id).Updates(map[string]interface{}{"status": 1})
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
 	//todo 请求接口 释放锁单
 
+	//查询批次下全部订单
+	result = db.Model(&batch.PickGoods{}).Where("batch_id = ?", form.Id).Find(&pickGoods)
+	if result.Error != nil {
+		zap.S().Info(result.Error)
+		xsq_net.ErrorJSON(c, errors.New("批次结束成功，但推送u8拣货数据查询失败"))
+		return
+	}
+
+	numbers := []string{}
+
+	mpGoods := make(map[string]batch.PickGoods, 0)
+
+	for _, good := range pickGoods {
+		numbers = append(numbers, good.Number)
+		//订单数据
+		//step1 map[number+sku]{...}
+		mpGoods[good.Number+good.Sku] = good
+		//step2 合并到 map[number][]PickGoods{...}
+	}
+	//去重
+	numbers = slice.UniqueStringSlice(numbers)
+
+	result = db.Model(&order.OrderInfo{}).Where("number in (?)", numbers).Find(&orderInfo)
+	if result.Error != nil {
+		zap.S().Info(result.Error)
+		xsq_net.ErrorJSON(c, errors.New("批次结束成功，但推送u8订单数据查询失败"))
+		return
+	}
+
+	mpPgv := make(map[string]PickGoodsView, 0)
+
+	for _, info := range orderInfo {
+		mp, goodsOk := mpGoods[info.Number+info.Sku]
+
+		if !goodsOk { //订单商品未拣货
+			continue
+		}
+
+		pgv, ok := mpPgv[info.Number]
+
+		if !ok {
+			pgv = PickGoodsView{}
+		}
+		pgv.SaleNumber = info.Number
+		pgv.ShopId = int64(info.ShopId)
+		pgv.ShopName = info.ShopName
+		pgv.Date = info.PayAt
+		pgv.Remark = info.OrderRemark
+		pgv.DeliveryType = info.DistributionType //配送方式
+		pgv.Line = info.Line
+		pgv.List = append(pgv.List, PickGoods{
+			GoodsName:    mp.GoodsName,
+			Sku:          mp.Sku,
+			Price:        int64(info.OriginalPrice),
+			GoodsSpe:     mp.GoodsSpe,
+			Shelves:      mp.Shelves,
+			RealOutCount: mp.ReviewNum,
+			SlaveCode:    info.SaleCode,
+			GoodsUnit:    info.GoodsUnit,
+			SlaveUnit:    info.SaleUnit,
+		})
+	}
+
+	for _, view := range mpPgv {
+		//推送u8
+		xml := GenU8Xml(view, view.ShopId, view.ShopName, view.HouseCode) //店铺属性中获 HouseCode
+		SendShopXml(xml)
+	}
+
 	xsq_net.Success(c)
+}
+
+// 当前批次是否有接单
+func IsPick(c *gin.Context) {
+	var (
+		form   req.EndBatchForm
+		pick   batch.Pick
+		status bool
+	)
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	result := global.DB.Where("batch_id = ? and pick_user != ''", form.Id).First(&pick)
+
+	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	if pick.Id > 0 {
+		status = true
+	}
+
+	xsq_net.SucJson(c, gin.H{"status": status})
 }
 
 // 变更批次状态
@@ -1850,4 +1964,40 @@ func ByGoods(form req.MergePickForm) error {
 	}
 
 	return nil
+}
+
+func PrintCallGet(c *gin.Context) {
+	var (
+		form req.PrintCallGetReq
+	)
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var (
+		pick      batch.Pick
+		pickGoods []batch.PickGoods
+	)
+
+	db := global.DB
+
+	result := db.First(&pick)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = db.Model(&batch.PickGoods{}).Where("pick_id = ?", pick.Id).Find(&pickGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	res := make([]rsp.PrintCallGetRsp, 0, 1)
+
+	xsq_net.SucJson(c, res)
 }

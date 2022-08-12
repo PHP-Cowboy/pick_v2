@@ -33,4 +33,5 @@ type PickingRecord struct {
 	OutNum           int    `json:"out_num"`
 	ReviewStatus     string `json:"review_status"`
 	DistributionType int    `json:"distribution_type"`
+	IsRemark         bool   `json:"is_remark"`
 }

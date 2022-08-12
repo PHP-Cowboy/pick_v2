@@ -25,7 +25,7 @@ type StopPickForm struct {
 }
 
 type EndBatchForm struct {
-	Id int `json:"id" binding:"required"`
+	Id int `json:"id" form:"id" binding:"required"`
 }
 
 type GetBatchListForm struct {
@@ -73,4 +73,8 @@ type MergePickForm struct {
 	TypeParam   []string `json:"type_param" binding:"required"`
 	TaskName    string   `json:"task_name" binding:"required"`
 	WarehouseId int      `json:"warehouse_id"`
+}
+
+type PrintCallGetReq struct {
+	HouseCode string `json:"house_code" binding:"required"`
 }

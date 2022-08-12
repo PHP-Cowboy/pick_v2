@@ -220,6 +220,7 @@ func ConfirmDelivery(c *gin.Context) {
 
 	db := global.DB
 
+	//根据id获取拣货数据
 	result := db.First(&pick, form.Id)
 
 	if result.Error != nil {
@@ -250,12 +251,14 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
+	//复核拣货数量数据 构造map 最终构造成db的save参数
 	pickGoodsMap := make(map[int]int, len(form.CompleteReview))
 
 	for _, cp := range form.CompleteReview {
 		pickGoodsMap[cp.PickGoodsId] = cp.ReviewNum
 	}
 
+	//获取拣货商品数据
 	result = db.Where("pick_id = ?", form.Id).Find(&pickGoods)
 
 	if result.Error != nil {
@@ -280,6 +283,7 @@ func ConfirmDelivery(c *gin.Context) {
 	//redis
 	redis := global.Redis
 
+	//出库单号key
 	redisKey := constant.DELIVERY_ORDER_NO + dateStr
 
 	val, err := redis.Do(context.Background(), "incr", redisKey).Result()
@@ -290,6 +294,7 @@ func ConfirmDelivery(c *gin.Context) {
 
 	number := strconv.Itoa(int(val.(int64)))
 
+	//填充出库单号编码
 	deliveryOrderNo := str_util.StrPad(number, 3, "0", 0)
 
 	tx := db.Begin()
@@ -303,6 +308,7 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
+	//更新拣货商品数据
 	result = tx.Save(&pickGoods)
 
 	if result.Error != nil {
@@ -311,9 +317,14 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
+	//拆单 -打印
+
 	//todo 判断批次是否结束，如果已结束则推送到u8 推订货系统告知订单出货情况
 
 	tx.Commit()
 
 	xsq_net.Success(c)
+}
+
+type name struct {
 }

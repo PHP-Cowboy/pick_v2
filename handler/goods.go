@@ -3,8 +3,16 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
+	"pick_v2/global"
+	"pick_v2/model"
+	"pick_v2/model/batch"
+	"pick_v2/model/order"
 	"pick_v2/utils/cache"
+	"pick_v2/utils/slice"
+	"pick_v2/utils/timeutil"
+	"time"
 
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
@@ -13,7 +21,7 @@ import (
 	"pick_v2/utils/xsq_net"
 )
 
-//获取待拣货订单商品列表
+// 获取待拣货订单商品列表
 func GetGoodsList(c *gin.Context) {
 
 	var form req.GetGoodsListForm
@@ -69,7 +77,7 @@ func OrderList(goodsList []*rsp.ApiGoods) []*rsp.OrderList {
 	return list
 }
 
-//订单明细
+// 订单明细
 func GetOrderDetail(c *gin.Context) {
 	var form req.GetOrderDetailForm
 
@@ -178,7 +186,7 @@ func RequestGoodsList(responseData interface{}) (rsp.ApiGoodsListRsp, error) {
 	return result, nil
 }
 
-//商品列表
+// 商品列表
 func CommodityList(c *gin.Context) {
 	var result rsp.CommodityListRsp
 
@@ -204,12 +212,252 @@ func CommodityList(c *gin.Context) {
 	xsq_net.SucJson(c, result.Data)
 }
 
-//订单出货记录
+// 订单出货记录
 func OrderShippingRecord(c *gin.Context) {
+	var (
+		form req.OrderShippingRecordReq
+		res  rsp.OrderShippingRecordRsp
+	)
 
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var pick []batch.Pick
+
+	result := global.DB.Where("delivery_order_no in (?)", form.DeliveryOrderNo).Find(&pick)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	list := make([]rsp.OrderShippingRecord, 0, result.RowsAffected)
+
+	for _, p := range pick {
+		list = append(list, rsp.OrderShippingRecord{
+			Id:              p.Id,
+			TakeOrdersTime:  p.TakeOrdersTime.Format(timeutil.TimeFormat),
+			PickUser:        p.PickUser,
+			ReviewUser:      p.ReviewUser,
+			ReviewTime:      p.ReviewTime.Format(timeutil.TimeFormat),
+			ReviewNum:       p.ReviewNum,
+			DeliveryOrderNo: p.DeliveryOrderNo,
+		})
+	}
+
+	res.List = list
+
+	xsq_net.SucJson(c, res)
 }
 
-//订单出货记录明细
+// 订单出货记录明细
 func ShippingRecordDetail(c *gin.Context) {
+	var (
+		form req.ShippingRecordDetailReq
+		//res  rsp.ShippingRecordDetailRsp
+	)
 
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var pickGoods []batch.PickGoods
+
+	result := global.DB.Where("pick_id in (?)", form.Id).Find(&pickGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	type Goods struct {
+		GoodsName string `json:"goods_name"`
+		GoodsSpe  string `json:"goods_spe"`
+		ReviewNum int    `json:"review_num"`
+	}
+
+	mp := make(map[string][]Goods, 0)
+
+	for _, good := range pickGoods {
+
+		mp[good.GoodsType] = append(mp[good.GoodsType], Goods{
+			GoodsName: good.GoodsName,
+			GoodsSpe:  good.GoodsSpe,
+			ReviewNum: good.ReviewNum,
+		})
+	}
+
+	xsq_net.SucJson(c, mp)
+}
+
+// 完成订单
+func CompleteOrder(c *gin.Context) {
+	var (
+		form req.CompleteOrderReq
+		res  rsp.CompleteOrderRsp
+	)
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var completeOrder []order.CompleteOrder
+
+	db := global.DB
+
+	numbers := []string{}
+
+	if form.Sku != "" {
+		var completeOrderDetail []order.CompleteOrderDetail
+		result := db.Model(&order.CompleteOrderDetail{}).Where("sku = ?", form.Sku).Find(&completeOrderDetail)
+		if result.Error != nil {
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+
+		for _, detail := range completeOrderDetail {
+			numbers = append(numbers, detail.Number)
+		}
+
+		numbers = slice.UniqueStringSlice(numbers)
+	}
+
+	//商品
+	local := db.
+		Model(&order.CompleteOrder{}).
+		Where(&order.CompleteOrder{
+			ShopId:         form.ShopId,
+			Number:         form.Number,
+			Line:           form.Line,
+			DeliveryMethod: form.DeliveryMethod,
+			ShopType:       form.ShopType,
+			Province:       form.Province,
+			City:           form.City,
+			District:       form.District,
+		})
+
+	if len(numbers) > 0 {
+		local.Where("number in (?)", numbers)
+	}
+
+	if form.IsRemark == 1 { //没有备注
+		local.Where("order_remark == ''")
+	} else if form.IsRemark == 2 { //有备注
+		local.Where("order_remark != ''")
+	}
+
+	if form.PayAt != "" {
+		t, err := time.ParseInLocation(timeutil.DateFormat, form.PayAt, time.Local)
+
+		if err != nil {
+			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+			return
+		}
+
+		local.Where("pay_at <= ", timeutil.GetLastTime(t))
+	}
+
+	result := local.Find(&completeOrder)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	res.Total = result.RowsAffected
+
+	result = local.Scopes(model.Paginate(form.Page, form.Size)).Find(&completeOrder)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	list := make([]rsp.CompleteOrder, 0, form.Size)
+
+	for _, o := range completeOrder {
+		list = append(list, rsp.CompleteOrder{
+			Number:      o.Number,
+			PayAt:       o.PayAt,
+			ShopCode:    o.ShopCode,
+			ShopName:    o.ShopName,
+			ShopType:    o.ShopType,
+			PayCount:    o.PayCount,
+			OutCount:    o.OutCount,
+			CloseCount:  o.CloseCount,
+			Line:        o.Line,
+			Region:      fmt.Sprintf("%s-%s-%s", o.Province, o.City, o.District),
+			PickTime:    o.PickTime.Format(timeutil.TimeFormat),
+			OrderRemark: o.OrderRemark,
+		})
+	}
+
+	res.List = list
+
+	xsq_net.SucJson(c, res)
+}
+
+// 完成订单详情
+func CompleteOrderDetail(c *gin.Context) {
+	var (
+		form req.CompleteOrderDetailReq
+		res  rsp.CompleteOrderDetailRsp
+	)
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var (
+		completeOrder       order.CompleteOrder
+		completeOrderDetail []order.CompleteOrderDetail
+	)
+
+	db := global.DB
+
+	result := db.Model(&order.CompleteOrder{}).Where("number = ?", form.Number).First(&completeOrder)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = db.Where("number = ?", form.Number).Find(&completeOrderDetail)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	goodsMap := make(map[string][]rsp.PrePickGoods, 0)
+
+	for _, goods := range completeOrderDetail {
+		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.PrePickGoods{
+			GoodsName:   goods.Name,
+			GoodsSpe:    goods.GoodsSpe,
+			Shelves:     goods.Shelves,
+			NeedNum:     goods.PayCount,
+			CloseNum:    goods.CloseCount,
+			OutCount:    goods.ReviewCount,
+			NeedOutNum:  goods.PayCount,
+			GoodsRemark: goods.GoodsRemark,
+		})
+	}
+
+	res.Goods = goodsMap
+
+	res.ShopName = completeOrder.ShopName
+	res.ShopCode = completeOrder.ShopCode
+	res.Line = completeOrder.Line
+	res.Region = fmt.Sprintf("%s-%s-%s", completeOrder.Province, completeOrder.City, completeOrder.District)
+	res.ShopType = completeOrder.ShopType
+	res.Number = completeOrder.Number
+	res.OrderRemark = completeOrder.OrderRemark
+
+	xsq_net.SucJson(c, res)
 }
