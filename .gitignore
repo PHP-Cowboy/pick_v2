@@ -1,6 +1,6 @@
 .DS_Store
 .idea
-log
+logs
 go.mod
 go.sum
 config.yaml

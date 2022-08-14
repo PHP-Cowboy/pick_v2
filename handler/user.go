@@ -27,7 +27,7 @@ import (
 	"pick_v2/utils/xsq_net"
 )
 
-//新增用户
+// 新增用户
 func CreateUser(ctx *gin.Context) {
 	var form req.AddUserForm
 	err := ctx.ShouldBind(&form)
@@ -105,7 +105,7 @@ func CreateUser(ctx *gin.Context) {
 	xsq_net.SucJson(ctx, userRsp)
 }
 
-//获取用户列表
+// 获取用户列表
 func GetUserList(ctx *gin.Context) {
 	var form req.GetUserListForm
 
@@ -153,7 +153,7 @@ func GetUserList(ctx *gin.Context) {
 	xsq_net.SucJson(ctx, res)
 }
 
-//登录
+// 登录
 func Login(ctx *gin.Context) {
 	var form req.LoginForm
 
@@ -163,6 +163,8 @@ func Login(ctx *gin.Context) {
 		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
 		return
 	}
+
+	global.SugarLogger.Error(form)
 
 	form.Account = strings.Trim(form.Account, " ")
 
@@ -229,7 +231,7 @@ func Login(ctx *gin.Context) {
 	})
 }
 
-//修改 名称 密码 状态 组织
+// 修改 名称 密码 状态 组织
 func ChangeUser(ctx *gin.Context) {
 	var form req.CheckPwdForm
 
@@ -288,7 +290,7 @@ func ChangeUser(ctx *gin.Context) {
 	xsq_net.Success(ctx)
 }
 
-//批量删除角色
+// 批量删除角色
 func BatchDeleteUser(c *gin.Context) {
 	var form req.BatchDeleteUserForm
 
@@ -307,7 +309,7 @@ func BatchDeleteUser(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-//获取仓库用户数列表
+// 获取仓库用户数列表
 func GetWarehouseUserCountList(ctx *gin.Context) {
 	var (
 		form req.WarehouseUserCountForm
@@ -339,7 +341,7 @@ func GenderPwd(pwd string) string {
 	return fmt.Sprintf("pbkdf2-sha512$%s$%s", salt, encodedPwd)
 }
 
-//获取拣货员列表
+// 获取拣货员列表
 func GetPickerList(c *gin.Context) {
 
 	var (
