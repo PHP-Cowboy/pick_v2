@@ -164,7 +164,7 @@ func Login(ctx *gin.Context) {
 		return
 	}
 
-	global.SugarLogger.Error(form)
+	global.SugarLogger.Infof("%+v", form)
 
 	form.Account = strings.Trim(form.Account, " ")
 

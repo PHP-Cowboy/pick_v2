@@ -216,6 +216,7 @@ func ConfirmDelivery(c *gin.Context) {
 	var (
 		pick      batch.Pick
 		pickGoods []batch.PickGoods
+		batches   batch.Batch
 	)
 
 	db := global.DB
@@ -319,7 +320,22 @@ func ConfirmDelivery(c *gin.Context) {
 
 	//拆单 -打印
 
-	//todo 判断批次是否结束，如果已结束则推送到u8 推订货系统告知订单出货情况
+	//todo 批次结束要删除相关数据并写入已完成订单表
+	result = db.First(&batches, pick.BatchId)
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	if batches.Status == 1 {
+		err = PushU8(pickGoods)
+		if err != nil {
+			tx.Commit() // u8推送失败不能影响仓库出货，只提示，业务继续
+			xsq_net.ErrorJSON(c, err)
+			return
+		}
+	}
 
 	tx.Commit()
 

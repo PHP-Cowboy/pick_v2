@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"go.uber.org/zap"
 	"io"
 	"math"
 	"net/http"
@@ -41,6 +40,7 @@ type PickGoods struct {
 }
 
 func SendShopXml(xml string) string {
+	global.SugarLogger.Info(xml)
 	var (
 		requestUrl string
 		err        error
@@ -52,21 +52,21 @@ func SendShopXml(xml string) string {
 
 	request, err = http.NewRequest(http.MethodPost, requestUrl, strings.NewReader(xml))
 	if err != nil {
-		zap.S().Info("请求失败", err)
+		global.SugarLogger.Error("请求失败", err)
 		return ""
 	}
 	request.Header.Set("Content-Type", "application/xml")
 	client := &http.Client{}
 	response, err = client.Do(request)
 	if err != nil {
-		zap.S().Info("请求用友失败1", err)
+		global.SugarLogger.Error("请求用友失败1", err)
 		return ""
 	}
 	defer response.Body.Close()
 
 	rspBody, err = io.ReadAll(response.Body)
 	if err != nil {
-		zap.S().Info("请求用友失败2", err)
+		global.SugarLogger.Error("请求用友失败2", err)
 		return ""
 	}
 	return string(rspBody)

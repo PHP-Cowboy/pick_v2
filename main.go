@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"go.uber.org/zap"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,12 +24,12 @@ func main() {
 
 	serverConfig := global.ServerConfig
 
-	zap.S().Info("服务启动中,端口:", serverConfig.Port)
+	fmt.Println("服务启动中,端口:", serverConfig.Port)
 
 	go func() {
 		err := g.Run(fmt.Sprintf(":%d", serverConfig.Port))
 		if err != nil {
-			zap.S().Panicf("启动失败:", err.Error())
+			panic("启动失败:" + err.Error())
 		}
 	}()
 

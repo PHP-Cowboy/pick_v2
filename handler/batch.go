@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"pick_v2/common/constant"
 	"pick_v2/forms/req"
@@ -349,7 +348,6 @@ func EndBatch(c *gin.Context) {
 	var (
 		batches   batch.Batch
 		pickGoods []batch.PickGoods
-		orderInfo []order.OrderInfo
 	)
 
 	db := global.DB
@@ -379,10 +377,24 @@ func EndBatch(c *gin.Context) {
 	//查询批次下全部订单
 	result = db.Model(&batch.PickGoods{}).Where("batch_id = ?", form.Id).Find(&pickGoods)
 	if result.Error != nil {
-		zap.S().Info(result.Error)
+		global.SugarLogger.Error("批次结束成功，但推送u8拣货数据查询失败:" + result.Error.Error())
 		xsq_net.ErrorJSON(c, errors.New("批次结束成功，但推送u8拣货数据查询失败"))
 		return
 	}
+
+	err := PushU8(pickGoods)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+}
+
+func PushU8(pickGoods []batch.PickGoods) error {
+
+	var orderInfo []order.OrderInfo
 
 	numbers := []string{}
 
@@ -395,14 +407,16 @@ func EndBatch(c *gin.Context) {
 		mpGoods[good.Number+good.Sku] = good
 		//step2 合并到 map[number][]PickGoods{...}
 	}
+
+	global.SugarLogger.Info(mpGoods)
+
 	//去重
 	numbers = slice.UniqueStringSlice(numbers)
 
-	result = db.Model(&order.OrderInfo{}).Where("number in (?)", numbers).Find(&orderInfo)
+	result := global.DB.Model(&order.OrderInfo{}).Where("number in (?)", numbers).Find(&orderInfo)
 	if result.Error != nil {
-		zap.S().Info(result.Error)
-		xsq_net.ErrorJSON(c, errors.New("批次结束成功，但推送u8订单数据查询失败"))
-		return
+		global.SugarLogger.Error("批次结束成功，但推送u8订单数据查询失败:" + result.Error.Error())
+		return errors.New("批次结束成功，但推送u8订单数据查询失败")
 	}
 
 	mpPgv := make(map[string]PickGoodsView, 0)
@@ -439,13 +453,15 @@ func EndBatch(c *gin.Context) {
 		})
 	}
 
+	global.SugarLogger.Info(mpPgv)
+
 	for _, view := range mpPgv {
 		//推送u8
 		xml := GenU8Xml(view, view.ShopId, view.ShopName, view.HouseCode) //店铺属性中获 HouseCode
 		SendShopXml(xml)
 	}
 
-	xsq_net.Success(c)
+	return nil
 }
 
 // 当前批次是否有接单
