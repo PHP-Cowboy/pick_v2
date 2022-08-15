@@ -93,6 +93,7 @@ type PrePickRemark struct {
 // 拣货列表
 type Pick struct {
 	model.Base
+	DeliveryOrderNo string     `gorm:"type:varchar(16);index:delivery_order_no_idx;comment:出库单号"`
 	WarehouseId     int        `gorm:"type:int(11);comment:仓库"`
 	BatchId         int        `gorm:"type:int(11) unsigned;comment:批次表id"`
 	PrePickIds      string     `gorm:"type:varchar(255);comment:预拣货ids"`
@@ -103,6 +104,7 @@ type Pick struct {
 	ShopNum         int        `gorm:"type:int;not null;comment:门店数"`
 	OrderNum        int        `gorm:"type:int;not null;comment:订单数"`
 	NeedNum         int        `gorm:"type:int;not null;comment:需拣数量"`
+	PickNum         int        `gorm:"type:int;default:0;comment:需拣数量"`
 	ReviewNum       int        `gorm:"type:int;not null;comment:复核数量"`
 	Num             int        `gorm:"type:int;not null;comment:件数"`
 	PickUser        string     `gorm:"type:varchar(32);default:'';comment:拣货人"`
@@ -112,16 +114,16 @@ type Pick struct {
 	Sort            int        `gorm:"type:int(11) unsigned;comment:排序"`
 	Version         int        `gorm:"type:tinyint(1);default:0;comment:版本"`
 	Status          int        `gorm:"type:tinyint;comment:状态:0:待拣货,1:待复核,2:复核完成,3:停止拣货,4:终止拣货"`
-	DeliveryOrderNo string     `gorm:"type:varchar(16);comment:出库单号"`
 }
 
 // 拣货商品明细
 type PickGoods struct {
 	model.Base
 	WarehouseId      int    `gorm:"type:int(11);comment:仓库"`
-	BatchId          int    `gorm:"type:int(11) unsigned;comment:批次表id"`
-	PickId           int    `gorm:"type:int(11) unsigned;comment:拣货表id"`
+	PickId           int    `gorm:"type:int(11) unsigned;index:pick_and_batch_idx;comment:拣货表id"`
+	BatchId          int    `gorm:"type:int(11) unsigned;index:pick_and_batch_idx;comment:批次表id"`
 	PrePickGoodsId   int    `gorm:"type:int(11);comment:预拣货商品表id"`
+	OrderInfoId      int    `gorm:"type:int(11) unsigned;comment:订单商品接口返回ID"`
 	Number           string `gorm:"type:varchar(64);comment:订单编号"`
 	ShopId           int    `gorm:"type:int(11);comment:店铺id"`
 	DistributionType int    `gorm:"type:tinyint unsigned;comment:配送方式:1:公司配送,2:用户自提,3:三方物流,4:快递配送,5:首批物料|设备单"`
@@ -144,6 +146,7 @@ type PickRemark struct {
 	BatchId         int    `gorm:"type:int(11) unsigned;comment:批次表id"`
 	PickId          int    `gorm:"type:int(11) unsigned;comment:拣货表id"`
 	PrePickRemarkId int    `gorm:"type:int(11);comment:预拣货备注表id"`
+	OrderInfoId     int    `gorm:"type:int(11) unsigned;comment:订单商品接口返回ID"`
 	Number          string `gorm:"type:varchar(64);comment:订单编号"`
 	OrderRemark     string `gorm:"type:varchar(512);comment:订单备注"`
 	GoodsRemark     string `gorm:"type:varchar(255);comment:商品备注"`

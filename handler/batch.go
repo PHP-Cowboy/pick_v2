@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -16,6 +17,7 @@ import (
 	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/helper"
+	"pick_v2/utils/request"
 	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
@@ -73,7 +75,7 @@ func CreateBatch(c *gin.Context) {
 		WarehouseId:     form.WarehouseId,
 		BatchName:       form.Lines + helper.GetDeliveryMethod(form.DeType),
 		DeliveryEndTime: &deliveryEndTime,
-		ShopNum:         0,
+		ShopNum:         0, //在后续的逻辑中更新处理，调用接口时需传批次id，只能更新，其他方式可能导致订货系统锁住数据，而拣货系统获取不到被锁住的数据
 		OrderNum:        0,
 		GoodsNum:        0,
 		UserName:        userInfo.Name,
@@ -140,7 +142,6 @@ func CreateBatch(c *gin.Context) {
 		prePicks      []batch.PrePick
 		prePickGoods  []*batch.PrePickGoods
 		prePickRemark []*batch.PrePickRemark
-		shopMap       = make(map[int]int, 0)
 	)
 
 	mp, err := cache.GetClassification()
@@ -150,33 +151,19 @@ func CreateBatch(c *gin.Context) {
 		return
 	}
 
-	var (
-		shopNum, orderNum, goodsNum int
-		shopMp                      = make(map[int]struct{}, 0)
-		orderMp                     = make(map[string]struct{}, 0)
-	)
+	//订单相关数据 -店铺数 订单数 商品数
+	goodsNum := 0                              //商品数
+	shopNumMp := make(map[int]struct{}, 0)     //店铺
+	orderNumMp := make(map[string]struct{}, 0) //订单
 
-	//订单相关数据
 	for _, goods := range goodsRes.Data.List {
-		_, sOk := shopMp[goods.ShopId]
-
-		if !sOk {
-			shopMp[goods.ShopId] = struct{}{}
-			shopNum++
-		}
-
-		_, orderOk := orderMp[goods.Number]
-
-		if !orderOk {
-			orderMp[goods.Number] = struct{}{}
-			orderNum++
-		}
-
 		goodsNum += goods.LackCount
 
-		goodsType, ok := mp[goods.SecondType]
+		orderNumMp[goods.Number] = struct{}{}
 
-		if !ok {
+		goodsType, mpOk := mp[goods.SecondType]
+
+		if !mpOk {
 			xsq_net.ErrorJSON(c, errors.New("商品类型:"+goods.SecondType+"数据未同步"))
 			return
 		}
@@ -251,11 +238,14 @@ func CreateBatch(c *gin.Context) {
 			})
 		}
 
-		_, ok = shopMap[goods.ShopId]
-		if ok {
+		_, shopMpOk := shopNumMp[goods.ShopId]
+
+		if shopMpOk {
 			continue
 		}
-		shopMap[goods.ShopId] = 0
+
+		shopNumMp[goods.ShopId] = struct{}{}
+
 		prePicks = append(prePicks, batch.PrePick{
 			WarehouseId: form.WarehouseId,
 			BatchId:     batches.Id,
@@ -283,13 +273,15 @@ func CreateBatch(c *gin.Context) {
 		return
 	}
 
+	shopMap := make(map[int]int, 0)
+
 	for _, pick := range prePicks {
 		shopMap[pick.ShopId] = pick.Id
 	}
 
 	for k, good := range prePickGoods {
-		val, ok := shopMap[good.ShopId]
-		if !ok {
+		val, shopMapOk := shopMap[good.ShopId]
+		if !shopMapOk {
 			xsq_net.ErrorJSON(c, ecode.MapKeyNotExist)
 			return
 		}
@@ -306,8 +298,8 @@ func CreateBatch(c *gin.Context) {
 
 	if len(prePickRemark) > 0 {
 		for k, remark := range prePickRemark {
-			val, ok := shopMap[remark.ShopId]
-			if !ok {
+			val, shopMapOk := shopMap[remark.ShopId]
+			if !shopMapOk {
 				xsq_net.ErrorJSON(c, ecode.MapKeyNotExist)
 				return
 			}
@@ -322,6 +314,9 @@ func CreateBatch(c *gin.Context) {
 			return
 		}
 	}
+
+	shopNum := len(shopNumMp)
+	orderNum := len(orderNumMp)
 
 	result = tx.Model(&batch.Batch{}).Where("id = ?", batches.Id).Updates(map[string]interface{}{"goods_num": goodsNum, "shop_num": shopNum, "order_num": orderNum})
 
@@ -348,6 +343,9 @@ func EndBatch(c *gin.Context) {
 	var (
 		batches   batch.Batch
 		pickGoods []batch.PickGoods
+		pick      []batch.Pick
+		orderInfo []order.OrderInfo
+		outGoods  req.OutGoods
 	)
 
 	db := global.DB
@@ -372,7 +370,11 @@ func EndBatch(c *gin.Context) {
 		return
 	}
 
-	//todo 请求接口 释放锁单
+	result = db.Model(&order.OrderInfo{}).Where("batch_id = ?", form.Id).Find(&orderInfo)
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
 
 	//查询批次下全部订单
 	result = db.Model(&batch.PickGoods{}).Where("batch_id = ?", form.Id).Find(&pickGoods)
@@ -382,7 +384,72 @@ func EndBatch(c *gin.Context) {
 		return
 	}
 
-	err := PushU8(pickGoods)
+	result = db.Model(&batch.Pick{}).Where("batch_id = ?", form.Id).Find(&pick)
+	if result.Error != nil {
+		global.SugarLogger.Error("批次结束成功，但推送u8拣货数据查询失败:" + result.Error.Error())
+		xsq_net.ErrorJSON(c, errors.New("批次结束成功，但推送u8拣货主表数据查询失败"))
+		return
+	}
+
+	//拣货表数据map
+	mpPick := make(map[int]batch.Pick, 0)
+
+	for _, p := range pick {
+		mpPick[p.Id] = p
+	}
+
+	//拣货商品map
+	mpGoods := make(map[int]batch.PickGoods, 0)
+
+	for _, good := range pickGoods {
+		mpGoods[good.OrderInfoId] = good
+	}
+
+	outGoods.BatchNumber = strconv.Itoa(batches.Id)
+
+	for _, info := range orderInfo {
+
+		goods, ok := mpGoods[info.Id]
+
+		if !ok {
+			//
+			continue
+		}
+
+		var outNumber, exWarehouse string
+
+		pMp, pickOk := mpPick[goods.PickId]
+
+		if pickOk {
+			outNumber = strconv.Itoa(pMp.Id) //拣货单号
+			exWarehouse = pMp.DeliveryOrderNo
+		}
+
+		outGoods.List = append(outGoods.List, req.OutGoodsList{
+			Number:       info.Number,
+			OutNumber:    outNumber, //拣货单号
+			CkNumber:     exWarehouse,
+			Sku:          info.Sku,
+			Name:         info.Name,
+			OutCount:     goods.CompleteNum,
+			Price:        info.DiscountPrice,
+			SumPrice:     goods.CompleteNum * info.DiscountPrice,
+			OutAt:        goods.UpdateTime.Format(timeutil.TimeFormat),
+			PayAt:        info.PayAt,
+			GoodsSpe:     info.GoodsSpe,
+			GoodsUnit:    info.GoodsUnit,
+			DeliveryType: info.DistributionType,
+		})
+	}
+
+	//请求接口 释放锁单
+	err := OutGoods(outGoods)
+	if err != nil {
+		xsq_net.ErrorJSON(c, errors.New("归还订货系统欠货信息失败"))
+		return
+	}
+
+	err = PushU8(pickGoods)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
@@ -390,6 +457,28 @@ func EndBatch(c *gin.Context) {
 	}
 
 	xsq_net.Success(c)
+}
+
+func OutGoods(responseData interface{}) error {
+	var result rsp.OutGoodsRsp
+
+	body, err := request.Post("api/v1/remote/out/goods", responseData)
+
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(body, &result)
+
+	if err != nil {
+		return err
+	}
+
+	if result.Code != 200 {
+		return errors.New(result.Msg)
+	}
+
+	return nil
 }
 
 func PushU8(pickGoods []batch.PickGoods) error {
@@ -598,7 +687,13 @@ func GetBatchList(c *gin.Context) {
 		db = db.Where("end_time <= ?", form.EndTime)
 	}
 
-	result := db.Where(map[string]interface{}{"status": form.Status}).Find(&batches)
+	if *form.Status == 0 {
+		db = db.Where("status in (0,2)")
+	} else {
+		db = db.Where("status = 1")
+	}
+
+	result := db.Find(&batches)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -607,7 +702,12 @@ func GetBatchList(c *gin.Context) {
 
 	res.Total = result.RowsAffected
 
-	db.Scopes(model.Paginate(form.Page, form.Size)).Order("sort desc").Find(&batches)
+	result = db.Scopes(model.Paginate(form.Page, form.Size)).Order("sort desc").Find(&batches)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
 
 	list := make([]*rsp.Batch, 0, len(batches))
 	for _, b := range batches {
@@ -646,6 +746,7 @@ func GetBatchPoolNum(c *gin.Context) {
 		batchPool []rsp.BatchPoolNum
 		res       rsp.GetBatchPoolNumRsp
 		ongoing   int
+		suspend   int
 		finished  int
 	)
 
@@ -667,10 +768,12 @@ func GetBatchPoolNum(c *gin.Context) {
 		case 1: //已结束
 			finished = bp.Count
 			break
+		case 2: //暂停 也属于进行中
+			suspend = bp.Count
 		}
 	}
 
-	res.Ongoing = ongoing
+	res.Ongoing = ongoing + suspend
 	res.Finished = finished
 
 	xsq_net.SucJson(c, res)
@@ -888,11 +991,19 @@ func Topping(c *gin.Context) {
 // 批次池内单数量
 func GetPoolNum(c *gin.Context) {
 	var (
-		res                               rsp.GetPoolNumRsp
-		count                             int64
-		poolNumCount                      []rsp.PoolNumCount
-		pickNum, toReviewNum, completeNum int
+		form         req.GetPoolNumReq
+		res          rsp.GetPoolNumRsp
+		count        int64
+		poolNumCount []rsp.PoolNumCount
+		pickNum,
+		toReviewNum,
+		completeNum int
 	)
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
 
 	db := global.DB
 
@@ -905,6 +1016,7 @@ func GetPoolNum(c *gin.Context) {
 
 	result = db.Model(&batch.Pick{}).
 		Select("count(id) as count, status").
+		Where("batch_id = ?", form.BatchId).
 		Group("status").
 		Find(&poolNumCount)
 
@@ -1047,6 +1159,7 @@ func BatchPickAll(form req.BatchPickForm) error {
 				BatchId:        pre.BatchId,
 				PickId:         pick.Id,
 				PrePickGoodsId: goods.Id,
+				OrderInfoId:    goods.OrderInfoId,
 				GoodsName:      goods.GoodsName,
 				GoodsSpe:       goods.GoodsSpe,
 				Shelves:        goods.Shelves,
@@ -1070,6 +1183,7 @@ func BatchPickAll(form req.BatchPickForm) error {
 				BatchId:         pre.BatchId,
 				PickId:          pick.Id,
 				PrePickRemarkId: remark.Id,
+				OrderInfoId:     remark.OrderInfoId,
 				Number:          remark.Number,
 				OrderRemark:     remark.OrderRemark,
 				GoodsRemark:     remark.GoodsRemark,
@@ -1982,6 +2096,7 @@ func ByGoods(form req.MergePickForm) error {
 	return nil
 }
 
+// 打印
 func PrintCallGet(c *gin.Context) {
 	var (
 		form req.PrintCallGetReq
@@ -1992,28 +2107,147 @@ func PrintCallGet(c *gin.Context) {
 		return
 	}
 
+	printCh := GetPrintJob()
+
+	global.SugarLogger.Infof("%+v", printCh)
+
+	//通道中没有任务
+	if printCh != nil {
+		xsq_net.SucJson(c, nil)
+		return
+	}
+
 	var (
-		pick      batch.Pick
-		pickGoods []batch.PickGoods
+		pick       batch.Pick
+		pickGoods  []batch.PickGoods
+		orderInfos []order.OrderInfo
 	)
 
 	db := global.DB
 
-	result := db.First(&pick)
+	result := db.Model(&batch.Pick{}).Where("delivery_order_no = ?", printCh.DeliveryOrderNo).Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	result = db.Model(&batch.PickGoods{}).Where("pick_id = ?", pick.Id).Find(&pickGoods)
+	result = db.Model(&batch.PickGoods{}).Where("pick_id = ? and shop_id = ?", pick.Id, printCh.ShopId).Find(&pickGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	res := make([]rsp.PrintCallGetRsp, 0, 1)
+	length := len(pickGoods) //有多少条pickGoods就有多少条OrderInfo数据，map数也是
 
-	xsq_net.SucJson(c, res)
+	orderInfoIds := make([]int, 0, length)
+
+	goodsMp := make(map[int]batch.PickGoods, length)
+
+	for _, good := range pickGoods {
+		orderInfoIds = append(orderInfoIds, good.OrderInfoId)
+
+		goodsMp[good.OrderInfoId] = good
+	}
+
+	result = db.Model(&order.OrderInfo{}).Where("id in (?)", orderInfoIds).Find(&orderInfos)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	if len(orderInfos) <= 0 {
+		xsq_net.ErrorJSON(c, errors.New("订单数据未找到"))
+		return
+	}
+
+	item := rsp.PrintCallGetRsp{
+		ShopName:    pick.ShopName,
+		JHNumber:    strconv.Itoa(pick.Id),
+		PickName:    pick.PickUser, //拣货人
+		ShopType:    orderInfos[0].ShopType,
+		CheckName:   pick.ReviewUser,                                          //复核员
+		HouseName:   TransferHouse(orderInfos[0].HouseCode),                   //TransferHouse(info.HouseCode)
+		Delivery:    TransferDistributionType(orderInfos[0].DistributionType), //TransferDistributionType(info.DistributionType),
+		OrderRemark: orderInfos[0].OrderRemark,
+		Consignee:   orderInfos[0].ConsigneeName, //info.ConsigneeName
+		Shop_code:   pick.ShopCode,
+		Packages:    0,
+		Phone:       orderInfos[0].ConsigneeTel, //info.ConsigneeTel,
+		PriType:     1,
+	}
+
+	if orderInfos[0].ShopCode != "" {
+		item.ShopName = orderInfos[0].ShopCode + "--" + orderInfos[0].ShopName
+	}
+
+	item2 := rsp.CallGetGoodsView{
+		SaleNumber:  orderInfos[0].Number,
+		Date:        orderInfos[0].PayAt,
+		OrderRemark: orderInfos[0].OrderRemark,
+	}
+
+	for _, info := range orderInfos {
+
+		pgs, ok := goodsMp[info.Id]
+
+		if !ok {
+			continue
+		}
+
+		item3 := rsp.CallGetGoods{
+			GoodsName:    info.Name,
+			GoodsSpe:     info.GoodsSpe,
+			GoodsCount:   info.PayCount,
+			RealOutCount: pgs.ReviewNum,
+			GoodsUnit:    info.GoodsUnit,
+			Price:        int64(info.DiscountPrice) * int64(pgs.ReviewNum),
+			LackCount:    info.PayCount - pgs.ReviewNum,
+		}
+		item2.List = append(item2.List, item3)
+	}
+
+	item.GoodsList = append(item.GoodsList, item2)
+
+	ret := make([]rsp.PrintCallGetRsp, 0, 1)
+
+	ret = append(ret, item)
+
+	xsq_net.SucJson(c, ret)
+}
+
+func TransferHouse(s string) string {
+	switch s {
+	case constant.JH_HUOSE_CODE:
+		return constant.JH_HUOSE_NAME
+	default:
+		return constant.OT_HUOSE_NAME
+	}
+}
+
+func TransferDistributionType(t int) (method string) {
+	switch t {
+	case 1:
+		method = "公司配送"
+		break
+	case 2:
+		method = "用户自提"
+		break
+	case 3:
+		method = "三方物流"
+		break
+	case 4:
+		method = "快递配送"
+		break
+	case 5:
+		method = "首批物料|设备单"
+		break
+	default:
+		method = "其他"
+		break
+	}
+
+	return method
 }

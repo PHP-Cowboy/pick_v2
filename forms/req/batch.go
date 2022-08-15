@@ -28,6 +28,27 @@ type EndBatchForm struct {
 	Id int `json:"id" form:"id" binding:"required"`
 }
 
+type OutGoods struct {
+	BatchNumber string         `json:"batch_number"`
+	List        []OutGoodsList `json:"list"`
+}
+
+type OutGoodsList struct {
+	Number       string `json:"number"`
+	OutNumber    string `json:"out_number"`
+	CkNumber     string `json:"ck_number"`
+	Sku          string `json:"sku"`
+	Name         string `json:"name"`
+	OutCount     int    `json:"out_count"`
+	Price        int    `json:"price"`
+	SumPrice     int    `json:"sum_price"`
+	OutAt        string `json:"out_at"`
+	PayAt        string `json:"pay_at"`
+	GoodsSpe     string `json:"goods_spe"`
+	GoodsUnit    string `json:"goods_unit"`
+	DeliveryType int    `json:"delivery_type"`
+}
+
 type GetBatchListForm struct {
 	Paging
 	Status         *int   `json:"status" form:"status" binding:"required"` //进行中，已结束
@@ -77,4 +98,8 @@ type MergePickForm struct {
 
 type PrintCallGetReq struct {
 	HouseCode string `json:"house_code" binding:"required"`
+}
+
+type GetPoolNumReq struct {
+	BatchId int `json:"batch_id" form:"batch_id" binding:"required"`
 }

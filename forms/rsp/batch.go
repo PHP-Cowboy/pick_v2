@@ -134,3 +134,9 @@ type CallGetGoods struct {
 	Price        int64  `json:"price"`
 	LackCount    int    `json:"lack_count"` //欠货数量
 }
+
+type OutGoodsRsp struct {
+	Code int         `json:"code"`
+	Data interface{} `json:"data"`
+	Msg  string      `json:"msg"`
+}

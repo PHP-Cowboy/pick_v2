@@ -7,9 +7,15 @@ import (
 	"pick_v2/config"
 )
 
+type PrintCh struct {
+	DeliveryOrderNo string
+	ShopId          int
+}
+
 var (
 	DB           *gorm.DB
 	Redis        *redis.Client
 	ServerConfig = &config.ServerConfig{}
 	SugarLogger  *zap.SugaredLogger
+	Job          = make(chan *PrintCh, 1000)
 )

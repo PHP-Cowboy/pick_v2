@@ -16,6 +16,7 @@ type PickListModel struct {
 	Status         int        `json:"status"`
 	OrderRemark    string     `json:"order_remark"`
 	GoodsRemark    string     `json:"goods_remark"`
+	PickNum        int        `json:"pick_num"`
 }
 
 type PickListRsp struct {
@@ -24,18 +25,17 @@ type PickListRsp struct {
 }
 
 type Pick struct {
-	Id             int        `json:"id"`
-	TaskName       string     `json:"task_name"`
-	ShopCode       string     `json:"shop_code"`
-	ShopName       string     `json:"shop_name"`
-	ShopNum        int        `json:"shop_num"`
-	OrderNum       int        `json:"order_num"`
-	NeedNum        int        `json:"need_num"`
-	PickUser       string     `json:"pick_user"`
-	TakeOrdersTime *time.Time `json:"take_orders_time"`
-	IsRemark       bool       `json:"is_remark"`
-	UpdateTime     time.Time  `json:"update_time"`
-	Status         int        `json:"status"`
+	Id             int    `json:"id"`
+	TaskName       string `json:"task_name"`
+	ShopCode       string `json:"shop_code"`
+	ShopName       string `json:"shop_name"`
+	ShopNum        int    `json:"shop_num"`
+	OrderNum       int    `json:"order_num"`
+	NeedNum        int    `json:"need_num"`
+	PickUser       string `json:"pick_user"`
+	TakeOrdersTime string `json:"take_orders_time"`
+	IsRemark       bool   `json:"is_remark"`
+	Status         int    `json:"status"`
 }
 
 type GetPickDetailRsp struct {

@@ -17,6 +17,6 @@ type ConfirmDeliveryReq struct {
 }
 
 type CompleteReviewDetail struct {
-	PickGoodsId int `json:"pick_goods_id"`
-	ReviewNum   int `json:"review_num"`
+	Id        int `json:"id"` //pick_goods_id
+	ReviewNum int `json:"review_num"`
 }

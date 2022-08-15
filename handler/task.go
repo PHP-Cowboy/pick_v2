@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"pick_v2/common/constant"
@@ -11,6 +13,7 @@ import (
 	"pick_v2/model"
 	"pick_v2/model/batch"
 	"pick_v2/utils/ecode"
+	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 )
 
@@ -78,7 +81,7 @@ func PickList(c *gin.Context) {
 		}
 	}
 
-	localDb := db.Table("t_pick p").Where("status = 0")
+	localDb := db.Table("t_pick p").Where("status = ?", form.Status)
 
 	if len(ids) > 0 {
 		localDb.Where("p.id in (?)", ids)
@@ -95,7 +98,7 @@ func PickList(c *gin.Context) {
 
 	result = localDb.
 		Select("p.id,shop_code,p.shop_name,shop_num,order_num,need_num,pick_user,take_orders_time,order_remark,goods_remark").
-		Where("p.status = 0").
+		Where("p.status = ?", form.Status).
 		Joins("left join t_pick_remark pr on pr.pick_id = p.id").
 		Scopes(model.Paginate(form.Page, form.Size)).
 		Scan(&pickListModel)
@@ -116,7 +119,7 @@ func PickList(c *gin.Context) {
 			OrderNum:       p.OrderNum,
 			NeedNum:        p.NeedNum,
 			PickUser:       p.PickUser,
-			TakeOrdersTime: p.TakeOrdersTime,
+			TakeOrdersTime: p.TakeOrdersTime.Format(timeutil.TimeFormat),
 			IsRemark:       isRemark,
 		})
 	}
@@ -199,4 +202,107 @@ func GetPickDetail(c *gin.Context) {
 	res.RemarkList = list
 
 	xsq_net.SucJson(c, res)
+}
+
+// 修改已出库件数
+func ChangeNum(c *gin.Context) {
+	var form req.ChangeNumReq
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var pick batch.Pick
+
+	db := global.DB
+
+	result := db.First(&pick, form.Id)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	if pick.Status != 2 {
+		xsq_net.ErrorJSON(c, errors.New("只允许修改已出库的"))
+		return
+	}
+
+	result = db.Model(&batch.Pick{}).Where("id = ?", form.Id).Update("num", form.Num)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	xsq_net.Success(c)
+}
+
+// 打印
+func PushPrint(c *gin.Context) {
+	var form req.PrintReq
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var (
+		pick      []batch.Pick
+		pickGoods []batch.PickGoods
+	)
+
+	db := global.DB
+
+	result := db.Where("id in (?)", form.Ids).Find(&pick)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	pickMp := make(map[int]string, 0)
+
+	for _, p := range pick {
+		pickMp[p.Id] = p.DeliveryOrderNo
+	}
+
+	result = db.Where("pick_id in (?)", form.Ids).Find(&pickGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	shopAndPickGoodsIdMp := make(map[string]struct{})
+
+	printChSlice := make([]global.PrintCh, 0)
+	for _, good := range pickGoods {
+		deliveryOrderNo, pickOk := pickMp[good.PickId]
+
+		if !pickOk {
+			continue
+		}
+
+		mpKey := fmt.Sprintf("%d%d", good.PickId, good.ShopId)
+		_, ok := shopAndPickGoodsIdMp[mpKey]
+		if ok {
+			continue
+		}
+		shopAndPickGoodsIdMp[mpKey] = struct{}{}
+		printChSlice = append(printChSlice, global.PrintCh{
+			DeliveryOrderNo: deliveryOrderNo,
+			ShopId:          good.ShopId,
+		})
+	}
+
+	for _, ch := range printChSlice {
+		AddPrintJob(&global.PrintCh{
+			DeliveryOrderNo: ch.DeliveryOrderNo,
+			ShopId:          ch.ShopId,
+		})
+	}
+
+	xsq_net.Success(c)
 }

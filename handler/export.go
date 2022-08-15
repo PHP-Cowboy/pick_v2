@@ -2,7 +2,9 @@ package handler
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"gorm.io/gorm"
 	"io"
 	"io/ioutil"
 	"pick_v2/forms/req"
@@ -36,6 +38,13 @@ func FirstMaterial(c *gin.Context) {
 	db := global.DB
 
 	result := db.Model(&batch.PickGoods{}).Where("pick_id = ?", form.Id).Find(&pickGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = db.First(&pick, form.Id)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -87,13 +96,6 @@ func FirstMaterial(c *gin.Context) {
 		orderNumber = pickGoods[0].Number
 	}
 
-	result = db.First(&pick, form.Id)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
 	shopName = pick.ShopName
 
 	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{fmt.Sprintf("门店 : %s  订单编号: %s 配送方式 :首批设备|物料单 需出库数:%d", shopName, orderNumber, tOutCount)})
@@ -135,6 +137,10 @@ func OutboundBatch(c *gin.Context) {
 	result := db.First(&batches, form.Id)
 
 	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			xsq_net.ErrorJSON(c, ecode.DataNotExist)
+			return
+		}
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}

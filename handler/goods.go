@@ -167,7 +167,7 @@ func RequestGoodsList(responseData interface{}) (rsp.ApiGoodsListRsp, error) {
 
 	var result rsp.ApiGoodsListRsp
 
-	body, err := request.Post("api/v1/remote/pick/lack/list", responseData)
+	body, err := request.Post("api/v1/remote/lack/list", responseData)
 
 	if err != nil {
 		return result, err
@@ -175,10 +175,10 @@ func RequestGoodsList(responseData interface{}) (rsp.ApiGoodsListRsp, error) {
 
 	err = json.Unmarshal(body, &result)
 
+	fmt.Println(result)
 	if err != nil {
 		return result, err
 	}
-
 	if result.Code != 200 {
 		return result, errors.New(result.Msg)
 	}
@@ -190,7 +190,7 @@ func RequestGoodsList(responseData interface{}) (rsp.ApiGoodsListRsp, error) {
 func CommodityList(c *gin.Context) {
 	var result rsp.CommodityListRsp
 
-	body, err := request.Post("api/v1/remote/pick/shop/sku", nil)
+	body, err := request.Post("api/v1/remote/shop/sku", nil)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
@@ -460,4 +460,29 @@ func CompleteOrderDetail(c *gin.Context) {
 	res.OrderRemark = completeOrder.OrderRemark
 
 	xsq_net.SucJson(c, res)
+}
+
+func Count(c *gin.Context) {
+	var result rsp.CountRsp
+
+	body, err := request.Get("api/v1/remote/order/node/count")
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	err = json.Unmarshal(body, &result)
+
+	fmt.Println(result)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+	if result.Code != 200 {
+		xsq_net.ErrorJSON(c, errors.New(result.Msg))
+		return
+	}
+
+	xsq_net.SucJson(c, result.Data)
 }

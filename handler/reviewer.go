@@ -46,7 +46,7 @@ func ReviewList(c *gin.Context) {
 	res.Total = result.RowsAffected
 
 	result = db.Table("t_pick p").
-		Select("p.id,shop_code,p.shop_name,shop_num,order_num,need_num,pick_user,take_orders_time,order_remark,goods_remark").
+		Select("p.id,shop_code,p.shop_name,shop_num,order_num,need_num,pick_num,pick_user,take_orders_time,review_num,order_remark,goods_remark").
 		Where("p.status = ?", form.Status).
 		Where(batch.Pick{PickUser: form.Name}).
 		Joins("left join t_pick_remark pr on pr.pick_id = p.id").
@@ -77,7 +77,7 @@ func ReviewList(c *gin.Context) {
 			OrderNum:       p.OrderNum,
 			NeedNum:        p.NeedNum,
 			PickUser:       p.PickUser,
-			TakeOrdersTime: p.TakeOrdersTime,
+			TakeOrdersTime: p.TakeOrdersTime.Format(timeutil.TimeFormat),
 			IsRemark:       isRemark,
 		})
 	}
@@ -212,7 +212,6 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
-	// todo 这里需要做并发处理
 	var (
 		pick      batch.Pick
 		pickGoods []batch.PickGoods
@@ -256,7 +255,7 @@ func ConfirmDelivery(c *gin.Context) {
 	pickGoodsMap := make(map[int]int, len(form.CompleteReview))
 
 	for _, cp := range form.CompleteReview {
-		pickGoodsMap[cp.PickGoodsId] = cp.ReviewNum
+		pickGoodsMap[cp.Id] = cp.ReviewNum
 	}
 
 	//获取拣货商品数据
@@ -267,10 +266,18 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
+	//构造打印 chan 结构体数据
+	printChMp := make(map[int]struct{}, 0)
 	for k, pg := range pickGoods {
-		num, ok := pickGoodsMap[pg.Id]
+		_, printChOk := printChMp[pg.ShopId]
 
-		if !ok {
+		if !printChOk {
+			printChMp[pg.ShopId] = struct{}{}
+		}
+
+		num, pgOk := pickGoodsMap[pg.Id]
+
+		if !pgOk {
 			continue
 		}
 
@@ -319,8 +326,15 @@ func ConfirmDelivery(c *gin.Context) {
 	}
 
 	//拆单 -打印
+	for shopId, _ := range printChMp {
+		AddPrintJob(&global.PrintCh{
+			DeliveryOrderNo: deliveryOrderNo,
+			ShopId:          shopId,
+		})
+	}
 
 	//todo 批次结束要删除相关数据并写入已完成订单表
+
 	result = db.First(&batches, pick.BatchId)
 	if result.Error != nil {
 		tx.Rollback()
@@ -340,7 +354,4 @@ func ConfirmDelivery(c *gin.Context) {
 	tx.Commit()
 
 	xsq_net.Success(c)
-}
-
-type name struct {
 }

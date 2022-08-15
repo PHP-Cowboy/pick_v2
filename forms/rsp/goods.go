@@ -153,3 +153,9 @@ type CompleteOrderDetailRsp struct {
 	OrderRemark string                    `json:"order_remark"`
 	Goods       map[string][]PrePickGoods `json:"goods"`
 }
+
+type CountRsp struct {
+	Code int         `json:"code"`
+	Data interface{} `json:"data"`
+	Msg  string      `json:"msg"`
+}

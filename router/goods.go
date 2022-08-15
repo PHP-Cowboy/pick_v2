@@ -23,5 +23,7 @@ func GoodsRoute(g *gin.RouterGroup) {
 		goodsGroup.GET("/complete_order", handler.CompleteOrder)
 		//完成订单详情
 		goodsGroup.GET("/complete_order_detail", handler.CompleteOrderDetail)
+		//订单数
+		goodsGroup.GET("/count", handler.Count)
 	}
 }
