@@ -2112,7 +2112,7 @@ func PrintCallGet(c *gin.Context) {
 	global.SugarLogger.Infof("%+v", printCh)
 
 	//通道中没有任务
-	if printCh != nil {
+	if printCh == nil {
 		xsq_net.SucJson(c, nil)
 		return
 	}
