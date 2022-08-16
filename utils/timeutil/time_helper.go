@@ -9,23 +9,23 @@ func GetDateTime() string {
 	return time.Now().Format(TimeFormat)
 }
 
-//获取传入的时间所在月份的第一天，即某月第一天的0点。如传入time.Now(), 返回当前月份的第一天0点时间。
+// 获取传入的时间所在月份的第一天，即某月第一天的0点。如传入time.Now(), 返回当前月份的第一天0点时间。
 func GetFirstDateOfMonth(d time.Time) time.Time {
 	d = d.AddDate(0, 0, -d.Day()+1)
 	return GetZeroTime(d)
 }
 
-//获取传入的时间所在月份的最后一天，即某月最后一天的0点。如传入time.Now(), 返回当前月份的最后一天0点时间。
+// 获取传入的时间所在月份的最后一天，即某月最后一天的0点。如传入time.Now(), 返回当前月份的最后一天0点时间。
 func GetLastDateOfMonth(d time.Time) time.Time {
 	return GetFirstDateOfMonth(d).AddDate(0, 1, -1)
 }
 
-//获取某一天的0点时间
+// 获取某一天的0点时间
 func GetZeroTime(d time.Time) time.Time {
 	return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, d.Location())
 }
 
-//获取某一天的最后一秒时间
+// 获取某一天的最后一秒时间
 func GetLastTime(d time.Time) time.Time {
 	return time.Date(d.Year(), d.Month(), d.Day(), 23, 59, 59, 0, d.Location())
 }
@@ -57,14 +57,14 @@ func StandardStr2Time(timeStr string, timeStringFormat ...string) int64 {
 	return t.Unix()
 }
 
-//获取当前时间还有多少秒到下一天
+// 获取当前时间还有多少秒到下一天
 func DayLeftSeconds() int64 {
 	now := time.Now()
 	return now.Unix() - GetLastTime(now).Unix()
 }
 
-//日期格式的字符串转当天 00:00:00 的日期时间格式字符串
-//例如 2020-10-26 转 2020-10-26 00:00:00
+// 日期格式的字符串转当天 00:00:00 的日期时间格式字符串
+// 例如 2020-10-26 转 2020-10-26 00:00:00
 // dateTimeSting 时间
 // formFormat 时间格式
 // toFormat 目标格式
@@ -84,8 +84,8 @@ func GetDateTimeByDateTimeString(dateTimeString string, formFormat, toFormat str
 	return t.Format(toFormat), nil
 }
 
-//日期格式的字符串转当天 23:59:59 的日期时间格式字符串
-//例如 2020-10-26 转 2020-10-26 23:59:59
+// 日期格式的字符串转当天 23:59:59 的日期时间格式字符串
+// 例如 2020-10-26 转 2020-10-26 23:59:59
 // dateTimeSting 时间
 // formFormat 时间格式
 // toFormat 目标格式
@@ -97,25 +97,29 @@ func GetDateTimeEndByDate(dateTimeString, formFormat, toFormat string) (string, 
 	return FormatTimeToMaxDateTime(t, toFormat), nil
 }
 
-//计算两个日期之间差多少天
+// 计算两个日期之间差多少天
 func DiffDays(startDateTime, endDateTime time.Time) int64 {
 	return int64(math.Abs(endDateTime.Sub(startDateTime).Hours() / 24))
 }
 
-//获取当前日期前后 days 天 months月 years年 日期
+// 获取当前日期前后 days 天 months月 years年 日期
 func GetTimeAroundByNum(days, months, years int) string {
 	t := time.Now().AddDate(years, months, days)
 	return GetZeroTime(t).Format(TimeFormat)
 }
 
-//获取当前日期前后 days 天 日期
+// 获取当前日期前后 days 天 日期
 func GetTimeAroundByDays(days int) string {
 	t := time.Now().AddDate(0, 0, days)
 	return GetZeroTime(t).Format(TimeFormat)
 }
 
-//获取当前日期前后 days 天 日期
+// 获取当前日期前后 days 天 日期
 func GetTimeAroundByMonths(months int) string {
 	t := time.Now().AddDate(0, months, 0)
 	return GetZeroTime(t).Format(TimeFormat)
+}
+
+func GetCurrentMonth() string {
+	return time.Now().Format("01")
 }

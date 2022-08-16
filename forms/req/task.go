@@ -2,10 +2,11 @@ package req
 
 type PickListForm struct {
 	Paging
-	ShopId int    `json:"shop_id" form:"shop_id"`
-	Goods  string `json:"goods" form:"goods"`
-	Number string `json:"number" form:"number"`
-	Status *int   `json:"status"`
+	BatchId int    `json:"batch_id" form:"batch_id" binding:"required"`
+	ShopId  int    `json:"shop_id" form:"shop_id"`
+	Goods   string `json:"goods" form:"goods"`
+	Number  string `json:"number" form:"number"`
+	Status  *int   `json:"status" form:"status"`
 }
 
 type PickToppingForm struct {
@@ -23,10 +24,4 @@ type ChangeNumReq struct {
 
 type PrintReq struct {
 	Ids []int `json:"ids" binding:"required"`
-}
-
-type PrintParams struct {
-	WarehouseId     int    `json:"warehouse_id" binding:"required"`
-	DeliveryOrderNo string `json:"delivery_order_no" binding:"required"`
-	ShopCode        string `json:"shop_code" binding:"required"`
 }

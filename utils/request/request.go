@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"pick_v2/global"
 )
 
 func Post(path string, responseData interface{}) ([]byte, error) {
+
+	global.SugarLogger.Infof("params:%+v", responseData)
 
 	cfg := global.ServerConfig
 
@@ -22,7 +25,7 @@ func Post(path string, responseData interface{}) ([]byte, error) {
 		return nil, err
 	}
 
-	fmt.Println(string(jData))
+	global.SugarLogger.Infof("params:%s", string(jData))
 
 	rq, err := http.NewRequest("POST", url, bytes.NewReader(jData))
 
@@ -37,10 +40,12 @@ func Post(path string, responseData interface{}) ([]byte, error) {
 
 	defer res.Body.Close()
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}
+
+	global.SugarLogger.Info(string(body))
 
 	return body, nil
 }

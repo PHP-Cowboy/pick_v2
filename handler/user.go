@@ -227,6 +227,7 @@ func Login(ctx *gin.Context) {
 		"token":       token,
 		"userId":      user.Id,
 		"account":     user.Account,
+		"name":        user.Name,
 		"warehouseId": user.WarehouseId,
 	})
 }

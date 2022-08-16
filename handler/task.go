@@ -10,7 +10,6 @@ import (
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
-	"pick_v2/model"
 	"pick_v2/model/batch"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
@@ -61,16 +60,16 @@ func PickList(c *gin.Context) {
 	db := global.DB
 
 	var (
-		ids           []int
-		res           rsp.PickListRsp
-		pick          []batch.Pick
-		pickGoods     []batch.PickGoods
-		pickListModel []rsp.PickListModel
-		result        *gorm.DB
+		ids        []int
+		res        rsp.PickListRsp
+		pick       []batch.Pick
+		pickGoods  []batch.PickGoods
+		pickRemark []batch.PickRemark
+		result     *gorm.DB
 	)
 
 	if form.Goods != "" || form.Number != "" || form.ShopId > 0 {
-		result = db.Where(batch.PickGoods{GoodsName: form.Goods, Number: form.Number, ShopId: form.ShopId}).Find(&pickGoods)
+		result = db.Where(batch.PickGoods{BatchId: form.BatchId, GoodsName: form.Goods, Number: form.Number, ShopId: form.ShopId}).Find(&pickGoods)
 		if result.Error != nil {
 			xsq_net.ErrorJSON(c, result.Error)
 			return
@@ -81,11 +80,13 @@ func PickList(c *gin.Context) {
 		}
 	}
 
-	localDb := db.Table("t_pick p").Where("status = ?", form.Status)
+	localDb := db.Table("t_pick")
 
 	if len(ids) > 0 {
-		localDb.Where("p.id in (?)", ids)
+		localDb.Where("id in (?)", ids)
 	}
+
+	localDb.Where("batch_id = ? and status = ?", form.BatchId, form.Status)
 
 	result = localDb.Find(&pick)
 
@@ -96,19 +97,44 @@ func PickList(c *gin.Context) {
 		return
 	}
 
-	result = localDb.
-		Select("p.id,shop_code,p.shop_name,shop_num,order_num,need_num,pick_user,take_orders_time,order_remark,goods_remark").
-		Where("p.status = ?", form.Status).
-		Joins("left join t_pick_remark pr on pr.pick_id = p.id").
-		Scopes(model.Paginate(form.Page, form.Size)).
-		Scan(&pickListModel)
+	//拣货ids
+	pickIds := make([]int, 0, len(pick))
+	for _, p := range pick {
+		pickIds = append(pickIds, p.Id)
+	}
+
+	//拣货ids 的订单备注
+	result = db.Where("pick_id in (?)", pickIds).Find(&pickRemark)
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//构建pickId 对应的订单 是否有备注map
+	remarkMp := make(map[int]struct{}, 0) //key 存在即为有
+	for _, remark := range pickRemark {
+		remarkMp[remark.PickId] = struct{}{}
+	}
 
 	isRemark := false
 
 	list := make([]rsp.Pick, 0)
-	for _, p := range pickListModel {
-		if p.GoodsRemark != "" || p.OrderRemark != "" {
+	for _, p := range pick {
+		_, ok := remarkMp[p.Id]
+		if ok { //拣货id在拣货备注中存在，即为有备注
 			isRemark = true
+		}
+
+		takeOrdersTime := ""
+
+		if p.TakeOrdersTime != nil {
+			takeOrdersTime = p.TakeOrdersTime.Format(timeutil.TimeFormat)
+		}
+
+		reviewTime := ""
+
+		if p.ReviewTime != nil {
+			takeOrdersTime = p.ReviewTime.Format(timeutil.TimeFormat)
 		}
 
 		list = append(list, rsp.Pick{
@@ -119,8 +145,15 @@ func PickList(c *gin.Context) {
 			OrderNum:       p.OrderNum,
 			NeedNum:        p.NeedNum,
 			PickUser:       p.PickUser,
-			TakeOrdersTime: p.TakeOrdersTime.Format(timeutil.TimeFormat),
+			TakeOrdersTime: takeOrdersTime,
 			IsRemark:       isRemark,
+			Status:         p.Status,
+			UpdateTime:     p.UpdateTime.Format(timeutil.TimeFormat),
+			PickNum:        p.PickNum,
+			ReviewNum:      p.ReviewNum,
+			Num:            p.Num,
+			ReviewUser:     p.ReviewUser,
+			ReviewTime:     reviewTime,
 		})
 	}
 
@@ -159,9 +192,15 @@ func GetPickDetail(c *gin.Context) {
 	res.TaskName = pick.TaskName
 	res.ShopNum = pick.ShopNum
 	res.OrderNum = pick.OrderNum
-	res.GoodsNum = 0
+	res.GoodsNum = pick.NeedNum
 	res.PickUser = pick.PickUser
-	res.TakeOrdersTime = pick.TakeOrdersTime
+
+	takeOrdersTime := ""
+
+	if pick.TakeOrdersTime != nil {
+		takeOrdersTime = pick.TakeOrdersTime.Format(timeutil.TimeFormat)
+	}
+	res.TakeOrdersTime = takeOrdersTime
 
 	result = db.Where("pick_id = ?", form.PickId).Find(&pickGoods)
 
@@ -174,10 +213,13 @@ func GetPickDetail(c *gin.Context) {
 
 	for _, goods := range pickGoods {
 		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.PickGoods{
-			GoodsName: goods.GoodsName,
-			GoodsSpe:  goods.GoodsSpe,
-			Shelves:   goods.Shelves,
-			NeedNum:   goods.NeedNum,
+			GoodsName:   goods.GoodsName,
+			GoodsSpe:    goods.GoodsSpe,
+			Shelves:     goods.Shelves,
+			NeedNum:     goods.NeedNum,
+			CompleteNum: goods.CompleteNum,
+			ReviewNum:   goods.ReviewNum,
+			Unit:        goods.Unit,
 		})
 	}
 
@@ -191,6 +233,7 @@ func GetPickDetail(c *gin.Context) {
 	}
 
 	list := []rsp.PickRemark{}
+	//这里订单号会重复，但是sku是不一致的，待确认
 	for _, remark := range pickRemark {
 		list = append(list, rsp.PickRemark{
 			Number:      remark.Number,
@@ -255,7 +298,8 @@ func PushPrint(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Where("id in (?)", form.Ids).Find(&pick)
+	//复核完成
+	result := db.Where("id in (?) and status = 2", form.Ids).Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -298,7 +342,7 @@ func PushPrint(c *gin.Context) {
 	}
 
 	for _, ch := range printChSlice {
-		AddPrintJob(&global.PrintCh{
+		AddPrintJobMap(constant.JH_HUOSE_CODE, &global.PrintCh{
 			DeliveryOrderNo: ch.DeliveryOrderNo,
 			ShopId:          ch.ShopId,
 		})

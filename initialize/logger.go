@@ -9,7 +9,7 @@ import (
 )
 
 func InitLogger() {
-	writeSyncer := getLogWriter("./logs/test.logs")
+	writeSyncer := getLogWriter("./logs/")
 	encoder := getEncoder()
 	core := zapcore.NewCore(encoder, writeSyncer, zapcore.DebugLevel)
 
@@ -27,7 +27,7 @@ func getEncoder() zapcore.Encoder {
 func getLogWriter(filename string) zapcore.WriteSyncer {
 
 	l, _ := rotatelogs.New(
-		filename+".%Y%m%d",
+		filename+"%Y%m%d.log",
 		rotatelogs.WithMaxAge(30*24*time.Hour),    // 最长保存30天
 		rotatelogs.WithRotationTime(time.Hour*24), // 24小时切割一次
 	)

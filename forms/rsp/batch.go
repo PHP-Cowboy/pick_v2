@@ -32,6 +32,7 @@ type PrePick struct {
 	ShopCode     string               `json:"shop_code"`
 	ShopName     string               `json:"shop_name"`
 	Line         string               `json:"line"`
+	Status       int                  `json:"status"`
 	CategoryInfo map[string]PickCount `json:"category_info"`
 }
 
@@ -139,4 +140,17 @@ type OutGoodsRsp struct {
 	Code int         `json:"code"`
 	Data interface{} `json:"data"`
 	Msg  string      `json:"msg"`
+}
+
+type PickNums struct {
+	PrePickId int `json:"pre_pick_id"`
+	ShopNum   int `json:"shop_num"`  //门店数
+	OrderNum  int `json:"order_num"` //订单数
+	NeedNum   int `json:"need_num"`  //需拣
+}
+
+type MergePickNums struct {
+	ShopNum  int `json:"shop_num"`  //门店数
+	OrderNum int `json:"order_num"` //订单数
+	NeedNum  int `json:"need_num"`  //需拣
 }

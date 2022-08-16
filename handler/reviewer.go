@@ -10,8 +10,8 @@ import (
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
 	"pick_v2/middlewares"
-	"pick_v2/model"
 	"pick_v2/model/batch"
+	"pick_v2/model/order"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/str_util"
 	"pick_v2/utils/timeutil"
@@ -23,10 +23,11 @@ import (
 // 复核列表 通过状态区分是否已完成
 func ReviewList(c *gin.Context) {
 	var (
-		form          req.ReviewListReq
-		res           rsp.ReviewListRsp
-		pick          []batch.Pick
-		pickListModel []rsp.PickListModel
+		form       req.ReviewListReq
+		res        rsp.ReviewListRsp
+		pick       []batch.Pick
+		pickRemark []batch.PickRemark
+		//pickListModel []rsp.PickListModel
 	)
 
 	if err := c.ShouldBind(&form); err != nil {
@@ -45,26 +46,33 @@ func ReviewList(c *gin.Context) {
 
 	res.Total = result.RowsAffected
 
-	result = db.Table("t_pick p").
-		Select("p.id,shop_code,p.shop_name,shop_num,order_num,need_num,pick_num,pick_user,take_orders_time,review_num,order_remark,goods_remark").
-		Where("p.status = ?", form.Status).
-		Where(batch.Pick{PickUser: form.Name}).
-		Joins("left join t_pick_remark pr on pr.pick_id = p.id").
-		Scopes(model.Paginate(form.Page, form.Size)).
-		Scan(&pickListModel)
+	//拣货ids
+	pickIds := make([]int, 0, len(pick))
+	for _, p := range pick {
+		pickIds = append(pickIds, p.Id)
+	}
 
+	//拣货ids 的订单备注
+	result = db.Where("pick_id in (?)", pickIds).Find(&pickRemark)
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	list := make([]rsp.Pick, 0, form.Size)
+	//构建pickId 对应的订单 是否有备注map
+	remarkMp := make(map[int]struct{}, 0) //key 存在即为有
+	for _, remark := range pickRemark {
+		remarkMp[remark.PickId] = struct{}{}
+	}
 
 	isRemark := false
 
-	for _, p := range pickListModel {
+	list := make([]rsp.Pick, 0, form.Size)
 
-		if p.GoodsRemark != "" || p.OrderRemark != "" {
+	for _, p := range pick {
+
+		_, ok := remarkMp[p.Id]
+		if ok { //拣货id在拣货备注中存在，即为有备注
 			isRemark = true
 		}
 
@@ -268,6 +276,9 @@ func ConfirmDelivery(c *gin.Context) {
 
 	//构造打印 chan 结构体数据
 	printChMp := make(map[int]struct{}, 0)
+
+	//构造更新 orderInfo 表完成出库数据
+	orderInfoIds := []int{}
 	for k, pg := range pickGoods {
 		_, printChOk := printChMp[pg.ShopId]
 
@@ -282,11 +293,16 @@ func ConfirmDelivery(c *gin.Context) {
 		}
 
 		pickGoods[k].ReviewNum = num
+
+		if pg.NeedNum == num { //需拣和复核数一致，即为完成
+			orderInfoIds = append(orderInfoIds, pg.OrderInfoId)
+		}
+
 	}
 
 	now := time.Now()
 
-	dateStr := strconv.Itoa(now.Year()) + now.Format("01") + strconv.Itoa(now.Day())
+	dateStr := now.Format(timeutil.DateIntFormat)
 
 	//redis
 	redis := global.Redis
@@ -306,6 +322,19 @@ func ConfirmDelivery(c *gin.Context) {
 	deliveryOrderNo := str_util.StrPad(number, 3, "0", 0)
 
 	tx := db.Begin()
+
+	//更新orderInfo表数据为完成状态
+	result = tx.Model(&order.OrderInfo{}).
+		Where("id in (?)", orderInfoIds).
+		Updates(map[string]interface{}{
+			"delivery_order_no": deliveryOrderNo,
+			"pick_time":         now.Format(timeutil.TimeFormat),
+		}) //
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
 
 	//更新主表
 	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2, "review_time": &now, "num": form.Num, "delivery_order_no": deliveryOrderNo})
@@ -327,7 +356,7 @@ func ConfirmDelivery(c *gin.Context) {
 
 	//拆单 -打印
 	for shopId, _ := range printChMp {
-		AddPrintJob(&global.PrintCh{
+		AddPrintJobMap(constant.JH_HUOSE_CODE, &global.PrintCh{
 			DeliveryOrderNo: deliveryOrderNo,
 			ShopId:          shopId,
 		})

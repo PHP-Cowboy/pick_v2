@@ -21,7 +21,7 @@ func ReceivingOrders(c *gin.Context) {
 	var (
 		res     rsp.ReceivingOrdersRsp
 		pick    batch.Pick
-		batches batch.Batch
+		batches []batch.Batch
 	)
 
 	db := global.DB
@@ -35,6 +35,7 @@ func ReceivingOrders(c *gin.Context) {
 
 	userInfo := claims.(*middlewares.CustomClaims)
 
+	//先查询是否有当前拣货员被分配的任务或已经接单且未完成拣货的数据
 	result := db.Model(&batch.Pick{}).Where("pick_user = ? and status = 0", userInfo.Name).First(&pick)
 
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -49,7 +50,21 @@ func ReceivingOrders(c *gin.Context) {
 		return
 	}
 
-	result = db.Model(&batch.Pick{}).Where("pick_user = '' and status = 0").First(&pick)
+	//进行中的批次
+	result = db.Where("status = 0").Find(&batches)
+
+	batchIds := make([]int, 0)
+
+	for _, b := range batches {
+		batchIds = append(batchIds, b.Id)
+	}
+
+	if len(batchIds) == 0 {
+		xsq_net.ErrorJSON(c, errors.New("当前没有正在进行中的批次"))
+	}
+
+	//查询未被接单的拣货池数据
+	result = db.Model(&batch.Pick{}).Where("batch_id in (?) and pick_user = '' and status = 0", batchIds).First(&pick)
 
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -57,16 +72,6 @@ func ReceivingOrders(c *gin.Context) {
 	}
 
 	if result.RowsAffected > 0 {
-		result = db.First(&batches, pick.Id)
-		if result.Error != nil {
-			xsq_net.ErrorJSON(c, result.Error)
-			return
-		}
-
-		if batches.Status != 0 {
-			xsq_net.ErrorJSON(c, errors.New("批次不在进行中"))
-			return
-		}
 
 		res.Id = pick.Id
 
@@ -148,9 +153,9 @@ func CompletePick(c *gin.Context) {
 	}
 
 	for k, pg := range pickGoods {
-		num, ok := pickGoodsMap[pg.Id]
+		num, pgMpOk := pickGoodsMap[pg.Id]
 
-		if !ok {
+		if !pgMpOk {
 			continue
 		}
 

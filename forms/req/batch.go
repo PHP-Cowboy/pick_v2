@@ -34,6 +34,7 @@ type OutGoods struct {
 }
 
 type OutGoodsList struct {
+	GoodsLogId   int    `json:"goods_log_id"`
 	Number       string `json:"number"`
 	OutNumber    string `json:"out_number"`
 	CkNumber     string `json:"ck_number"`
