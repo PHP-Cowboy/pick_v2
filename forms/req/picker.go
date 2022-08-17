@@ -6,7 +6,7 @@ type ReceivingOrdersForm struct {
 
 type PickingRecordForm struct {
 	Paging
-	Status int `json:"status" form:"status"`
+	Status *int `json:"status" form:"status"`
 }
 
 type CompletePickForm struct {

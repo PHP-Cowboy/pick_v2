@@ -195,12 +195,17 @@ func CompletePick(c *gin.Context) {
 
 // 剩余数量 放拣货池那边
 func RemainingQuantity(c *gin.Context) {
-	var form req.ReceivingOrdersForm
 
-	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+	var count int64
+
+	result := global.DB.Model(&batch.Pick{}).Where("status = 0 and pick_user = ''").Count(&count)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
+
+	xsq_net.SucJson(c, gin.H{"count": count})
 }
 
 // 拣货记录
@@ -234,8 +239,8 @@ func PickingRecord(c *gin.Context) {
 
 	local := db.Where("pick_user = ? and take_orders_time >= ?", userInfo.Name, towDaysAgo)
 
-	if form.Status == 0 {
-		local.Where("status = ?", form.Status)
+	if form.Status != nil && *form.Status == 0 {
+		local.Where("status = ?", *form.Status)
 	} else {
 		local.Where("status != 0")
 	}

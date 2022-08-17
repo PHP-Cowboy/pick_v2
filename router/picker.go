@@ -13,6 +13,8 @@ func PickerRoute(g *gin.RouterGroup) {
 		pickerGroup.GET("/receiving_orders", handler.ReceivingOrders)
 		//完成拣货
 		pickerGroup.POST("/complete", handler.CompletePick)
+		//剩余数量
+		pickerGroup.GET("/remaining_quantity", handler.RemainingQuantity)
 		//拣货记录
 		pickerGroup.GET("/record", handler.PickingRecord)
 		//拣货记录明细
