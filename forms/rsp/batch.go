@@ -7,6 +7,7 @@ type GetBatchListRsp struct {
 
 type Batch struct {
 	Id                int    `json:"id"`
+	UpdateTime        string `json:"update_time"`
 	BatchName         string `json:"batch_name"`
 	DeliveryStartTime string `json:"delivery_start_time"`
 	DeliveryEndTime   string `json:"delivery_end_time"`
@@ -42,10 +43,10 @@ type PickCount struct {
 }
 
 type Ret struct {
-	OutC      int
-	NeedC     int
-	ShopId    int
-	GoodsType string
+	OutC      int    `json:"out_c"`
+	NeedC     int    `json:"need_c"`
+	ShopId    int    `json:"shop_id"`
+	GoodsType string `json:"goods_type"`
 }
 
 type BatchPoolNum struct {

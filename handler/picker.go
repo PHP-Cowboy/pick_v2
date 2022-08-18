@@ -84,6 +84,14 @@ func ReceivingOrders(c *gin.Context) {
 			return
 		}
 
+		//更新拣货单数量
+		result = db.Model(batch.Batch{}).Where("id = ?", pick.BatchId).Update("pick_num", gorm.Expr("pick_num + ?", 1))
+
+		if result.Error != nil {
+			xsq_net.ErrorJSON(c, ecode.DataSaveError)
+			return
+		}
+
 		xsq_net.SucJson(c, res)
 		return
 	} else {
@@ -152,6 +160,8 @@ func CompletePick(c *gin.Context) {
 		return
 	}
 
+	totalNum := 0 //更新拣货池拣货数量
+
 	for k, pg := range pickGoods {
 		num, pgMpOk := pickGoodsMap[pg.Id]
 
@@ -160,11 +170,15 @@ func CompletePick(c *gin.Context) {
 		}
 
 		pickGoods[k].CompleteNum = num
+
+		totalNum += num
 	}
 
 	tx := db.Begin()
 
 	status := 1
+
+	updates := make(map[string]interface{}, 0)
 
 	if form.Type == 2 { //无需拣货
 		status = 2
@@ -177,10 +191,14 @@ func CompletePick(c *gin.Context) {
 			xsq_net.ErrorJSON(c, result.Error)
 			return
 		}
+
+		updates["pick_num"] = totalNum
 	}
 
+	updates["status"] = status
+
 	//更新主表
-	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Update("status", status)
+	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(updates)
 
 	if result.Error != nil {
 		tx.Rollback()

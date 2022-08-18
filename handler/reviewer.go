@@ -76,6 +76,12 @@ func ReviewList(c *gin.Context) {
 			isRemark = true
 		}
 
+		reviewTime := ""
+
+		if p.ReviewTime != nil {
+			reviewTime = p.ReviewTime.Format(timeutil.TimeFormat)
+		}
+
 		list = append(list, rsp.Pick{
 			Id:             p.Id,
 			TaskName:       p.TaskName,
@@ -87,6 +93,11 @@ func ReviewList(c *gin.Context) {
 			PickUser:       p.PickUser,
 			TakeOrdersTime: p.TakeOrdersTime.Format(timeutil.TimeFormat),
 			IsRemark:       isRemark,
+			PickNum:        p.PickNum,
+			ReviewNum:      p.ReviewNum,
+			Num:            p.Num,
+			ReviewUser:     p.ReviewUser,
+			ReviewTime:     reviewTime,
 		})
 	}
 
@@ -137,6 +148,14 @@ func ReviewDetail(c *gin.Context) {
 			xsq_net.ErrorJSON(c, result.Error)
 			return
 		}
+
+		//更新复核单数量
+		result = db.Model(batch.Batch{}).Where("id = ?", pick.BatchId).Update("recheck_sheet_num", gorm.Expr("recheck_sheet_num + ?", 1))
+
+		if result.Error != nil {
+			xsq_net.ErrorJSON(c, ecode.DataSaveError)
+			return
+		}
 	}
 
 	var (
@@ -145,8 +164,6 @@ func ReviewDetail(c *gin.Context) {
 	)
 
 	res.TaskName = pick.TaskName
-	res.OutTotal = 0
-	res.UnselectedTotal = 0
 	res.PickUser = pick.PickUser
 	res.TakeOrdersTime = pick.TakeOrdersTime.Format(timeutil.TimeFormat)
 	res.ReviewUser = pick.ReviewUser
@@ -169,9 +186,11 @@ func ReviewDetail(c *gin.Context) {
 
 	needTotal := 0
 	completeTotal := 0
+	reviewTotal := 0
 	for _, goods := range pickGoods {
 		completeTotal += goods.CompleteNum
 		needTotal += goods.NeedNum
+		reviewTotal += goods.ReviewNum
 		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.PickGoods{
 			Id:          goods.Id,
 			GoodsName:   goods.GoodsName,
@@ -185,6 +204,7 @@ func ReviewDetail(c *gin.Context) {
 
 	res.OutTotal = completeTotal
 	res.UnselectedTotal = needTotal - completeTotal
+	res.ReviewTotal = reviewTotal
 
 	res.Goods = goodsMap
 
@@ -323,17 +343,19 @@ func ConfirmDelivery(c *gin.Context) {
 
 	tx := db.Begin()
 
-	//更新orderInfo表数据为完成状态
-	result = tx.Model(&order.OrderInfo{}).
-		Where("id in (?)", orderInfoIds).
-		Updates(map[string]interface{}{
-			"delivery_order_no": deliveryOrderNo,
-			"pick_time":         now.Format(timeutil.TimeFormat),
-		}) //
-	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
+	if len(orderInfoIds) > 0 { //有完成的
+		//更新orderInfo表数据为完成状态
+		result = tx.Model(&order.OrderInfo{}).
+			Where("id in (?)", orderInfoIds).
+			Updates(map[string]interface{}{
+				"delivery_order_no": deliveryOrderNo,
+				"pick_time":         now.Format(timeutil.TimeFormat),
+			}) //
+		if result.Error != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
 	}
 
 	//更新主表
@@ -361,8 +383,6 @@ func ConfirmDelivery(c *gin.Context) {
 			ShopId:          shopId,
 		})
 	}
-
-	//todo 批次结束要删除相关数据并写入已完成订单表
 
 	result = db.First(&batches, pick.BatchId)
 	if result.Error != nil {

@@ -12,6 +12,7 @@ type ReviewDetailRsp struct {
 	TaskName        string                 `json:"task_name"`
 	OutTotal        int                    `json:"out_total"`
 	UnselectedTotal int                    `json:"unselected_total"`
+	ReviewTotal     int                    `json:"review_total"`
 	PickUser        string                 `json:"pick_user"`
 	TakeOrdersTime  string                 `json:"take_orders_time"`
 	ReviewUser      string                 `json:"review_user"`

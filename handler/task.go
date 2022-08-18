@@ -134,7 +134,7 @@ func PickList(c *gin.Context) {
 		reviewTime := ""
 
 		if p.ReviewTime != nil {
-			takeOrdersTime = p.ReviewTime.Format(timeutil.TimeFormat)
+			reviewTime = p.ReviewTime.Format(timeutil.TimeFormat)
 		}
 
 		list = append(list, rsp.Pick{

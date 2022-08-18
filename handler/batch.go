@@ -834,6 +834,7 @@ func GetBatchList(c *gin.Context) {
 
 		list = append(list, &rsp.Batch{
 			Id:                b.Id,
+			UpdateTime:        b.UpdateTime.Format(timeutil.TimeFormat),
 			BatchName:         b.BatchName,
 			DeliveryStartTime: deliveryStartTime,
 			DeliveryEndTime:   b.DeliveryEndTime.Format(timeutil.TimeFormat),
@@ -970,7 +971,7 @@ func GetPrePickList(c *gin.Context) {
 	retCount := []rsp.Ret{}
 
 	result = db.Model(&batch.PrePickGoods{}).
-		Select("SUM(out_count) as outC, SUM(need_num) AS needC, shop_id, goods_type").
+		Select("SUM(out_count) as out_c, SUM(need_num) AS need_c, shop_id, goods_type").
 		Where("pre_pick_id in (?)", prePickIds).
 		Group("shop_id, goods_type").
 		Find(&retCount)
