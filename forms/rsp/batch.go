@@ -60,6 +60,10 @@ type GetBatchPoolNumRsp struct {
 }
 
 type GetPrePickDetailRsp struct {
+	TaskName   string                    `json:"task_name"`
+	OrderNum   int                       `json:"order_num"`
+	GoodsNum   int                       `json:"goods_num"`
+	Line       string                    `json:"line"`
 	Goods      map[string][]PrePickGoods `json:"goods"`
 	RemarkList []Remark                  `json:"remark_list"`
 }
@@ -89,6 +93,7 @@ type GetBaseRsp struct {
 	DeliveryMethod    int    `json:"delivery_method"`
 	Line              string `json:"line"`
 	Goods             string `json:"goods"`
+	Status            int    `json:"status"`
 }
 
 type GetPoolNumRsp struct {

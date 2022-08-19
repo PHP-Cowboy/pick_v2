@@ -48,7 +48,7 @@ type PrePick struct {
 	ShopCode    string `gorm:"type:varchar(255);not null;comment:店铺编号"`
 	ShopName    string `gorm:"type:varchar(64);not null;comment:店铺名称"`
 	Line        string `gorm:"type:varchar(255);not null;comment:线路"`
-	OrderNum    int    `gorm:"type:int(11);comment:订单数量"`
+	OrderNum    int    `gorm:"type:int;not null;comment:订单数"`
 	Status      int    `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:已进入拣货池"`
 }
 
@@ -60,7 +60,7 @@ type PrePickGoods struct {
 	OrderInfoId      int    `gorm:"type:int(11) unsigned;comment:订单商品接口返回ID"`
 	Number           string `gorm:"type:varchar(32);comment:订单编号"`
 	ShopId           int    `gorm:"type:int(11);comment:店铺id"`
-	PrePickId        int    `gorm:"type:int(11) unsigned;index;comment:预拣货表id"`
+	PrePickId        int    `gorm:"type:int(11) unsigned;index;comment:预拣货表id"` //index
 	DistributionType int    `gorm:"type:tinyint unsigned;comment:配送方式:1:公司配送,2:用户自提,3:三方物流,4:快递配送,5:首批物料|设备单"`
 	Sku              string `gorm:"type:varchar(64);comment:sku"`
 	GoodsName        string `gorm:"type:varchar(64);comment:商品名称"`

@@ -60,7 +60,8 @@ func ReceivingOrders(c *gin.Context) {
 	}
 
 	if len(batchIds) == 0 {
-		xsq_net.ErrorJSON(c, errors.New("当前没有正在进行中的批次"))
+		xsq_net.ErrorJSON(c, errors.New("已停止拣货,无法接单"))
+		return
 	}
 
 	//查询未被接单的拣货池数据
@@ -214,9 +215,27 @@ func CompletePick(c *gin.Context) {
 // 剩余数量 放拣货池那边
 func RemainingQuantity(c *gin.Context) {
 
-	var count int64
+	var (
+		count    int64
+		batches  []batch.Batch
+		batchIds []int
+	)
 
-	result := global.DB.Model(&batch.Pick{}).Where("status = 0 and pick_user = ''").Count(&count)
+	db := global.DB
+
+	//批次进行中或暂停的单数量
+	result := db.Where("status = 0 or status = 2").Find(&batches)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	for _, b := range batches {
+		batchIds = append(batchIds, b.Id)
+	}
+
+	result = db.Model(&batch.Pick{}).Where("batch_id in (?) and status = 0 and pick_user = ''", batchIds).Count(&count)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
