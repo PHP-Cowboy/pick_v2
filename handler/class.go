@@ -2,12 +2,14 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/gin-gonic/gin"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
 	"pick_v2/model"
 	"pick_v2/model/other"
+	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/request"
 	"pick_v2/utils/xsq_net"
@@ -18,7 +20,7 @@ type ClassResponse struct {
 	Data []other.Classification `json:"data"`
 }
 
-//同步分类
+// 同步分类
 func SyncClassification(c *gin.Context) {
 	url := "api/v1/remote/pick/goods/typ/list"
 
@@ -72,12 +74,17 @@ func SyncClassification(c *gin.Context) {
 			xsq_net.ErrorJSON(c, ret.Error)
 			return
 		}
+
+		if err = cache.SetClassification(); err != nil {
+			xsq_net.ErrorJSON(c, errors.New("分类更新成功，但缓存更新失败"))
+			return
+		}
 	}
 
 	xsq_net.Success(c)
 }
 
-//分类列表
+// 分类列表
 func ClassList(c *gin.Context) {
 	var form req.ClassListForm
 
@@ -129,7 +136,7 @@ func ClassList(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-//批量设置分类
+// 批量设置分类
 func BatchSetClass(c *gin.Context) {
 	var form req.BatchSetClassForm
 
@@ -145,10 +152,15 @@ func BatchSetClass(c *gin.Context) {
 		return
 	}
 
+	if err := cache.SetClassification(); err != nil {
+		xsq_net.ErrorJSON(c, errors.New("分类更新成功，但缓存更新失败"))
+		return
+	}
+
 	xsq_net.Success(c)
 }
 
-//仓库分类名列表
+// 仓库分类名列表
 func ClassNameList(c *gin.Context) {
 	var (
 		res []*rsp.ClassNameListRsp

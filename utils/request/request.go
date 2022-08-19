@@ -67,10 +67,11 @@ func Get(path string) ([]byte, error) {
 	}
 	defer res.Body.Close()
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}
+
 	return body, err
 }
 

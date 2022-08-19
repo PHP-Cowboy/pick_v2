@@ -10,6 +10,7 @@ import (
 	"pick_v2/global"
 	"pick_v2/model"
 	"pick_v2/model/other"
+	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/request"
 	"pick_v2/utils/xsq_net"
@@ -21,10 +22,10 @@ type ShopResponse struct {
 	Data []other.Shop `json:"data"`
 }
 
-//同步门店
+// 同步门店
 func SyncShop(c *gin.Context) {
 
-	path := "api/v1/remote/pick/shop/list"
+	path := "api/v1/remote/shop/list"
 
 	body, err := request.Get(path)
 	if err != nil {
@@ -74,10 +75,11 @@ func SyncShop(c *gin.Context) {
 			Province:  shop.Province,
 			City:      shop.City,
 			District:  shop.District,
-			ShopCode:  shop.ShopCode,
-			Status:    shop.Status,
-			CreateAt:  time.Now(),
-			UpdateAt:  time.Now(),
+			//Line:      shop.Line,
+			ShopCode: shop.ShopCode,
+			Status:   shop.Status,
+			CreateAt: time.Now(),
+			UpdateAt: time.Now(),
 		})
 	}
 
@@ -88,12 +90,17 @@ func SyncShop(c *gin.Context) {
 		if res.Error != nil {
 			xsq_net.ErrorJSON(c, res.Error)
 		}
+
+		if err = cache.SetShopLine(); err != nil {
+			xsq_net.ErrorJSON(c, errors.New("店铺更新成功，但缓存更新失败"))
+			return
+		}
 	}
 
 	xsq_net.Success(c)
 }
 
-//门店列表
+// 门店列表
 func ShopList(c *gin.Context) {
 	var form req.ShopListForm
 
@@ -132,7 +139,9 @@ func ShopList(c *gin.Context) {
 
 	res.Total = ret.RowsAffected
 
-	ret = db.Scopes(model.Paginate(form.Page, form.Size)).Find(&shops)
+	if form.IsPage {
+		ret = db.Scopes(model.Paginate(form.Page, form.Size)).Find(&shops)
+	}
 
 	list := make([]*rsp.Shop, 0, form.Size)
 
@@ -150,7 +159,7 @@ func ShopList(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-//批量设置线路
+// 批量设置线路
 func BatchSetLine(c *gin.Context) {
 	var form req.BatchSetLineForm
 
@@ -166,10 +175,15 @@ func BatchSetLine(c *gin.Context) {
 		return
 	}
 
+	if err := cache.SetShopLine(); err != nil {
+		xsq_net.ErrorJSON(c, errors.New("线路设置成功，但缓存更新失败"))
+		return
+	}
+
 	xsq_net.Success(c)
 }
 
-//线路名称列表
+// 线路名称列表
 func LineList(c *gin.Context) {
 	var (
 		res []*rsp.LineListRsp

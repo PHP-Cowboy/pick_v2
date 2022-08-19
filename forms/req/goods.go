@@ -17,6 +17,8 @@ type GetGoodsListForm struct {
 	PayStartTime string `json:"pay_start_time" form:"pay_start_time"`
 	PayEndTime   string `json:"pay_end_time"  form:"pay_end_time"`
 	Index        int    `json:"index"`
+	GoodsName    string `json:"goods_name" form:"goods_name"` //
+	ShopName     string `json:"shop_name" form:"shop_name"`   //
 }
 
 type GetOrderDetailForm struct {

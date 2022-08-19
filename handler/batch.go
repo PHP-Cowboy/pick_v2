@@ -156,6 +156,14 @@ func CreateBatch(c *gin.Context) {
 	shopNumMp := make(map[int]struct{}, 0)     //店铺
 	orderNumMp := make(map[string]struct{}, 0) //订单
 
+	//缓存中的线路数据
+	lineCacheMp, errCache := cache.GetShopLine()
+
+	if errCache != nil {
+		xsq_net.ErrorJSON(c, errors.New("线路缓存获取失败"))
+		return
+	}
+
 	for _, goods := range goodsRes.Data.List {
 		goodsNum += goods.LackCount
 
@@ -167,6 +175,14 @@ func CreateBatch(c *gin.Context) {
 			xsq_net.ErrorJSON(c, errors.New("商品类型:"+goods.SecondType+"数据未同步"))
 			return
 		}
+
+		cacheMpLine, cacheMpOk := lineCacheMp[goods.ShopId]
+
+		if !cacheMpOk {
+			xsq_net.ErrorJSON(c, errors.New("店铺:"+goods.ShopName+"线路未同步，请先同步"))
+			return
+		}
+
 		orders = append(orders, order.OrderInfo{
 			Id:               goods.Id,
 			BatchId:          batches.Id,
@@ -175,7 +191,7 @@ func CreateBatch(c *gin.Context) {
 			ShopType:         goods.ShopType,
 			ShopCode:         goods.ShopCode,
 			HouseCode:        goods.HouseCode,
-			Line:             goods.Line,
+			Line:             cacheMpLine,
 			Number:           goods.Number,
 			Status:           goods.Status,
 			DeliveryAt:       goods.DeliveryAt,
@@ -236,7 +252,7 @@ func CreateBatch(c *gin.Context) {
 				OrderRemark: goods.OrderRemark,
 				GoodsRemark: goods.GoodsRemark,
 				ShopName:    goods.ShopName,
-				Line:        goods.Line,
+				Line:        cacheMpLine,
 				PrePickId:   0,
 			})
 		}
@@ -255,7 +271,7 @@ func CreateBatch(c *gin.Context) {
 			ShopId:      goods.ShopId,
 			ShopCode:    goods.ShopCode,
 			ShopName:    goods.ShopName,
-			Line:        goods.Line,
+			Line:        cacheMpLine,
 			Status:      0,
 		})
 
@@ -756,16 +772,16 @@ func GetBatchList(c *gin.Context) {
 	db := global.DB
 
 	//子表数据
-	if form.GoodsName != "" || form.Number != "" || form.ShopId > 0 {
+	if form.Sku != "" || form.Number != "" || form.ShopId > 0 {
 		var batchIds []struct {
 			BatchId int
 		}
 
 		preGoodsRes := global.DB.Model(batch.PrePickGoods{}).
 			Where(batch.PrePickGoods{
-				GoodsName: form.GoodsName,
-				Number:    form.Number,
-				ShopId:    form.ShopId,
+				Sku:    form.Sku,
+				Number: form.Number,
+				ShopId: form.ShopId,
 			}).
 			Select("batch_id").
 			Find(&batchIds)
@@ -808,6 +824,8 @@ func GetBatchList(c *gin.Context) {
 	} else {
 		db = db.Where("status = 1")
 	}
+
+	db.Where(&batch.Batch{DeliveryMethod: form.DeliveryMethod})
 
 	result := db.Find(&batches)
 

@@ -5,6 +5,7 @@ type ShopListForm struct {
 	ShopName   string `json:"shop_name" form:"shop_name"`
 	LineStatus int    `json:"line_status" form:"line_status"`
 	Line       string `json:"line" form:"line"`
+	IsPage     bool   `json:"is_page"`
 }
 
 type BatchSetLineForm struct {

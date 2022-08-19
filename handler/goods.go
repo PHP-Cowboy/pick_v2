@@ -33,6 +33,8 @@ func GetGoodsList(c *gin.Context) {
 	//商品系统接口页数为index
 	form.Index = form.Page
 
+	fmt.Printf("%+v", form)
+
 	result, err := RequestGoodsList(form)
 
 	if err != nil {
