@@ -773,27 +773,32 @@ func GetBatchList(c *gin.Context) {
 
 	//子表数据
 	if form.Sku != "" || form.Number != "" || form.ShopId > 0 {
-		var batchIds []struct {
-			BatchId int
-		}
 
-		preGoodsRes := global.DB.Model(batch.PrePickGoods{}).
+		var prePickGoods []batch.PrePickGoods
+
+		preGoodsRes := global.DB.Model(&batch.PrePickGoods{}).
 			Where(batch.PrePickGoods{
 				Sku:    form.Sku,
 				Number: form.Number,
 				ShopId: form.ShopId,
 			}).
 			Select("batch_id").
-			Find(&batchIds)
+			Find(&prePickGoods)
 
 		if preGoodsRes.Error != nil {
 			xsq_net.ErrorJSON(c, preGoodsRes.Error)
 			return
 		}
 
+		//未找到，直接返回
+		if preGoodsRes.RowsAffected == 0 {
+			xsq_net.SucJson(c, res)
+			return
+		}
+
 		//利用map键唯一，去重
 		uMap := make(map[int]struct{}, 0)
-		for _, b := range batchIds {
+		for _, b := range prePickGoods {
 			_, ok := uMap[b.BatchId]
 			if ok {
 				continue
@@ -803,12 +808,10 @@ func GetBatchList(c *gin.Context) {
 		}
 	}
 
+	db = db.Where("id in (?)", batchIdSlice)
+
 	if form.Line != "" {
 		db = db.Where("line like ?", form.Line+"%")
-	}
-
-	if len(batchIdSlice) > 0 {
-		db = db.Where("id in (?)", batchIdSlice)
 	}
 
 	if form.CreateTime != "" {
