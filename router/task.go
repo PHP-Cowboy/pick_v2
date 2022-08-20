@@ -19,5 +19,7 @@ func TaskRoute(g *gin.RouterGroup) {
 		taskGroup.POST("/pick_topping", handler.PickTopping)
 		//打印
 		taskGroup.POST("/push_print", handler.PushPrint)
+		//指派
+		taskGroup.POST("/assign", handler.Assign)
 	}
 }

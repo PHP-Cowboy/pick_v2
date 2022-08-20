@@ -1,7 +1,8 @@
 package rsp
 
 type ReceivingOrdersRsp struct {
-	Id int `json:"id"`
+	Id      int `json:"id"`
+	BatchId int `json:"batch_id"`
 }
 
 type PickingRecordDetailRsp struct {

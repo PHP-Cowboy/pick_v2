@@ -16,11 +16,83 @@ import (
 	"time"
 )
 
+func getPick(pick []batch.Pick, pickUser string) (res rsp.ReceivingOrdersRsp, err error) {
+
+	if len(pick) == 1 { //只查到一条
+		res.Id = pick[0].Id
+	} else { //查到多条
+		//排序
+		var (
+			batchIds []int
+			batchMp  = make(map[int]struct{}, 0)
+			pickMp   = make(map[int][]batch.Pick, 0)
+		)
+
+		//去重，构造批次id切片
+		for _, b := range pick {
+			//构造批次下的拣货池数据map
+			//批次排序后，直接获取某个批次的全部拣货池数据。
+			//然后对这部分数据排序
+			pickMp[b.BatchId] = append(pickMp[b.BatchId], b)
+			//已经存入了批次map的，跳过
+			_, bMpOk := batchMp[b.BatchId]
+			if bMpOk {
+				continue
+			}
+			//写入批次mp
+			batchMp[b.BatchId] = struct{}{}
+			//存入批次id切片
+			batchIds = append(batchIds, b.BatchId)
+		}
+
+		var (
+			bat    batch.Batch
+			result *gorm.DB
+		)
+
+		now := time.Now()
+
+		db := global.DB
+
+		if len(batchIds) == 0 { //只有一个批次
+			bat.Id = batchIds[0]
+		} else {
+			//多个批次
+			result = db.Select("id").Where("id in (?)", batchIds).Order("sort desc").First(&bat)
+
+			if result.Error != nil {
+				return rsp.ReceivingOrdersRsp{}, result.Error
+			}
+		}
+
+		maxSort := 0
+
+		res.BatchId = bat.Id
+
+		//循环排序最大的批次下的拣货数据，并取出sort最大的那个的id
+		for _, pm := range pickMp[bat.Id] {
+			if pm.Sort >= maxSort {
+				res.Id = pm.Id
+			}
+		}
+
+		//更新拣货池
+		result = db.Model(&batch.Pick{}).Where("id = ?", res.Id).Updates(map[string]interface{}{"pick_user": pickUser, "take_orders_time": &now})
+
+		if result.Error != nil {
+			return rsp.ReceivingOrdersRsp{}, result.Error
+		}
+	}
+
+	return res, nil
+}
+
 // 接单拣货
 func ReceivingOrders(c *gin.Context) {
 	var (
 		res     rsp.ReceivingOrdersRsp
-		pick    batch.Pick
+		pick    []batch.Pick
+		err     error
 		batches []batch.Batch
 	)
 
@@ -35,17 +107,21 @@ func ReceivingOrders(c *gin.Context) {
 
 	userInfo := claims.(*middlewares.CustomClaims)
 
-	//先查询是否有当前拣货员被分配的任务或已经接单且未完成拣货的数据
-	result := db.Model(&batch.Pick{}).Where("pick_user = ? and status = 0", userInfo.Name).First(&pick)
+	// 先查询是否有当前拣货员被分配的任务或已经接单且未完成拣货的数据,如果被分配多条，第一按批次优先级，第二按拣货池优先级 优先拣货
+	result := db.Model(&batch.Pick{}).Where("pick_user = ? and status = 0", userInfo.Name).Find(&pick)
 
-	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
+	//有分配的拣货任务
 	if result.RowsAffected > 0 {
-		//todo 如果是首批物料则需要到后台拣货
-		res.Id = pick.Id
+		res, err = getPick(pick, userInfo.Name)
+		if err != nil {
+			xsq_net.ErrorJSON(c, err)
+			return
+		}
 		xsq_net.SucJson(c, res)
 		return
 	}
@@ -65,28 +141,22 @@ func ReceivingOrders(c *gin.Context) {
 	}
 
 	//查询未被接单的拣货池数据
-	result = db.Model(&batch.Pick{}).Where("batch_id in (?) and pick_user = '' and status = 0", batchIds).First(&pick)
+	result = db.Model(&batch.Pick{}).Where("batch_id in (?) and pick_user = '' and status = 0", batchIds).Find(&pick)
 
-	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
 	if result.RowsAffected > 0 {
 
-		res.Id = pick.Id
-
-		now := time.Now()
-		//更新拣货员为当前用户
-		result = db.Model(batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"pick_user": userInfo.Name, "take_orders_time": &now})
-
-		if result.Error != nil {
-			xsq_net.ErrorJSON(c, ecode.DataSaveError)
-			return
+		res, err = getPick(pick, userInfo.Name)
+		if err != nil {
+			xsq_net.ErrorJSON(c, err)
 		}
 
 		//更新拣货单数量
-		result = db.Model(batch.Batch{}).Where("id = ?", pick.BatchId).Update("pick_num", gorm.Expr("pick_num + ?", 1))
+		result = db.Model(batch.Batch{}).Where("id = ?", res.BatchId).Update("pick_num", gorm.Expr("pick_num + ?", 1))
 
 		if result.Error != nil {
 			xsq_net.ErrorJSON(c, ecode.DataSaveError)
@@ -110,7 +180,7 @@ func CompletePick(c *gin.Context) {
 		return
 	}
 
-	// todo 这里需要做并发处理
+	// todo 这里是否需要做并发处理
 	var (
 		pick      batch.Pick
 		pickGoods []batch.PickGoods
@@ -144,7 +214,7 @@ func CompletePick(c *gin.Context) {
 	userInfo := claims.(*middlewares.CustomClaims)
 
 	if pick.PickUser != userInfo.Name {
-		xsq_net.ErrorJSON(c, ecode.DataNotExist)
+		xsq_net.ErrorJSON(c, errors.New("请确认改单是否被分配给其他拣货员"))
 		return
 	}
 

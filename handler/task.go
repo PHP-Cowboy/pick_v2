@@ -10,6 +10,7 @@ import (
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
+	"pick_v2/model"
 	"pick_v2/model/batch"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
@@ -346,6 +347,56 @@ func PushPrint(c *gin.Context) {
 			DeliveryOrderNo: ch.DeliveryOrderNo,
 			ShopId:          ch.ShopId,
 		})
+	}
+
+	xsq_net.Success(c)
+}
+
+// 指派
+func Assign(c *gin.Context) {
+	var form req.AssignReq
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var (
+		user model.User
+		pick batch.Pick
+	)
+
+	db := global.DB
+
+	result := db.First(&user, form.UserId)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	if user.RoleId != 3 { //不是拣货员
+		xsq_net.ErrorJSON(c, ecode.UserNotFound)
+		return
+	}
+
+	result = db.First(&pick, form.PickId)
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	if pick.Status != 0 {
+		xsq_net.ErrorJSON(c, errors.New("只能分配待拣货的任务"))
+		return
+	}
+
+	//已有拣货员可以强转
+	result = db.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"pick_user": user.Name, "take_orders_time": nil})
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
 	}
 
 	xsq_net.Success(c)
