@@ -7,6 +7,12 @@ import (
 )
 
 func BatchRoute(g *gin.RouterGroup) {
+	group := g.Group("/batch")
+	{
+		//打印
+		group.GET("/print_call", handler.PrintCallGet)
+	}
+
 	batchGroup := g.Group("/batch", middlewares.JWTAuth(), middlewares.IsAdminAuth())
 	{
 		//列表
@@ -35,7 +41,5 @@ func BatchRoute(g *gin.RouterGroup) {
 		batchGroup.POST("/batch_pick", handler.BatchPick)
 		//合并拣货
 		batchGroup.POST("/merge_pick", handler.MergePick)
-		//打印
-		batchGroup.GET("/print_call", handler.PrintCallGet)
 	}
 }
