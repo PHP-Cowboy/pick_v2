@@ -806,9 +806,9 @@ func GetBatchList(c *gin.Context) {
 			uMap[b.BatchId] = struct{}{}
 			batchIdSlice = append(batchIdSlice, b.BatchId)
 		}
-	}
 
-	db = db.Where("id in (?)", batchIdSlice)
+		db = db.Where("id in (?)", batchIdSlice)
+	}
 
 	if form.Line != "" {
 		db = db.Where("line like ?", form.Line+"%")
