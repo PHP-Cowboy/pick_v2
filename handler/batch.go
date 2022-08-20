@@ -698,7 +698,7 @@ func IsPick(c *gin.Context) {
 		return
 	}
 
-	result := global.DB.Where("batch_id = ? and pick_user != ''", form.Id).First(&pick)
+	result := global.DB.Where("batch_id = ? and status = 1", form.Id).First(&pick)
 
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		xsq_net.ErrorJSON(c, result.Error)
