@@ -36,6 +36,6 @@ func BatchRoute(g *gin.RouterGroup) {
 		//合并拣货
 		batchGroup.POST("/merge_pick", handler.MergePick)
 		//打印
-		batchGroup.POST("/print_call", handler.PrintCallGet)
+		batchGroup.GET("/print_call", handler.PrintCallGet)
 	}
 }

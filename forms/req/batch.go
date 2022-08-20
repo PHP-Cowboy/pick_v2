@@ -98,7 +98,7 @@ type MergePickForm struct {
 }
 
 type PrintCallGetReq struct {
-	HouseCode string `json:"house_code" binding:"required"`
+	HouseCode string `json:"house_code" form:"house_code" binding:"required"`
 }
 
 type GetPoolNumReq struct {
