@@ -3265,13 +3265,13 @@ func PrintCallGet(c *gin.Context) {
 
 	printCh := GetPrintJobMap(form.HouseCode)
 
-	global.SugarLogger.Infof("%+v", printCh)
-
 	//通道中没有任务
 	if printCh == nil {
 		xsq_net.SucJson(c, nil)
 		return
 	}
+
+	global.SugarLogger.Infof("%+v", printCh)
 
 	var (
 		pick       batch.Pick
