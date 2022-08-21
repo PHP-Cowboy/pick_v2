@@ -350,6 +350,339 @@ func CreateBatch(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
+//根据订单生成批次
+func CreateByOrder(c *gin.Context) {
+	var form req.CreateByOrderReq
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	claims, ok := c.Get("claims")
+
+	if !ok {
+		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
+		return
+	}
+
+	userInfo := claims.(*middlewares.CustomClaims)
+
+	tx := global.DB.Begin()
+
+	//创建批次
+	batches := batch.Batch{
+		WarehouseId:     userInfo.WarehouseId,
+		BatchName:       form.Number,
+		DeliveryEndTime: nil,
+		ShopNum:         0, //在后续的逻辑中更新处理，调用接口时需传批次id，只能更新，其他方式可能导致订货系统锁住数据，而拣货系统获取不到被锁住的数据
+		OrderNum:        0,
+		GoodsNum:        0,
+		UserName:        userInfo.Name,
+		Line:            "",
+		DeliveryMethod:  0,
+		EndTime:         nil,
+		Status:          0,
+		PickNum:         0,
+		RecheckSheetNum: 0,
+		Sort:            0,
+	}
+
+	result := tx.Save(&batches)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	form.BatchNumber = strconv.Itoa(batches.Id)
+
+	goodsRes, err := RequestGoodsList(form)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	if len(goodsRes.Data.List) <= 0 {
+		xsq_net.ErrorJSON(c, ecode.NoOrderFound)
+		return
+	}
+
+	var (
+		orders        []order.OrderInfo
+		prePicks      []batch.PrePick
+		prePickGoods  []*batch.PrePickGoods
+		prePickRemark []*batch.PrePickRemark
+	)
+
+	mp, err := cache.GetClassification()
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	//订单相关数据 -店铺数 订单数 商品数
+	goodsNum := 0                              //商品数
+	shopNumMp := make(map[int]struct{}, 0)     //店铺
+	orderNumMp := make(map[string]struct{}, 0) //订单
+
+	params := make(map[string]req.BatchParams, 0)
+
+	//缓存中的线路数据
+	lineCacheMp, errCache := cache.GetShopLine()
+
+	if errCache != nil {
+		xsq_net.ErrorJSON(c, errors.New("线路缓存获取失败"))
+		return
+	}
+
+	for _, goods := range goodsRes.Data.List {
+
+		//更新批次和批次条件的相关数据使用
+		_, pOk := params[goods.Number]
+		if !pOk {
+			params[goods.Number] = req.BatchParams{
+				DeliveryEndTime: goods.DeliveryAt,
+				PayEndTime:      goods.PayAt,
+				DeliveryMethod:  goods.DistributionType,
+			}
+		}
+
+		goodsNum += goods.LackCount
+
+		orderNumMp[goods.Number] = struct{}{}
+
+		goodsType, mpOk := mp[goods.SecondType]
+
+		if !mpOk {
+			xsq_net.ErrorJSON(c, errors.New("商品类型:"+goods.SecondType+"数据未同步"))
+			return
+		}
+
+		cacheMpLine, cacheMpOk := lineCacheMp[goods.ShopId]
+
+		if !cacheMpOk {
+			xsq_net.ErrorJSON(c, errors.New("店铺:"+goods.ShopName+"线路未同步，请先同步"))
+			return
+		}
+
+		orders = append(orders, order.OrderInfo{
+			Id:               goods.Id,
+			BatchId:          batches.Id,
+			ShopId:           goods.ShopId,
+			ShopName:         goods.ShopName,
+			ShopType:         goods.ShopType,
+			ShopCode:         goods.ShopCode,
+			HouseCode:        goods.HouseCode,
+			Line:             cacheMpLine,
+			Number:           goods.Number,
+			Status:           goods.Status,
+			DeliveryAt:       goods.DeliveryAt,
+			DistributionType: goods.DistributionType,
+			OrderRemark:      goods.OrderRemark,
+			Province:         goods.Province,
+			City:             goods.City,
+			District:         goods.District,
+			Address:          goods.Address,
+			ConsigneeName:    goods.ConsigneeName,
+			ConsigneeTel:     goods.ConsigneeTel,
+			Name:             goods.Name,
+			Sku:              goods.Sku,
+			GoodsSpe:         goods.GoodsSpe,
+			GoodsType:        goodsType,
+			Shelves:          goods.Shelves,
+			OriginalPrice:    goods.OriginalPrice,
+			DiscountPrice:    int(goods.DiscountPrice * 100),
+			GoodsUnit:        goods.GoodsUnit,
+			SaleUnit:         goods.SaleUnit,
+			SaleCode:         goods.SaleCode,
+			PayCount:         goods.PayCount,
+			CloseCount:       goods.CloseCount,
+			OutCount:         goods.OutCount,
+			GoodsRemark:      goods.GoodsRemark,
+			PickStatus:       goods.PickStatus,
+			PayAt:            goods.PayAt,
+			LackCount:        goods.LackCount,
+			PickTime:         nil,
+		})
+
+		prePickGoods = append(prePickGoods, &batch.PrePickGoods{
+			WarehouseId:      userInfo.WarehouseId,
+			BatchId:          batches.Id,
+			OrderInfoId:      goods.Id,
+			Number:           goods.Number,
+			PrePickId:        0, //后续逻辑变更
+			ShopId:           goods.ShopId,
+			DistributionType: goods.DistributionType,
+			Sku:              goods.Sku,
+			GoodsName:        goods.Name,
+			GoodsType:        goodsType,
+			GoodsSpe:         goods.GoodsSpe,
+			Shelves:          goods.Shelves,
+			NeedNum:          goods.LackCount,
+			CloseNum:         goods.CloseCount,
+			OutCount:         goods.OutCount,
+			NeedOutNum:       goods.LackCount,
+		})
+
+		if goods.GoodsRemark != "" || goods.OrderRemark != "" {
+			prePickRemark = append(prePickRemark, &batch.PrePickRemark{
+				WarehouseId: userInfo.WarehouseId,
+				BatchId:     batches.Id,
+				OrderInfoId: goods.Id,
+				ShopId:      goods.ShopId,
+				Number:      goods.Number,
+				OrderRemark: goods.OrderRemark,
+				GoodsRemark: goods.GoodsRemark,
+				ShopName:    goods.ShopName,
+				Line:        cacheMpLine,
+				PrePickId:   0,
+			})
+		}
+
+		_, shopMpOk := shopNumMp[goods.ShopId]
+
+		if shopMpOk {
+			continue
+		}
+
+		shopNumMp[goods.ShopId] = struct{}{}
+
+		prePicks = append(prePicks, batch.PrePick{
+			WarehouseId: userInfo.WarehouseId,
+			BatchId:     batches.Id,
+			ShopId:      goods.ShopId,
+			ShopCode:    goods.ShopCode,
+			ShopName:    goods.ShopName,
+			Line:        cacheMpLine,
+			Status:      0,
+		})
+	}
+
+	result = tx.Save(&orders)
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = tx.Save(&prePicks)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	shopMap := make(map[int]int, 0)
+
+	for _, pick := range prePicks {
+		shopMap[pick.ShopId] = pick.Id
+	}
+
+	for k, good := range prePickGoods {
+		val, shopMapOk := shopMap[good.ShopId]
+		if !shopMapOk {
+			xsq_net.ErrorJSON(c, ecode.MapKeyNotExist)
+			return
+		}
+		prePickGoods[k].PrePickId = val
+	}
+
+	result = tx.Save(&prePickGoods)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	if len(prePickRemark) > 0 {
+		for k, remark := range prePickRemark {
+			val, shopMapOk := shopMap[remark.ShopId]
+			if !shopMapOk {
+				xsq_net.ErrorJSON(c, ecode.MapKeyNotExist)
+				return
+			}
+			prePickRemark[k].PrePickId = val
+		}
+
+		result = tx.Save(&prePickRemark)
+
+		if result.Error != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+	}
+
+	shopNum := len(shopNumMp)
+	orderNum := len(orderNumMp)
+
+	updates := gin.H{}
+
+	var (
+		deliveryEndTime    time.Time
+		payEndTime         time.Time
+		errDeliveryEndTime error
+		errPayEndTime      error
+		deliveryMethod     int
+	)
+
+	if p, pOk := params[form.Number]; pOk {
+
+		deliveryEndTime, errDeliveryEndTime = time.ParseInLocation(timeutil.TimeFormat, p.DeliveryEndTime, time.Local)
+
+		payEndTime, errPayEndTime = time.ParseInLocation(timeutil.TimeFormat, p.PayEndTime, time.Local)
+
+		if errDeliveryEndTime != nil || errPayEndTime != nil {
+			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+			return
+		}
+
+		updates["delivery_end_time"] = &deliveryEndTime
+		updates["pay_end_time"] = &payEndTime
+		deliveryMethod = p.DeliveryMethod
+		updates["delivery_method"] = deliveryMethod
+	}
+
+	updates["goods_num"] = goodsNum
+	updates["shop_num"] = shopNum
+	updates["order_num"] = orderNum
+
+	result = tx.Model(&batch.Batch{}).Where("id = ?", batches.Id).Updates(updates)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//批次创建条件
+	condition := batch.BatchCondition{
+		BatchId:         batches.Id,
+		WarehouseId:     userInfo.WarehouseId,
+		PayEndTime:      &payEndTime,
+		DeliveryEndTime: &deliveryEndTime,
+		Line:            "",
+		DeliveryMethod:  deliveryMethod,
+		Sku:             "",
+		Goods:           "",
+	}
+
+	tx.Save(condition)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	tx.Commit()
+
+	xsq_net.Success(c)
+}
+
 // 结束拣货批次
 func EndBatch(c *gin.Context) {
 	var form req.EndBatchForm

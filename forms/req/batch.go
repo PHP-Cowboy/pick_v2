@@ -24,6 +24,17 @@ type StopPickForm struct {
 	Status *int `json:"status" binding:"required,oneof=0 2"`
 }
 
+type CreateByOrderReq struct {
+	Number      string `json:"number"`
+	BatchNumber string `json:"batch_number"`
+}
+
+type BatchParams struct {
+	DeliveryEndTime string `json:"delivery_endTime"`
+	PayEndTime      string `json:"pay_end_time"`
+	DeliveryMethod  int    `json:"delivery_method"`
+}
+
 type EndBatchForm struct {
 	Id int `json:"id" form:"id" binding:"required"`
 }
