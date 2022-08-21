@@ -31,6 +31,7 @@ var (
 	MapKeyNotExist                   = New(1008, "map key not exist")
 	OrderPickingCompleted            = New(1009, "订单已拣货完成")
 	OrderHasBeenReviewedAndCompleted = New(1010, "订单已拣货完成")
+	OrderDataNotFound                = New(1011, "订单数据未找到")
 
 	WarehouseSelectError = New(2000, "仓库选择有误，请重试")
 	GetWarehouseFailed   = New(2001, "获取仓库数据失败")

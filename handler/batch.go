@@ -3315,7 +3315,7 @@ func PrintCallGet(c *gin.Context) {
 	}
 
 	if len(orderInfos) <= 0 {
-		xsq_net.ErrorJSON(c, errors.New("订单数据未找到"))
+		xsq_net.ErrorJSON(c, ecode.OrderDataNotFound)
 		return
 	}
 
