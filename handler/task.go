@@ -357,13 +357,13 @@ func Assign(c *gin.Context) {
 	var form req.AssignReq
 
 	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
 	var (
-		user model.User
-		pick batch.Pick
+		user  model.User
+		picks []batch.Pick
 	)
 
 	db := global.DB
@@ -380,19 +380,21 @@ func Assign(c *gin.Context) {
 		return
 	}
 
-	result = db.First(&pick, form.PickId)
+	result = db.Where("id in (?)", form.PickIds).Find(&picks)
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	if pick.Status != 0 {
-		xsq_net.ErrorJSON(c, errors.New("只能分配待拣货的任务"))
-		return
+	for _, p := range picks {
+		if p.Status != 0 {
+			xsq_net.ErrorJSON(c, errors.New("只能分配待拣货的任务"))
+			return
+		}
 	}
 
 	//已有拣货员可以强转
-	result = db.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"pick_user": user.Name, "take_orders_time": nil})
+	result = db.Model(&batch.Pick{}).Where("id in (?)", form.PickIds).Updates(map[string]interface{}{"pick_user": user.Name, "take_orders_time": nil})
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

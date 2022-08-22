@@ -27,6 +27,6 @@ type PrintReq struct {
 }
 
 type AssignReq struct {
-	UserId int `json:"user_id" binding:"required"`
-	PickId int `json:"pick_id" binding:"required"`
+	UserId  int   `json:"user_id" binding:"required"`
+	PickIds []int `json:"pick_ids" binding:"required"`
 }

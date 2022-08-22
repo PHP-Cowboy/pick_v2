@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"pick_v2/common/constant"
@@ -350,7 +351,7 @@ func CreateBatch(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-//根据订单生成批次
+// 根据订单生成批次
 func CreateByOrder(c *gin.Context) {
 	var form req.CreateByOrderReq
 
@@ -631,6 +632,9 @@ func CreateByOrder(c *gin.Context) {
 	)
 
 	if p, pOk := params[form.Number]; pOk {
+
+		fmt.Println(p.DeliveryEndTime)
+		fmt.Println(p.PayEndTime)
 
 		deliveryEndTime, errDeliveryEndTime = time.ParseInLocation(timeutil.TimeFormat, p.DeliveryEndTime, time.Local)
 
@@ -1937,6 +1941,7 @@ func BatchPickByParams(form req.BatchPickForm) error {
 				BatchId:        pre.BatchId,
 				PickId:         pick.Id,
 				PrePickGoodsId: goods.Id,
+				OrderInfoId:    goods.OrderInfoId,
 				GoodsName:      goods.GoodsName,
 				GoodsSpe:       goods.GoodsSpe,
 				Shelves:        goods.Shelves,
@@ -1963,6 +1968,7 @@ func BatchPickByParams(form req.BatchPickForm) error {
 				BatchId:         pre.BatchId,
 				PickId:          pick.Id,
 				PrePickRemarkId: remark.Id,
+				OrderInfoId:     remark.OrderInfoId,
 				Number:          remark.Number,
 				OrderRemark:     remark.OrderRemark,
 				GoodsRemark:     remark.GoodsRemark,
@@ -2620,6 +2626,7 @@ func MergePickByParams(form req.MergePickForm) error {
 			BatchId:        form.BatchId,
 			PickId:         pick.Id,
 			PrePickGoodsId: goods.Id,
+			OrderInfoId:    goods.OrderInfoId,
 			GoodsName:      goods.GoodsName,
 			GoodsType:      goods.GoodsType,
 			GoodsSpe:       goods.GoodsSpe,
@@ -2704,6 +2711,7 @@ func MergePickByParams(form req.MergePickForm) error {
 				BatchId:         form.BatchId,
 				PickId:          pick.Id,
 				PrePickRemarkId: remark.Id,
+				OrderInfoId:     remark.OrderInfoId,
 				Number:          remark.Number,
 				OrderRemark:     remark.OrderRemark,
 				GoodsRemark:     remark.GoodsRemark,
