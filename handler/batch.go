@@ -371,6 +371,10 @@ func CreateByOrder(c *gin.Context) {
 
 	tx := global.DB.Begin()
 
+	var (
+		isSaveCond bool
+	)
+
 	//创建批次
 	batches := batch.Batch{
 		WarehouseId:     userInfo.WarehouseId,
@@ -387,6 +391,20 @@ func CreateByOrder(c *gin.Context) {
 		PickNum:         0,
 		RecheckSheetNum: 0,
 		Sort:            0,
+	}
+
+	if form.BatchNumber == "" {
+		isSaveCond = true
+
+	} else {
+
+		batchId, convErr := strconv.Atoi(form.BatchNumber)
+
+		if convErr != nil {
+			xsq_net.ErrorJSON(c, convErr)
+			return
+		}
+		batches.Id = batchId
 	}
 
 	result := tx.Save(&batches)
@@ -621,7 +639,7 @@ func CreateByOrder(c *gin.Context) {
 	shopNum := len(shopNumMp)
 	orderNum := len(orderNumMp)
 
-	updates := gin.H{}
+	updates := map[string]interface{}{}
 
 	var (
 		deliveryEndTime    time.Time
@@ -636,7 +654,7 @@ func CreateByOrder(c *gin.Context) {
 		fmt.Println(p.DeliveryEndTime)
 		fmt.Println(p.PayEndTime)
 
-		deliveryEndTime, errDeliveryEndTime = time.ParseInLocation(timeutil.TimeFormat, p.DeliveryEndTime, time.Local)
+		deliveryEndTime, errDeliveryEndTime = time.ParseInLocation(timeutil.DateFormat, p.DeliveryEndTime, time.Local)
 
 		payEndTime, errPayEndTime = time.ParseInLocation(timeutil.TimeFormat, p.PayEndTime, time.Local)
 
@@ -663,23 +681,25 @@ func CreateByOrder(c *gin.Context) {
 		return
 	}
 
-	//批次创建条件
-	condition := batch.BatchCondition{
-		BatchId:         batches.Id,
-		WarehouseId:     userInfo.WarehouseId,
-		PayEndTime:      &payEndTime,
-		DeliveryEndTime: &deliveryEndTime,
-		Line:            "",
-		DeliveryMethod:  deliveryMethod,
-		Sku:             "",
-		Goods:           "",
-	}
+	if isSaveCond {
+		//批次创建条件
+		condition := batch.BatchCondition{
+			BatchId:         batches.Id,
+			WarehouseId:     userInfo.WarehouseId,
+			PayEndTime:      &payEndTime,
+			DeliveryEndTime: &deliveryEndTime,
+			Line:            "",
+			DeliveryMethod:  deliveryMethod,
+			Sku:             "",
+			Goods:           "",
+		}
 
-	tx.Save(condition)
+		tx.Save(&condition)
 
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
+		if result.Error != nil {
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
 	}
 
 	tx.Commit()
