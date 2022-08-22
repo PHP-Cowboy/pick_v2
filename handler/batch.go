@@ -375,6 +375,8 @@ func CreateByOrder(c *gin.Context) {
 		isSaveCond bool
 	)
 
+	now := time.Now()
+
 	//创建批次
 	batches := batch.Batch{
 		WarehouseId:     userInfo.WarehouseId,
@@ -386,7 +388,7 @@ func CreateByOrder(c *gin.Context) {
 		UserName:        userInfo.Name,
 		Line:            "",
 		DeliveryMethod:  0,
-		EndTime:         nil,
+		EndTime:         &now,
 		Status:          0,
 		PickNum:         0,
 		RecheckSheetNum: 0,
