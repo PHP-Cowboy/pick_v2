@@ -66,6 +66,7 @@ type PrePickGoods struct {
 	GoodsName        string `gorm:"type:varchar(64);comment:商品名称"`
 	GoodsType        string `gorm:"type:varchar(64);comment:商品类型"`
 	GoodsSpe         string `gorm:"type:varchar(128);comment:商品规格"`
+	Unit             string `gorm:"type:varchar(64);comment:单位"`
 	Shelves          string `gorm:"type:varchar(64);comment:货架"`
 	DiscountPrice    int    `gorm:"comment:折扣价"`
 	NeedNum          int    `gorm:"type:int;not null;comment:需拣数量"`

@@ -3,18 +3,38 @@ package rsp
 type ReceivingOrdersRsp struct {
 	Id      int `json:"id"`
 	BatchId int `json:"batch_id"`
+	Version int `json:"version"`
 }
 
 type PickingRecordDetailRsp struct {
-	TaskName        string                 `json:"task_name"`
-	OutTotal        int                    `json:"out_total"`
-	UnselectedTotal int                    `json:"unselected_total"`
-	PickUser        string                 `json:"pick_user"`
-	TakeOrdersTime  string                 `json:"take_orders_time"`
-	ReviewUser      string                 `json:"review_user"`
-	ReviewTime      string                 `json:"review_time"`
-	Goods           map[string][]PickGoods `json:"goods"`
-	RemarkList      []PickRemark           `json:"remark_list"`
+	TaskName        string                      `json:"task_name"`
+	OutTotal        int                         `json:"out_total"`
+	UnselectedTotal int                         `json:"unselected_total"`
+	PickUser        string                      `json:"pick_user"`
+	TakeOrdersTime  string                      `json:"take_orders_time"`
+	ReviewUser      string                      `json:"review_user"`
+	ReviewTime      string                      `json:"review_time"`
+	Goods           map[string][]MergePickGoods `json:"goods"`
+	RemarkList      []PickRemark                `json:"remark_list"`
+}
+
+type MergePickGoods struct {
+	Id          int        `json:"id"`
+	Sku         string     `json:"sku"`
+	GoodsName   string     `json:"goods_name"`
+	GoodsType   string     `json:"goods_type"`
+	GoodsSpe    string     `json:"goods_spe"`
+	Shelves     string     `json:"shelves"`
+	NeedNum     int        `json:"need_num"`
+	CompleteNum int        `json:"complete_num"`
+	ReviewNum   int        `json:"review_num"`
+	Unit        string     `json:"unit"`
+	ParamsId    []ParamsId `json:"params_id"`
+}
+
+type ParamsId struct {
+	PickGoodsId int `json:"pick_goods_id"`
+	OrderInfoId int `json:"order_info_id"`
 }
 
 type PickingRecordRsp struct {

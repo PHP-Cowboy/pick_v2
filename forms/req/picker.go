@@ -16,8 +16,14 @@ type CompletePickForm struct {
 }
 
 type CompletePickDetail struct {
-	Id          int `json:"id"`
-	CompleteNum int `json:"complete_num"`
+	Sku         string     `json:"sku"`
+	ParamsId    []ParamsId `json:"params_id"`
+	CompleteNum int        `json:"complete_num"`
+}
+
+type ParamsId struct {
+	PickGoodsId int `json:"pick_goods_id"`
+	OrderInfoId int `json:"order_info_id"`
 }
 
 type PickingRecordDetailForm struct {

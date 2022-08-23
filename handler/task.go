@@ -210,17 +210,58 @@ func GetPickDetail(c *gin.Context) {
 		return
 	}
 
-	goodsMap := make(map[string][]rsp.PickGoods, 0)
-
+	pickGoodsSkuMp := make(map[string]rsp.MergePickGoods, 0)
+	//相同sku合并处理
 	for _, goods := range pickGoods {
-		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.PickGoods{
+		val, ok := pickGoodsSkuMp[goods.Sku]
+
+		paramsId := rsp.ParamsId{
+			PickGoodsId: goods.Id,
+			OrderInfoId: goods.OrderInfoId,
+		}
+
+		if !ok {
+
+			pickGoodsSkuMp[goods.Sku] = rsp.MergePickGoods{
+				Id:          goods.Id,
+				Sku:         goods.Sku,
+				GoodsName:   goods.GoodsName,
+				GoodsType:   goods.GoodsType,
+				GoodsSpe:    goods.GoodsSpe,
+				Shelves:     goods.Shelves,
+				NeedNum:     goods.NeedNum,
+				CompleteNum: goods.CompleteNum,
+				ReviewNum:   goods.ReviewNum,
+				Unit:        goods.Unit,
+				ParamsId:    []rsp.ParamsId{paramsId},
+			}
+		} else {
+			val.NeedNum += val.NeedNum
+			val.CompleteNum += val.CompleteNum
+			val.ParamsId = append(val.ParamsId, paramsId)
+			pickGoodsSkuMp[goods.Sku] = val
+		}
+	}
+
+	goodsMap := make(map[string][]rsp.MergePickGoods, 0)
+
+	needTotal := 0
+	completeTotal := 0
+	for _, goods := range pickGoodsSkuMp {
+		completeTotal += goods.CompleteNum
+		needTotal += goods.NeedNum
+		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.MergePickGoods{
+			Id:          goods.Id,
+			Sku:         goods.Sku,
 			GoodsName:   goods.GoodsName,
+			GoodsType:   goods.GoodsType,
 			GoodsSpe:    goods.GoodsSpe,
 			Shelves:     goods.Shelves,
 			NeedNum:     goods.NeedNum,
 			CompleteNum: goods.CompleteNum,
 			ReviewNum:   goods.ReviewNum,
 			Unit:        goods.Unit,
+			ParamsId:    goods.ParamsId,
 		})
 	}
 

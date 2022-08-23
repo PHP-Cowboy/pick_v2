@@ -10,16 +10,21 @@ import (
 	"pick_v2/middlewares"
 	"pick_v2/model"
 	"pick_v2/model/batch"
+	"pick_v2/model/order"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"time"
 )
 
-func getPick(pick []batch.Pick, pickUser string) (res rsp.ReceivingOrdersRsp, err error) {
+func getPick(pick []batch.Pick) (res rsp.ReceivingOrdersRsp, err error) {
+
+	db := global.DB
 
 	if len(pick) == 1 { //只查到一条
 		res.Id = pick[0].Id
+		res.BatchId = pick[0].BatchId
+		res.Version = pick[0].Version
 	} else { //查到多条
 		//排序
 		var (
@@ -50,10 +55,6 @@ func getPick(pick []batch.Pick, pickUser string) (res rsp.ReceivingOrdersRsp, er
 			result *gorm.DB
 		)
 
-		now := time.Now()
-
-		db := global.DB
-
 		if len(batchIds) == 0 { //只有一个批次
 			bat.Id = batchIds[0]
 		} else {
@@ -73,14 +74,8 @@ func getPick(pick []batch.Pick, pickUser string) (res rsp.ReceivingOrdersRsp, er
 		for _, pm := range pickMp[bat.Id] {
 			if pm.Sort >= maxSort {
 				res.Id = pm.Id
+				res.Version = pm.Version
 			}
-		}
-
-		//更新拣货池
-		result = db.Model(&batch.Pick{}).Where("id = ?", res.Id).Updates(map[string]interface{}{"pick_user": pickUser, "take_orders_time": &now})
-
-		if result.Error != nil {
-			return rsp.ReceivingOrdersRsp{}, result.Error
 		}
 	}
 
@@ -117,7 +112,7 @@ func ReceivingOrders(c *gin.Context) {
 
 	//有分配的拣货任务
 	if result.RowsAffected > 0 {
-		res, err = getPick(pick, userInfo.Name)
+		res, err = getPick(pick)
 		if err != nil {
 			xsq_net.ErrorJSON(c, err)
 			return
@@ -148,20 +143,45 @@ func ReceivingOrders(c *gin.Context) {
 		return
 	}
 
+	//拣货池有未接单的数据
 	if result.RowsAffected > 0 {
 
-		res, err = getPick(pick, userInfo.Name)
+		res, err = getPick(pick)
 		if err != nil {
 			xsq_net.ErrorJSON(c, err)
 		}
 
-		//更新拣货单数量
-		result = db.Model(batch.Batch{}).Where("id = ?", res.BatchId).Update("pick_num", gorm.Expr("pick_num + ?", 1))
+		now := time.Now()
+
+		tx := db.Begin()
+
+		//更新拣货池 + version 防并发
+		result = tx.Model(&batch.Pick{}).
+			Where("id = ? and version = ?", res.Id, res.Version).
+			Updates(map[string]interface{}{
+				"pick_user":        userInfo.Name,
+				"take_orders_time": &now,
+				"version":          gorm.Expr("version + ?", 1),
+			})
 
 		if result.Error != nil {
+			tx.Rollback()
 			xsq_net.ErrorJSON(c, ecode.DataSaveError)
 			return
 		}
+
+		//更新拣货单数量
+		result = tx.Model(batch.Batch{}).
+			Where("id = ?", res.BatchId).
+			Update("pick_num", gorm.Expr("pick_num + ?", 1))
+
+		if result.Error != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, ecode.DataSaveError)
+			return
+		}
+
+		tx.Commit()
 
 		xsq_net.SucJson(c, res)
 		return
@@ -180,10 +200,11 @@ func CompletePick(c *gin.Context) {
 		return
 	}
 
-	// todo 这里是否需要做并发处理
+	// 这里是否需要做并发处理
 	var (
 		pick      batch.Pick
 		pickGoods []batch.PickGoods
+		orderInfo []order.OrderInfo
 	)
 
 	db := global.DB
@@ -214,62 +235,121 @@ func CompletePick(c *gin.Context) {
 	userInfo := claims.(*middlewares.CustomClaims)
 
 	if pick.PickUser != userInfo.Name {
-		xsq_net.ErrorJSON(c, errors.New("请确认改单是否被分配给其他拣货员"))
+		xsq_net.ErrorJSON(c, errors.New("请确认拣货单是否被分配给其他拣货员"))
 		return
 	}
 
-	pickGoodsMap := make(map[int]int, len(form.CompletePick))
+	//****************************** 无需拣货 ******************************//
+	if form.Type == 2 {
+		//更新主表 无需拣货直接更新为复核完成
+		result = db.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2})
+		if result.Error != nil {
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+		xsq_net.Success(c)
+		return
+	}
+	//****************************** 无需拣货逻辑完成 ******************************//
 
+	//****************************** 正常拣货逻辑 ******************************//
+	//step:处理前端传递的拣货数据，构造[订单表id切片,订单表id和拣货商品表id映射,sku完成数量映射]
+	//step: 根据 订单表id切片 查出订单数据 根据支付时间升序
+	//step: 构造 拣货商品表 id, 完成数量 并扣减 sku 完成数量
+	//step: 更新拣货商品表
+
+	var (
+		orderInfoIds       []int
+		orderPickGoodsIdMp = make(map[int]int, 0)
+		skuCompleteNumMp   = make(map[string]int, 0)
+		totalNum           int //更新拣货池拣货数量
+	)
+
+	//step:处理前端传递的拣货数据，构造[订单表id切片,订单表id和拣货商品表id映射,sku完成数量映射]
 	for _, cp := range form.CompletePick {
-		pickGoodsMap[cp.Id] = cp.CompleteNum
+		//全部订单数据id
+		for _, ids := range cp.ParamsId {
+			orderInfoIds = append(orderInfoIds, ids.OrderInfoId)
+			//map[订单表id]拣货商品表id
+			orderPickGoodsIdMp[ids.OrderInfoId] = ids.PickGoodsId
+		}
+		//sku完成数量
+		skuCompleteNumMp[cp.Sku] = cp.CompleteNum
 	}
 
-	result = db.Where("pick_id = ?", form.PickId).Find(&pickGoods)
+	//step: 根据 订单表id切片 查出订单数据 根据支付时间升序
+	result = db.Where("id in (?)", orderInfoIds).Order("pay_at ASC").Find(&orderInfo)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	totalNum := 0 //更新拣货池拣货数量
+	//拣货表 id 和 拣货数量
+	mp := make(map[int]int, 0)
 
-	for k, pg := range pickGoods {
-		num, pgMpOk := pickGoodsMap[pg.Id]
+	var pickGoodsIds []int
 
-		if !pgMpOk {
+	//step: 构造 拣货商品表 id, 完成数量 并扣减 sku 完成数量
+	for _, info := range orderInfo {
+		//完成数量
+		completeNum, completeOk := skuCompleteNumMp[info.Sku]
+
+		if !completeOk {
 			continue
 		}
 
-		pickGoods[k].CompleteNum = num
+		pickGoodsId, mpOk := orderPickGoodsIdMp[info.Id]
 
-		totalNum += num
+		if !mpOk {
+			continue
+		}
+
+		totalNum += completeNum
+
+		pickCompleteNum := 0
+
+		if completeNum >= info.LackCount {
+			pickCompleteNum = info.LackCount
+			skuCompleteNumMp[info.Sku] = completeNum - info.LackCount //减
+		}
+		pickGoodsIds = append(pickGoodsIds, pickGoodsId)
+		mp[pickGoodsId] = pickCompleteNum
+
 	}
 
 	tx := db.Begin()
 
-	status := 1
+	//查出拣货商品数据
+	result = tx.Where("id in (?)", pickGoodsIds).Find(&pickGoods)
 
-	updates := make(map[string]interface{}, 0)
-
-	if form.Type == 2 { //无需拣货
-		status = 2
-	} else {
-		//正常拣货的更新拣货数量，无需拣货不更新
-		result = tx.Save(&pickGoods)
-
-		if result.Error != nil {
-			tx.Rollback()
-			xsq_net.ErrorJSON(c, result.Error)
-			return
-		}
-
-		updates["pick_num"] = totalNum
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
 	}
 
-	updates["status"] = status
+	//更新拣货数量数据
+	for i, good := range pickGoods {
+		completeNum, mpOk := mp[good.Id]
+
+		if !mpOk {
+			continue
+		}
+
+		pickGoods[i].CompleteNum = completeNum
+	}
+
+	//正常拣货 更新拣货数量
+	result = tx.Save(&pickGoods)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
 
 	//更新主表
-	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(updates)
+	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 1, "pick_num": totalNum})
 
 	if result.Error != nil {
 		tx.Rollback()
@@ -472,7 +552,12 @@ func PickingRecordDetail(c *gin.Context) {
 	res.OutTotal = 0
 	res.UnselectedTotal = 0
 	res.PickUser = pick.PickUser
-	res.TakeOrdersTime = pick.TakeOrdersTime.Format(timeutil.TimeFormat)
+
+	takeOrdersTime := ""
+	if pick.TakeOrdersTime != nil {
+		takeOrdersTime = pick.TakeOrdersTime.Format(timeutil.TimeFormat)
+	}
+	res.TakeOrdersTime = takeOrdersTime
 	res.ReviewUser = pick.ReviewUser
 
 	var reviewTime string
@@ -489,21 +574,58 @@ func PickingRecordDetail(c *gin.Context) {
 		return
 	}
 
-	goodsMap := make(map[string][]rsp.PickGoods, 0)
+	pickGoodsSkuMp := make(map[string]rsp.MergePickGoods, 0)
+	//相同sku合并处理
+	for _, goods := range pickGoods {
+		val, ok := pickGoodsSkuMp[goods.Sku]
+
+		paramsId := rsp.ParamsId{
+			PickGoodsId: goods.Id,
+			OrderInfoId: goods.OrderInfoId,
+		}
+
+		if !ok {
+
+			pickGoodsSkuMp[goods.Sku] = rsp.MergePickGoods{
+				Id:          goods.Id,
+				Sku:         goods.Sku,
+				GoodsName:   goods.GoodsName,
+				GoodsType:   goods.GoodsType,
+				GoodsSpe:    goods.GoodsSpe,
+				Shelves:     goods.Shelves,
+				NeedNum:     goods.NeedNum,
+				CompleteNum: goods.CompleteNum,
+				ReviewNum:   goods.ReviewNum,
+				Unit:        goods.Unit,
+				ParamsId:    []rsp.ParamsId{paramsId},
+			}
+		} else {
+			val.NeedNum += val.NeedNum
+			val.CompleteNum += val.CompleteNum
+			val.ParamsId = append(val.ParamsId, paramsId)
+			pickGoodsSkuMp[goods.Sku] = val
+		}
+	}
+
+	goodsMap := make(map[string][]rsp.MergePickGoods, 0)
 
 	needTotal := 0
 	completeTotal := 0
-	for _, goods := range pickGoods {
+	for _, goods := range pickGoodsSkuMp {
 		completeTotal += goods.CompleteNum
 		needTotal += goods.NeedNum
-		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.PickGoods{
+		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.MergePickGoods{
 			Id:          goods.Id,
+			Sku:         goods.Sku,
 			GoodsName:   goods.GoodsName,
+			GoodsType:   goods.GoodsType,
 			GoodsSpe:    goods.GoodsSpe,
 			Shelves:     goods.Shelves,
 			NeedNum:     goods.NeedNum,
 			CompleteNum: goods.CompleteNum,
+			ReviewNum:   goods.ReviewNum,
 			Unit:        goods.Unit,
+			ParamsId:    goods.ParamsId,
 		})
 	}
 

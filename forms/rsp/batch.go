@@ -60,12 +60,24 @@ type GetBatchPoolNumRsp struct {
 }
 
 type GetPrePickDetailRsp struct {
-	TaskName   string                    `json:"task_name"`
-	OrderNum   int                       `json:"order_num"`
-	GoodsNum   int                       `json:"goods_num"`
-	Line       string                    `json:"line"`
-	Goods      map[string][]PrePickGoods `json:"goods"`
-	RemarkList []Remark                  `json:"remark_list"`
+	TaskName   string                         `json:"task_name"`
+	OrderNum   int                            `json:"order_num"`
+	GoodsNum   int                            `json:"goods_num"`
+	Line       string                         `json:"line"`
+	Goods      map[string][]MergePrePickGoods `json:"goods"`
+	RemarkList []Remark                       `json:"remark_list"`
+}
+
+type MergePrePickGoods struct {
+	Id        int        `json:"id"`
+	Sku       string     `json:"sku"`
+	GoodsName string     `json:"goods_name"`
+	GoodsType string     `json:"goods_type"`
+	GoodsSpe  string     `json:"goods_spe"`
+	Shelves   string     `json:"shelves"`
+	NeedNum   int        `json:"need_num"`
+	Unit      string     `json:"unit"`
+	ParamsId  []ParamsId `json:"params_id"`
 }
 
 type PrePickGoods struct {

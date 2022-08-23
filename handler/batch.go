@@ -541,6 +541,7 @@ func CreateByOrder(c *gin.Context) {
 			GoodsType:        goodsType,
 			GoodsSpe:         goods.GoodsSpe,
 			Shelves:          goods.Shelves,
+			Unit:             goods.GoodsUnit,
 			NeedNum:          goods.LackCount,
 			CloseNum:         goods.CloseCount,
 			OutCount:         goods.OutCount,
@@ -553,12 +554,12 @@ func CreateByOrder(c *gin.Context) {
 				BatchId:     batches.Id,
 				OrderInfoId: goods.Id,
 				ShopId:      goods.ShopId,
+				PrePickId:   0,
 				Number:      goods.Number,
 				OrderRemark: goods.OrderRemark,
 				GoodsRemark: goods.GoodsRemark,
 				ShopName:    goods.ShopName,
 				Line:        cacheMpLine,
-				PrePickId:   0,
 			})
 		}
 
@@ -1440,31 +1441,61 @@ func GetPrePickDetail(c *gin.Context) {
 		return
 	}
 
-	goodsMap := make(map[string][]rsp.PrePickGoods, 0)
+	prePickGoodsSkuMp := make(map[string]rsp.MergePrePickGoods, 0)
 
-	//商品数
 	goodsNum := 0
-	//订单数map
-	orderMp := make(map[string]struct{}, 0)
 
+	//相同sku合并处理
 	for _, goods := range prePickGoods {
-		orderMp[goods.Number] = struct{}{}
+
 		goodsNum += goods.NeedNum
-		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.PrePickGoods{
-			GoodsName:  goods.GoodsName,
-			GoodsSpe:   goods.GoodsSpe,
-			Shelves:    goods.Shelves,
-			NeedNum:    goods.NeedNum,
-			CloseNum:   goods.CloseNum,
-			OutCount:   goods.OutCount,
-			NeedOutNum: goods.NeedOutNum,
-		})
+
+		val, ok := prePickGoodsSkuMp[goods.Sku]
+
+		paramsId := rsp.ParamsId{
+			PickGoodsId: goods.Id,
+			OrderInfoId: goods.OrderInfoId,
+		}
+
+		if !ok {
+
+			prePickGoodsSkuMp[goods.Sku] = rsp.MergePrePickGoods{
+				Id:        goods.Id,
+				Sku:       goods.Sku,
+				GoodsName: goods.GoodsName,
+				GoodsType: goods.GoodsType,
+				GoodsSpe:  goods.GoodsSpe,
+				Shelves:   goods.Shelves,
+				NeedNum:   goods.NeedNum,
+				Unit:      goods.Unit,
+				ParamsId:  []rsp.ParamsId{paramsId},
+			}
+		} else {
+			val.NeedNum += val.NeedNum
+			val.ParamsId = append(val.ParamsId, paramsId)
+			prePickGoodsSkuMp[goods.Sku] = val
+		}
 	}
 
 	//商品数
 	res.GoodsNum = goodsNum
-	//订单数
-	res.OrderNum = len(orderMp)
+
+	goodsMap := make(map[string][]rsp.MergePrePickGoods, 0)
+
+	for _, goods := range prePickGoodsSkuMp {
+
+		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.MergePrePickGoods{
+			Id:        goods.Id,
+			Sku:       goods.Sku,
+			GoodsName: goods.GoodsName,
+			GoodsType: goods.GoodsType,
+			GoodsSpe:  goods.GoodsSpe,
+			Shelves:   goods.Shelves,
+			NeedNum:   goods.NeedNum,
+			Unit:      goods.Unit,
+			ParamsId:  goods.ParamsId,
+		})
+	}
 
 	res.Goods = goodsMap
 
@@ -1959,18 +1990,22 @@ func BatchPickByParams(form req.BatchPickForm) error {
 			prePickGoodsIds = append(prePickGoodsIds, goods.Id)
 
 			pickGoods = append(pickGoods, batch.PickGoods{
-				WarehouseId:    form.WarehouseId,
-				BatchId:        pre.BatchId,
-				PickId:         pick.Id,
-				PrePickGoodsId: goods.Id,
-				OrderInfoId:    goods.OrderInfoId,
-				GoodsName:      goods.GoodsName,
-				GoodsSpe:       goods.GoodsSpe,
-				Shelves:        goods.Shelves,
-				NeedNum:        goods.NeedNum,
-				Number:         goods.Number,
-				ShopId:         goods.ShopId,
-				GoodsType:      goods.GoodsType,
+				WarehouseId:      form.WarehouseId,
+				PickId:           pick.Id,
+				BatchId:          pre.BatchId,
+				PrePickGoodsId:   goods.Id,
+				OrderInfoId:      goods.OrderInfoId,
+				Number:           goods.Number,
+				ShopId:           goods.ShopId,
+				DistributionType: goods.DistributionType,
+				Sku:              goods.Sku,
+				GoodsName:        goods.GoodsName,
+				GoodsType:        goods.GoodsType,
+				GoodsSpe:         goods.GoodsSpe,
+				Shelves:          goods.Shelves,
+				DiscountPrice:    goods.DiscountPrice,
+				NeedNum:          goods.NeedNum,
+				Unit:             goods.Unit,
 			})
 		}
 
@@ -2644,18 +2679,22 @@ func MergePickByParams(form req.MergePickForm) error {
 		orderInfoIds = append(orderInfoIds, goods.Id)
 
 		pickGoods = append(pickGoods, batch.PickGoods{
-			WarehouseId:    form.WarehouseId,
-			BatchId:        form.BatchId,
-			PickId:         pick.Id,
-			PrePickGoodsId: goods.Id,
-			OrderInfoId:    goods.OrderInfoId,
-			GoodsName:      goods.GoodsName,
-			GoodsType:      goods.GoodsType,
-			GoodsSpe:       goods.GoodsSpe,
-			Shelves:        goods.Shelves,
-			NeedNum:        goods.NeedNum,
-			Number:         goods.Number,
-			ShopId:         goods.ShopId,
+			WarehouseId:      form.WarehouseId,
+			PickId:           pick.Id,
+			BatchId:          goods.BatchId,
+			PrePickGoodsId:   goods.Id,
+			OrderInfoId:      goods.OrderInfoId,
+			Number:           goods.Number,
+			ShopId:           goods.ShopId,
+			DistributionType: goods.DistributionType,
+			Sku:              goods.Sku,
+			GoodsName:        goods.GoodsName,
+			GoodsType:        goods.GoodsType,
+			GoodsSpe:         goods.GoodsSpe,
+			Shelves:          goods.Shelves,
+			DiscountPrice:    goods.DiscountPrice,
+			NeedNum:          goods.NeedNum,
+			Unit:             goods.Unit,
 		})
 	}
 

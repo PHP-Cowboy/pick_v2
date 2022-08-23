@@ -50,18 +50,19 @@ type Pick struct {
 }
 
 type GetPickDetailRsp struct {
-	TaskName       string                 `json:"task_name"`
-	ShopNum        int                    `json:"shop_num"`
-	OrderNum       int                    `json:"order_num"`
-	GoodsNum       int                    `json:"goods_num"`
-	PickUser       string                 `json:"pick_user"`
-	TakeOrdersTime string                 `json:"take_orders_time"`
-	Goods          map[string][]PickGoods `json:"goods"`
-	RemarkList     []PickRemark           `json:"remark_list"`
+	TaskName       string                      `json:"task_name"`
+	ShopNum        int                         `json:"shop_num"`
+	OrderNum       int                         `json:"order_num"`
+	GoodsNum       int                         `json:"goods_num"`
+	PickUser       string                      `json:"pick_user"`
+	TakeOrdersTime string                      `json:"take_orders_time"`
+	Goods          map[string][]MergePickGoods `json:"goods"`
+	RemarkList     []PickRemark                `json:"remark_list"`
 }
 
 type PickGoods struct {
 	Id          int    `json:"id"`
+	Sku         string `json:"sku"`
 	GoodsName   string `json:"goods_name"`
 	GoodsSpe    string `json:"goods_spe"`
 	Shelves     string `json:"shelves"`
