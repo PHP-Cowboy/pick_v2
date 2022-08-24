@@ -1,9 +1,12 @@
 package rsp
 
+import "time"
+
 type ReceivingOrdersRsp struct {
-	Id      int `json:"id"`
-	BatchId int `json:"batch_id"`
-	Version int `json:"version"`
+	Id             int        `json:"id"`
+	BatchId        int        `json:"batch_id"`
+	Version        int        `json:"version"`
+	TakeOrdersTime *time.Time `json:"take_orders_time"`
 }
 
 type PickingRecordDetailRsp struct {

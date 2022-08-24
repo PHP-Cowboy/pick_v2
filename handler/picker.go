@@ -25,6 +25,7 @@ func getPick(pick []batch.Pick) (res rsp.ReceivingOrdersRsp, err error) {
 		res.Id = pick[0].Id
 		res.BatchId = pick[0].BatchId
 		res.Version = pick[0].Version
+		res.TakeOrdersTime = pick[0].TakeOrdersTime
 	} else { //查到多条
 		//排序
 		var (
@@ -75,6 +76,7 @@ func getPick(pick []batch.Pick) (res rsp.ReceivingOrdersRsp, err error) {
 			if pm.Sort >= maxSort {
 				res.Id = pm.Id
 				res.Version = pm.Version
+				res.TakeOrdersTime = pm.TakeOrdersTime
 			}
 		}
 	}
@@ -110,6 +112,8 @@ func ReceivingOrders(c *gin.Context) {
 		return
 	}
 
+	now := time.Now()
+
 	//有分配的拣货任务
 	if result.RowsAffected > 0 {
 		res, err = getPick(pick)
@@ -117,7 +121,15 @@ func ReceivingOrders(c *gin.Context) {
 			xsq_net.ErrorJSON(c, err)
 			return
 		}
-		//更新接单时间
+		//后台分配的单没有接单时间,更新接单时间
+		if res.TakeOrdersTime == nil {
+			result = db.Model(&batch.Pick{}).Where("id = ?", res.Id).Update("take_orders_time", &now)
+
+			if result.Error != nil {
+				xsq_net.ErrorJSON(c, result.Error)
+				return
+			}
+		}
 		xsq_net.SucJson(c, res)
 		return
 	}
@@ -151,8 +163,6 @@ func ReceivingOrders(c *gin.Context) {
 		if err != nil {
 			xsq_net.ErrorJSON(c, err)
 		}
-
-		now := time.Now()
 
 		tx := db.Begin()
 
