@@ -211,8 +211,6 @@ func CompletePick(c *gin.Context) {
 		return
 	}
 
-	global.SugarLogger.Infof("form:%+v", form)
-
 	// 这里是否需要做并发处理
 	var (
 		pick      batch.Pick
@@ -322,9 +320,13 @@ func CompletePick(c *gin.Context) {
 
 		pickCompleteNum := 0
 
-		if completeNum >= info.LackCount {
+		if completeNum >= info.LackCount { //完成数量大于等于需拣数量
 			pickCompleteNum = info.LackCount
 			skuCompleteNumMp[info.Sku] = completeNum - info.LackCount //减
+		} else {
+			//按下单时间拣货少于需拣时
+			pickCompleteNum = completeNum
+			skuCompleteNumMp[info.Sku] = 0
 		}
 		pickGoodsIds = append(pickGoodsIds, pickGoodsId)
 		mp[pickGoodsId] = pickCompleteNum
