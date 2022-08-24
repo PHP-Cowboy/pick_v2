@@ -10,6 +10,7 @@ type ReviewList struct {
 
 type ReviewDetailRsp struct {
 	TaskName        string                 `json:"task_name"`
+	ShopCode        string                 `json:"shop_code"`
 	OutTotal        int                    `json:"out_total"`
 	UnselectedTotal int                    `json:"unselected_total"`
 	ReviewTotal     int                    `json:"review_total"`

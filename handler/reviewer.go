@@ -164,6 +164,7 @@ func ReviewDetail(c *gin.Context) {
 	)
 
 	res.TaskName = pick.TaskName
+	res.ShopCode = pick.ShopCode
 	res.PickUser = pick.PickUser
 	res.TakeOrdersTime = pick.TakeOrdersTime.Format(timeutil.TimeFormat)
 	res.ReviewUser = pick.ReviewUser
