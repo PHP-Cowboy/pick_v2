@@ -37,7 +37,27 @@ func ReviewList(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Model(&batch.Pick{}).Where("status = ?", form.Status).Where(batch.Pick{PickUser: form.Name}).Find(&pick)
+	//result := db.Model(&batch.Pick{}).Where("status = ?", form.Status).Where(batch.Pick{PickUser: form.Name}).Find(&pick)
+
+	localDb := db.Model(&batch.Pick{}).Where("status = ?", form.Status)
+
+	claims, ok := c.Get("claims")
+
+	if !ok {
+		xsq_net.ErrorJSON(c, errors.New("claims 获取失败"))
+		return
+	}
+
+	userInfo := claims.(*middlewares.CustomClaims)
+
+	//1:待复核,2:复核完成
+	if form.Status == 1 {
+		localDb.Where("review_user = ? or review_user = ''", userInfo.Name)
+	} else {
+		localDb.Where("review_user = ? ", userInfo.Name)
+	}
+
+	result := localDb.Where(batch.Pick{PickUser: form.Name}).Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

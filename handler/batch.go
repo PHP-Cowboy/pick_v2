@@ -1229,7 +1229,7 @@ func GetBatchList(c *gin.Context) {
 
 	res.Total = result.RowsAffected
 
-	result = db.Scopes(model.Paginate(form.Page, form.Size)).Order("sort desc").Find(&batches)
+	result = db.Scopes(model.Paginate(form.Page, form.Size)).Order("sort desc, id desc").Find(&batches)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
