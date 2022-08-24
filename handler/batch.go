@@ -74,7 +74,7 @@ func CreateBatch(c *gin.Context) {
 	batchName := form.BatchName
 
 	if form.BatchName == "" {
-		batchName = form.Lines + helper.GetDeliveryMethod(form.DeType)
+		batchName = form.Lines
 	}
 
 	//批次数据
@@ -216,7 +216,7 @@ func CreateBatch(c *gin.Context) {
 			GoodsType:        goodsType,
 			Shelves:          goods.Shelves,
 			OriginalPrice:    goods.OriginalPrice,
-			DiscountPrice:    int(goods.DiscountPrice * 100),
+			DiscountPrice:    goods.DiscountPrice,
 			GoodsUnit:        goods.GoodsUnit,
 			SaleUnit:         goods.SaleUnit,
 			SaleCode:         goods.SaleCode,
@@ -1247,7 +1247,7 @@ func GetBatchList(c *gin.Context) {
 		list = append(list, &rsp.Batch{
 			Id:                b.Id,
 			UpdateTime:        b.UpdateTime.Format(timeutil.TimeFormat),
-			BatchName:         b.BatchName,
+			BatchName:         b.BatchName + helper.GetDeliveryMethod(b.DeliveryMethod),
 			DeliveryStartTime: deliveryStartTime,
 			DeliveryEndTime:   b.DeliveryEndTime.Format(timeutil.TimeFormat),
 			ShopNum:           b.ShopNum,
@@ -1342,13 +1342,15 @@ func GetBase(c *gin.Context) {
 		deliveryStartTime = batchCond.DeliveryStartTime.Format(timeutil.TimeFormat)
 	}
 
+	line := batches.BatchName
+
 	ret := rsp.GetBaseRsp{
 		CreateTime:        batchCond.CreateTime.Format(timeutil.TimeFormat),
 		PayEndTime:        batchCond.PayEndTime.Format(timeutil.TimeFormat),
 		DeliveryStartTime: deliveryStartTime,
 		DeliveryEndTime:   batchCond.DeliveryEndTime.Format(timeutil.TimeFormat),
 		DeliveryMethod:    batchCond.DeliveryMethod,
-		Line:              batchCond.Line,
+		Line:              line,
 		Goods:             batchCond.Goods,
 		Status:            batches.Status,
 	}
@@ -2291,7 +2293,7 @@ func PrintCallGet(c *gin.Context) {
 		OrderRemark: orderInfos[0].OrderRemark,
 		Consignee:   orderInfos[0].ConsigneeName, //info.ConsigneeName
 		Shop_code:   pick.ShopCode,
-		Packages:    0,
+		Packages:    pick.Num,
 		Phone:       orderInfos[0].ConsigneeTel, //info.ConsigneeTel,
 		PriType:     1,
 	}
