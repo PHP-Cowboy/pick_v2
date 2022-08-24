@@ -1371,6 +1371,7 @@ func GetPrePickList(c *gin.Context) {
 	result = db.Model(&batch.PrePickGoods{}).
 		Select("SUM(out_count) as out_c, SUM(need_num) AS need_c, shop_id, goods_type").
 		Where("pre_pick_id in (?)", prePickIds).
+		Where("status = 0"). //状态:0:未处理,1:已进入拣货池
 		Group("shop_id, goods_type").
 		Find(&retCount)
 
