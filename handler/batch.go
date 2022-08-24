@@ -1346,7 +1346,7 @@ func GetPrePickList(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Where(batch.PrePick{ShopId: form.ShopId, Line: form.Line}).Where("status = 0").Find(&prePicks)
+	result := db.Where("batch_id = ?", form.BatchId).Where(batch.PrePick{ShopId: form.ShopId, Line: form.Line}).Where("status = 0").Find(&prePicks)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -1355,7 +1355,7 @@ func GetPrePickList(c *gin.Context) {
 
 	res.Total = result.RowsAffected
 
-	db.Where(batch.PrePick{ShopId: form.ShopId, Line: form.Line}).Where("status = 0").Scopes(model.Paginate(form.Page, form.Size)).Find(&prePicks)
+	db.Where("batch_id = ?", form.BatchId).Where(batch.PrePick{ShopId: form.ShopId, Line: form.Line}).Where("status = 0").Scopes(model.Paginate(form.Page, form.Size)).Find(&prePicks)
 
 	for _, pick := range prePicks {
 		prePickIds = append(prePickIds, pick.Id)
