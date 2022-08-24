@@ -27,6 +27,8 @@ func BatchRoute(g *gin.RouterGroup) {
 		batchGroup.GET("/is_pick", handler.IsPick)
 		//结束批次
 		batchGroup.POST("/end", handler.EndBatch)
+		//编辑批次
+		batchGroup.POST("/edit", handler.EditBatch)
 		//批次池数量
 		batchGroup.GET("/batch_pool_num", handler.GetBatchPoolNum)
 		//预拣池基础信息

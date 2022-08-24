@@ -12,6 +12,7 @@ type CreateBatchForm struct {
 	Sku               string  `json:"sku" form:"sku"`
 	GoodsName         string  `json:"goods_name" form:"goods_name"`
 	BatchNumber       string  `json:"batch_number"`
+	BatchName         string  `json:"batch_name" form:"batch_name"`
 }
 
 type Goods struct {
@@ -37,6 +38,11 @@ type BatchParams struct {
 
 type EndBatchForm struct {
 	Id int `json:"id" form:"id" binding:"required"`
+}
+
+type EditBatchForm struct {
+	Id        int    `json:"id" form:"id" binding:"required"`
+	BatchName string `json:"batch_name"`
 }
 
 type OutGoods struct {
