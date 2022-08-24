@@ -117,6 +117,7 @@ func ReceivingOrders(c *gin.Context) {
 			xsq_net.ErrorJSON(c, err)
 			return
 		}
+		//更新接单时间
 		xsq_net.SucJson(c, res)
 		return
 	}

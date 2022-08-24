@@ -48,8 +48,8 @@ type PrePick struct {
 	ShopCode    string `gorm:"type:varchar(255);not null;comment:店铺编号"`
 	ShopName    string `gorm:"type:varchar(64);not null;comment:店铺名称"`
 	Line        string `gorm:"type:varchar(255);not null;comment:线路"`
-	OrderNum    int    `gorm:"type:int;not null;comment:订单数"`
-	Status      int    `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:已进入拣货池"`
+	//OrderNum    int    `gorm:"type:int;not null;comment:订单数"`
+	Status int `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:已进入拣货池"`
 }
 
 // 预拣货商品明细

@@ -236,8 +236,8 @@ func GetPickDetail(c *gin.Context) {
 				ParamsId:    []rsp.ParamsId{paramsId},
 			}
 		} else {
-			val.NeedNum += val.NeedNum
-			val.CompleteNum += val.CompleteNum
+			val.NeedNum += goods.NeedNum
+			val.CompleteNum += goods.CompleteNum
 			val.ParamsId = append(val.ParamsId, paramsId)
 			pickGoodsSkuMp[goods.Sku] = val
 		}
@@ -245,11 +245,8 @@ func GetPickDetail(c *gin.Context) {
 
 	goodsMap := make(map[string][]rsp.MergePickGoods, 0)
 
-	needTotal := 0
-	completeTotal := 0
 	for _, goods := range pickGoodsSkuMp {
-		completeTotal += goods.CompleteNum
-		needTotal += goods.NeedNum
+
 		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.MergePickGoods{
 			Id:          goods.Id,
 			Sku:         goods.Sku,

@@ -338,7 +338,12 @@ func CreateBatch(c *gin.Context) {
 	shopNum := len(shopNumMp)
 	orderNum := len(orderNumMp)
 
-	result = tx.Model(&batch.Batch{}).Where("id = ?", batches.Id).Updates(map[string]interface{}{"goods_num": goodsNum, "shop_num": shopNum, "order_num": orderNum})
+	result = tx.Model(&batch.Batch{}).
+		Where("id = ?", batches.Id).
+		Updates(map[string]interface{}{
+			"goods_num": goodsNum,
+			"shop_num":  shopNum,
+			"order_num": orderNum})
 
 	if result.Error != nil {
 		tx.Rollback()
@@ -1431,7 +1436,6 @@ func GetPrePickDetail(c *gin.Context) {
 	}
 
 	res.TaskName = prePick.ShopName
-	res.OrderNum = prePick.OrderNum
 	res.Line = prePick.Line
 
 	result = db.Where("pre_pick_id = ? and status = 0", form.PrePickId).Find(&prePickGoods)
@@ -1445,8 +1449,12 @@ func GetPrePickDetail(c *gin.Context) {
 
 	goodsNum := 0
 
+	orderNumMp := make(map[string]struct{}, 0)
+
 	//相同sku合并处理
 	for _, goods := range prePickGoods {
+
+		orderNumMp[goods.Number] = struct{}{}
 
 		goodsNum += goods.NeedNum
 
@@ -1476,6 +1484,9 @@ func GetPrePickDetail(c *gin.Context) {
 			prePickGoodsSkuMp[goods.Sku] = val
 		}
 	}
+
+	//订单数
+	res.OrderNum = len(orderNumMp)
 
 	//商品数
 	res.GoodsNum = goodsNum
