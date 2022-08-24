@@ -211,6 +211,8 @@ func CompletePick(c *gin.Context) {
 		return
 	}
 
+	global.SugarLogger.Infof("form:%+v", form)
+
 	// 这里是否需要做并发处理
 	var (
 		pick      batch.Pick
