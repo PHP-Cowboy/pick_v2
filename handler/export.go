@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"gorm.io/gorm"
 	"io"
-	"io/ioutil"
 	"pick_v2/forms/req"
 	"pick_v2/global"
 	"pick_v2/model/batch"
@@ -254,7 +253,7 @@ func OutboundBatch(c *gin.Context) {
 	var buffer bytes.Buffer
 	_ = xFile.Write(&buffer)
 	content := bytes.NewReader(buffer.Bytes())
-	data, _ := ioutil.ReadAll(content)
+	data, _ := io.ReadAll(content)
 	date := time.Now().Format("20060102")
 	c.Writer.Header().Add("Content-Type", "application/octet-stream")
 	c.Writer.Header().Add("Access-Control-Expose-Headers", "Content-Disposition")

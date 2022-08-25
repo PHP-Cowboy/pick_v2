@@ -23,6 +23,7 @@ type GetGoodsListForm struct {
 
 type GetOrderDetailForm struct {
 	Number string `json:"number" form:"number" binding:"required"`
+	IsLack bool   `json:"is_lack" form:"is_lack"`
 }
 
 type OrderShippingRecordReq struct {

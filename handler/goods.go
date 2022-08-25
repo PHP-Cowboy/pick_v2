@@ -120,6 +120,58 @@ func GetOrderDetail(c *gin.Context) {
 	}
 
 	r := OrderDetail(list)
+
+	//欠货单 需要查询 历史出库单号
+	if form.IsLack {
+		var (
+			pickGoods          []batch.PickGoods
+			pick               []batch.Pick
+			pickIds            []int
+			deliveryOrderNoArr []string
+		)
+
+		db := global.DB
+
+		dbRes := db.Where("number = ?", form.Number).Find(&pickGoods)
+
+		if dbRes.Error != nil {
+			xsq_net.ErrorJSON(c, dbRes.Error)
+			return
+		}
+
+		//拣货id map 去重
+		pickIdsMp := make(map[int]struct{}, len(pickGoods))
+
+		for _, pg := range pickGoods {
+
+			_, ok := pickIdsMp[pg.PickId]
+
+			if ok {
+				continue
+			}
+
+			//获取复核数量和需拣货数量不一致的
+			if pg.NeedNum != pg.ReviewNum {
+				pickIds = append(pickIds, pg.PickId)
+				pickIdsMp[pg.PickId] = struct{}{}
+			}
+		}
+
+		if len(pickIds) > 0 {
+			dbRes = db.Where("id in (?)", pickIds).Find(&pick)
+			if dbRes.Error != nil {
+				xsq_net.ErrorJSON(c, dbRes.Error)
+				return
+			}
+
+			for _, p := range pick {
+				deliveryOrderNoArr = append(deliveryOrderNoArr, p.DeliveryOrderNo)
+			}
+		}
+
+		r.DeliveryOrderNo = deliveryOrderNoArr
+	}
+
 	xsq_net.SucJson(c, r)
 
 }

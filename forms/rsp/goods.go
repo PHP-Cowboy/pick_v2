@@ -80,15 +80,16 @@ type OrderList struct {
 }
 
 type OrderDetail struct {
-	Number      string             `json:"number"`
-	PayAt       string             `json:"pay_time"`
-	ShopCode    string             `json:"shop_code"`
-	ShopName    string             `json:"shop_name"`
-	OrderRemark string             `json:"order_remark"` //订单备注
-	Line        string             `json:"line"`
-	Region      string             `json:"region"`
-	ShopType    string             `json:"shop_type"`
-	Detail      map[string]*Detail `json:"detail"`
+	Number          string             `json:"number"`
+	PayAt           string             `json:"pay_time"`
+	ShopCode        string             `json:"shop_code"`
+	ShopName        string             `json:"shop_name"`
+	OrderRemark     string             `json:"order_remark"` //订单备注
+	Line            string             `json:"line"`
+	Region          string             `json:"region"`
+	ShopType        string             `json:"shop_type"`
+	Detail          map[string]*Detail `json:"detail"`
+	DeliveryOrderNo []string           `json:"delivery_order_no"`
 }
 
 type Detail struct {
