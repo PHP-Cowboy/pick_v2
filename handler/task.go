@@ -15,6 +15,7 @@ import (
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
+	"time"
 )
 
 // 置顶
@@ -431,8 +432,10 @@ func Assign(c *gin.Context) {
 		}
 	}
 
+	now := time.Now()
+
 	//已有拣货员可以强转
-	result = db.Model(&batch.Pick{}).Where("id in (?)", form.PickIds).Updates(map[string]interface{}{"pick_user": user.Name, "take_orders_time": nil})
+	result = db.Model(&batch.Pick{}).Where("id in (?)", form.PickIds).Updates(map[string]interface{}{"pick_user": user.Name, "take_orders_time": &now})
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

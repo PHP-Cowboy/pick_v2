@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"net/http"
 	"pick_v2/common/constant"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
@@ -854,7 +855,11 @@ func EndBatch(c *gin.Context) {
 	//请求接口 释放锁单
 	err := OutGoods(outGoods)
 	if err != nil {
-		xsq_net.ErrorJSON(c, errors.New("归还订货系统欠货信息失败"))
+		c.JSON(http.StatusOK, gin.H{
+			"code": 200,
+			"msg":  "归还订货系统欠货信息失败",
+			"data": nil,
+		})
 		return
 	}
 
