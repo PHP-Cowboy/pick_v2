@@ -229,7 +229,6 @@ func RequestGoodsList(responseData interface{}) (rsp.ApiGoodsListRsp, error) {
 
 	err = json.Unmarshal(body, &result)
 
-	fmt.Println(result)
 	if err != nil {
 		return result, err
 	}

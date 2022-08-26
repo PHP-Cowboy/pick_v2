@@ -13,7 +13,7 @@ type GetGoodsListForm struct {
 	Province     string `json:"province" form:"province"`
 	City         string `json:"city" form:"city"`
 	District     string `json:"district" form:"district"`
-	HasRemark    bool   `json:"has_remark" form:"has_remark"`
+	HasRemark    int    `json:"has_remark" form:"has_remark"` ////是否存在备注  0-默认全部 1-有备注 2-无备注
 	PayStartTime string `json:"pay_start_time" form:"pay_start_time"`
 	PayEndTime   string `json:"pay_end_time"  form:"pay_end_time"`
 	Index        int    `json:"index"`

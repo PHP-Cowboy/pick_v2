@@ -396,7 +396,7 @@ func Assign(c *gin.Context) {
 	var form req.AssignReq
 
 	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, err)
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
 
