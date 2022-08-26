@@ -3,7 +3,7 @@ package req
 // pay_range,batch_number,de_start,de_end
 type GetGoodsListForm struct {
 	Paging
-	PickSta      *int   `json:"pick_sta" form:"pick_sta" binding:"required,oneof=0 1 2"`
+	PickSta      *int   `json:"pick_sta" form:"pick_sta" binding:"required,oneof=0 1 2 3"`
 	Number       string `json:"number" form:"number"`
 	ShopId       int    `json:"shop_id" form:"shop_id"`
 	Sku          string `json:"sku" form:"sku"`
