@@ -7,6 +7,7 @@ type ShopListRsp struct {
 
 type Shop struct {
 	Id       int    `json:"id"`
+	ShopId   int    `json:"shop_id"`
 	ShopName string `json:"shop_name"`
 	ShopCode string `json:"shop_code"`
 	Line     string `json:"line"`

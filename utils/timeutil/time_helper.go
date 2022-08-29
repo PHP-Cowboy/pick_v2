@@ -1,6 +1,7 @@
 package timeutil
 
 import (
+	"fmt"
 	"math"
 	"time"
 )
@@ -122,4 +123,43 @@ func GetTimeAroundByMonths(months int) string {
 
 func GetCurrentMonth() string {
 	return time.Now().Format("01")
+}
+
+// 获取当前时间前后时间段时间
+func GetDurationDateTime(s string) (string, error) {
+
+	duration, err := time.ParseDuration(s) //"-30m"
+
+	if err != nil {
+		return "", err
+	}
+
+	dateTime := time.Now().Add(duration).Format("2006-01-02 15:04:05")
+
+	return dateTime, nil
+}
+
+func GetDiffDateTime(t time.Time) string {
+
+	if t.IsZero() {
+		return ""
+	}
+
+	ms := int(time.Now().Sub(t).Minutes())
+
+	diffStr := ""
+
+	if ms >= 1440 { //超过一天
+		day := ms / 1440 //天
+		hour := (ms % 1440) / 60
+		diffStr = fmt.Sprintf("%d天%d小时", day, hour)
+	} else if ms > 60 { //超过一小时
+		minute := ms % 60
+		hour := ms / 60
+		diffStr = fmt.Sprintf("%d小时%d分钟", hour, minute)
+	} else {
+		diffStr = fmt.Sprintf("%d分钟", ms)
+	}
+
+	return diffStr
 }

@@ -148,6 +148,7 @@ func ShopList(c *gin.Context) {
 	for _, shop := range shops {
 		list = append(list, &rsp.Shop{
 			Id:       shop.Id,
+			ShopId:   shop.ShopId,
 			ShopName: shop.ShopName,
 			ShopCode: shop.ShopCode,
 			Line:     shop.Line,

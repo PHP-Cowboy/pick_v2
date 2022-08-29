@@ -343,7 +343,7 @@ func ConfirmDelivery(c *gin.Context) {
 
 	now := time.Now()
 
-	dateStr := now.Format(timeutil.DateIntFormat)
+	dateStr := now.Format(timeutil.DateNumberFormat)
 
 	//redis
 	redis := global.Redis
