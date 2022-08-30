@@ -35,6 +35,8 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 		form.OrderId = append(form.OrderId, Id)
 	}
 
+	// todo 查询是否已存在 存在的过滤掉？
+
 	orderRsp, err := GetOrderInfo(form)
 
 	if err != nil {
@@ -42,6 +44,39 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 	}
 
 	for _, info := range orderRsp.Data {
+
+		//是否备注
+		var isRemark int
+
+		for _, goods := range info.GoodsInfo {
+			orderGoods = append(orderGoods, order2.OrderGoods{
+				Id:            goods.ID,
+				Number:        info.Number,
+				GoodsName:     goods.Name,
+				Sku:           goods.Sku,
+				GoodsType:     goods.GoodsType,
+				GoodsSpe:      goods.GoodsSpe,
+				Shelves:       goods.Shelves,
+				DiscountPrice: goods.DiscountPrice,
+				GoodsUnit:     goods.GoodsUnit,
+				SaleUnit:      goods.SaleUnit,
+				SaleCode:      goods.SaleCode,
+				PayCount:      goods.PayCount,
+				LackCount:     goods.PayCount, //欠货数 默认等于 下单数
+				GoodsRemark:   goods.GoodsRemark,
+			})
+
+			//商品有备注 - 即为订单是有备注的
+			if goods.GoodsRemark != "" {
+				isRemark = 1
+			}
+		}
+
+		//订单有备注 - 即为订单是有备注的
+		if info.OrderRemark != "" {
+			isRemark = 1
+		}
+
 		order = append(order, order2.Order{
 			Id:               info.OrderID,
 			ShopId:           info.ShopID,
@@ -60,25 +95,8 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 			Address:          info.Address,
 			ConsigneeName:    info.ConsigneeName,
 			ConsigneeTel:     info.ConsigneeTel,
+			IsRemark:         isRemark,
 		})
-
-		for _, goods := range info.GoodsInfo {
-			orderGoods = append(orderGoods, order2.OrderGoods{
-				Id:            goods.ID,
-				Number:        info.Number,
-				GoodsName:     goods.Name,
-				Sku:           goods.Sku,
-				GoodsType:     goods.GoodsType,
-				GoodsSpe:      goods.GoodsSpe,
-				Shelves:       goods.Shelves,
-				DiscountPrice: goods.DiscountPrice,
-				GoodsUnit:     goods.GoodsUnit,
-				SaleUnit:      goods.SaleUnit,
-				SaleCode:      goods.SaleCode,
-				PayCount:      goods.PayCount,
-				GoodsRemark:   goods.GoodsRemark,
-			})
-		}
 	}
 
 	tx := global.DB.Begin()
