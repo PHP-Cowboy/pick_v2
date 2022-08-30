@@ -8,7 +8,38 @@ import (
 	"io/ioutil"
 	"net/http"
 	"pick_v2/global"
+	"strings"
 )
+
+func PostTest() {
+	url := "http://121.196.60.92:19090/api/v1/remote/get/goods/by/id"
+	method := "POST"
+
+	payload := strings.NewReader(`{"order_id":[255]}`)
+
+	client := &http.Client{}
+	req, err := http.NewRequest(method, url, payload)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	req.Header.Add("Content-Type", "application/json")
+
+	res, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(string(body))
+}
 
 func Post(path string, responseData interface{}) ([]byte, error) {
 
@@ -32,6 +63,9 @@ func Post(path string, responseData interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	rq.Header.Add("Content-Type", "application/json")
+
 	res, err := client.Do(rq)
 
 	if err != nil {

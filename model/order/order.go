@@ -5,19 +5,48 @@ import (
 	"time"
 )
 
+// 订单表
 type Order struct {
-	model.Base
-	Number         string    `gorm:"type:varchar(32);comment:订单编号"`
-	PayTime        time.Time `gorm:"type:datetime;not null;comment:支付时间"`
-	ShopNo         string    `gorm:"type:varchar(32);not null;comment:店铺编号"`
-	ShopName       string    `gorm:"type:varchar(32);not null;comment:店铺名称"`
-	ShopType       string    `gorm:"type:varchar(32);not null;comment:店铺类型"`
-	DeliveryMethod int       `gorm:"type:tinyint;not null;comment:配送方式"`
-	GoodsNum       int       `gorm:"type:int;not null;comment:商品数量"`
-	GoodsUnit      int       `gorm:"type:int;not null;comment:商品单位"`
-	Line           string    `gorm:"type:varchar(32);not null;comment:线路"`
-	Region         string    `gorm:"type:varchar(255);not null;comment:地区"`
-	Remark         string    `gorm:"type:varchar(255);not null;comment:地区"`
+	Id               int       `gorm:"primaryKey;type:int(11) unsigned;comment:id"`
+	CreateTime       time.Time `gorm:"autoCreateTime;type:datetime;not null;comment:创建时间"`
+	UpdateTime       time.Time `gorm:"autoUpdateTime;type:datetime;not null;comment:更新时间"`
+	DeleteTime       time.Time `gorm:"type:datetime;default:null;comment:删除时间"`
+	ShopId           int       `gorm:"type:int(11);not null;comment:店铺id"`
+	ShopType         string    `gorm:"type:varchar(64);not null;comment:店铺类型"`
+	ShopCode         string    `gorm:"type:varchar(255);not null;comment:店铺编号"`
+	Number           string    `gorm:"type:varchar(64);index:number_sku_idx;comment:订单编号"`
+	HouseCode        string    `gorm:"type:varchar(64);not null;comment:仓库编码"`
+	Line             string    `gorm:"type:varchar(255);not null;comment:线路"`
+	DistributionType int       `gorm:"type:tinyint;comment:配送方式"`
+	OrderRemark      string    `gorm:"type:varchar(512);comment:订单备注"`
+	PayAt            string    `gorm:"type:datetime;comment:支付时间"`
+	DeliveryAt       string    `gorm:"type:date;comment:配送时间"`
+	Province         string    `gorm:"type:varchar(64);comment:省"`
+	City             string    `gorm:"type:varchar(64);comment:市"`
+	District         string    `gorm:"type:varchar(64);comment:区"`
+	Address          string    `gorm:"type:varchar(255);comment:地址"`
+	ConsigneeName    string    `gorm:"type:varchar(64);comment:收货人名称"`
+	ConsigneeTel     string    `gorm:"type:varchar(64);comment:收货人电话"`
+}
+
+// 订单商品表
+type OrderGoods struct {
+	Id            int       `gorm:"primaryKey;type:int(11) unsigned;comment:id"`
+	CreateTime    time.Time `gorm:"autoCreateTime;type:datetime;not null;comment:创建时间"`
+	UpdateTime    time.Time `gorm:"autoUpdateTime;type:datetime;not null;comment:更新时间"`
+	DeleteTime    time.Time `gorm:"type:datetime;default:null;comment:删除时间"`
+	Number        string    `gorm:"type:varchar(64);index:number_sku_idx;comment:订单编号"`
+	GoodsName     string    `gorm:"type:varchar(64);comment:商品名称"`
+	Sku           string    `gorm:"type:varchar(64);index:number_sku_idx;comment:sku"`
+	GoodsType     string    `gorm:"type:varchar(64);comment:商品类型"`
+	GoodsSpe      string    `gorm:"type:varchar(128);comment:商品规格"`
+	Shelves       string    `gorm:"type:varchar(64);comment:货架"`
+	DiscountPrice int       `gorm:"comment:折扣价"`
+	GoodsUnit     string    `gorm:"type:varchar(64);comment:商品单位"`
+	SaleUnit      string    `gorm:"type:varchar(64);comment:销售单位"`
+	SaleCode      string    `gorm:"comment:销售编码"`
+	PayCount      int       `gorm:"comment:下单数量"`
+	GoodsRemark   string    `gorm:"type:varchar(255);comment:商品备注"`
 }
 
 type OrderInfo struct {

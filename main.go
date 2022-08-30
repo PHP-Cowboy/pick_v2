@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/apache/rocketmq-client-go/v2"
+	"github.com/apache/rocketmq-client-go/v2/consumer"
 	"os"
 	"os/signal"
+	"pick_v2/handler"
 	"syscall"
 
 	"pick_v2/global"
@@ -33,8 +36,21 @@ func main() {
 		}
 	}()
 
+	c, _ := rocketmq.NewPushConsumer(
+		consumer.WithNameServer([]string{"192.168.1.40:9876"}),
+		consumer.WithGroupName("purchase"),
+	)
+
+	if err := c.Subscribe("purchase_order", consumer.MessageSelector{}, handler.Order); err != nil {
+		global.SugarLogger.Errorf("消费topic：purchase_order失败:%s", err.Error())
+	}
+
+	_ = c.Start()
+
 	//接收终止信号
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+
+	_ = c.Shutdown()
 }

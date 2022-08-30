@@ -41,6 +41,10 @@ func main() {
 
 	_ = db.Set(model.TableOptions, model.GetOptions("拣货订单数据表")).AutoMigrate(&order.OrderInfo{})
 
+	_ = db.Set(model.TableOptions, model.GetOptions("订单表")).AutoMigrate(&order.Order{})
+
+	_ = db.Set(model.TableOptions, model.GetOptions("订单商品表")).AutoMigrate(&order.OrderGoods{})
+
 	_ = db.Set(model.TableOptions, model.GetOptions("批次生成条件表")).AutoMigrate(&batch.BatchCondition{})
 
 	_ = db.Set(model.TableOptions, model.GetOptions("批次表")).AutoMigrate(&batch.Batch{})
