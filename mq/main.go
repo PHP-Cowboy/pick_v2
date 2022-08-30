@@ -22,19 +22,18 @@ func main() {
 
 	topic := "purchase_order"
 
-	for i := 0; i < 1; i++ {
-		msg := &primitive.Message{
-			Topic: topic,
-			Body:  []byte("255"),
-		}
-		res, err := p.SendSync(context.Background(), msg)
-
-		if err != nil {
-			fmt.Printf("send message error: %s\n", err)
-		} else {
-			fmt.Printf("send message success: result=%s\n", res.String())
-		}
+	msg := &primitive.Message{
+		Topic: topic,
+		Body:  []byte("255"),
 	}
+	res, err := p.SendSync(context.Background(), msg)
+
+	if err != nil {
+		fmt.Printf("send message error: %s\n", err)
+	} else {
+		fmt.Printf("send message success: result=%s\n", res.String())
+	}
+
 	err = p.Shutdown()
 	if err != nil {
 		fmt.Printf("shutdown producer error: %s", err.Error())
