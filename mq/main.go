@@ -14,7 +14,9 @@ func main() {
 		producer.WithNsResolver(primitive.NewPassthroughResolver([]string{"192.168.1.40:9876"})),
 		producer.WithRetry(2),
 	)
+
 	err := p.Start()
+
 	if err != nil {
 		fmt.Printf("start producer error: %s", err.Error())
 		os.Exit(1)
@@ -26,6 +28,7 @@ func main() {
 		Topic: topic,
 		Body:  []byte("255"),
 	}
+
 	res, err := p.SendSync(context.Background(), msg)
 
 	if err != nil {
@@ -35,6 +38,7 @@ func main() {
 	}
 
 	err = p.Shutdown()
+
 	if err != nil {
 		fmt.Printf("shutdown producer error: %s", err.Error())
 	}
