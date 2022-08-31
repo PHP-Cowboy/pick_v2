@@ -13,7 +13,7 @@ import (
 )
 
 func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.ConsumeResult, error) {
-
+	global.SugarLogger.Info("111111")
 	type Form struct {
 		OrderId []int `json:"order_id"`
 	}
@@ -46,9 +46,14 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 	for _, info := range orderRsp.Data {
 
 		//是否备注
-		var isRemark int
+		var hasRemark int
+
+		payTotal := 0
 
 		for _, goods := range info.GoodsInfo {
+			//订单商品总数量
+			payTotal += goods.PayCount
+
 			orderGoods = append(orderGoods, order2.OrderGoods{
 				Id:            goods.ID,
 				Number:        info.Number,
@@ -68,18 +73,19 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 
 			//商品有备注 - 即为订单是有备注的
 			if goods.GoodsRemark != "" {
-				isRemark = 1
+				hasRemark = 1
 			}
 		}
 
 		//订单有备注 - 即为订单是有备注的
 		if info.OrderRemark != "" {
-			isRemark = 1
+			hasRemark = 1
 		}
 
 		order = append(order, order2.Order{
 			Id:               info.OrderID,
 			ShopId:           info.ShopID,
+			ShopName:         info.ShopName,
 			ShopType:         info.ShopType,
 			ShopCode:         info.ShopCode,
 			Number:           info.Number,
@@ -88,6 +94,7 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 			DistributionType: info.DistributionType,
 			OrderRemark:      info.OrderRemark,
 			PayAt:            info.PayAt,
+			PayTotal:         payTotal,
 			DeliveryAt:       info.DeliveryAt,
 			Province:         info.Province,
 			City:             info.City,
@@ -95,7 +102,7 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 			Address:          info.Address,
 			ConsigneeName:    info.ConsigneeName,
 			ConsigneeTel:     info.ConsigneeTel,
-			IsRemark:         isRemark,
+			HasRemark:        hasRemark,
 		})
 	}
 

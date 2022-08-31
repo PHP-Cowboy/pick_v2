@@ -21,6 +21,107 @@ import (
 	"pick_v2/utils/xsq_net"
 )
 
+func GoodsList(c *gin.Context) {
+	var form req.GoodsListForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	var (
+		orders     []order.Order
+		orderGoods []order.OrderGoods
+		numbers    []string
+	)
+
+	db := global.DB
+
+	if form.Sku != "" {
+		result := db.Where("sku = ?", form.Sku).Find(&orderGoods)
+
+		if result.Error != nil {
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+
+		for _, good := range orderGoods {
+			numbers = append(numbers, good.Number)
+		}
+	}
+
+	localDb := db.Model(&order.Order{})
+
+	if len(numbers) > 0 {
+		localDb = localDb.Where("number in (?)", numbers)
+	}
+
+	localDb.Where(&order.Order{
+		OrderType:        form.OrderType,
+		ShopId:           form.ShopId,
+		Number:           form.Number,
+		Line:             form.Lines,
+		DistributionType: form.DistributionType,
+		ShopType:         form.ShopType,
+		Province:         form.Province,
+		City:             form.City,
+		District:         form.District,
+		HasRemark:        form.HasRemark,
+	})
+
+	if form.PayEndTime != "" {
+		localDb = localDb.Where("pay_at >= ?", form.PayEndTime)
+	}
+
+	var (
+		total int64
+		res   rsp.GoodsListRsp
+	)
+
+	result := localDb.Count(&total)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = localDb.Scopes(model.Paginate(form.Page, form.Size)).Find(&orders)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	list := make([]rsp.OrderList, 0, form.Size)
+
+	for _, o := range orders {
+		latestPickingTime := ""
+
+		if o.LatestPickingTime != nil {
+			latestPickingTime = o.LatestPickingTime.Format(timeutil.TimeFormat)
+		}
+
+		list = append(list, rsp.OrderList{
+			Number:            o.Number,
+			PayAt:             o.PayAt,
+			ShopCode:          o.ShopCode,
+			ShopName:          o.ShopName,
+			ShopType:          o.ShopType,
+			DistributionType:  o.DistributionType,
+			PayCount:          o.PayTotal,
+			Line:              o.Line,
+			Region:            o.Province + o.City + o.District,
+			OrderRemark:       o.OrderRemark,
+			LatestPickingTime: latestPickingTime,
+		})
+	}
+
+	res.Total = total
+	res.List = list
+
+	xsq_net.SucJson(c, res)
+}
+
 // 获取待拣货订单商品列表
 func GetGoodsList(c *gin.Context) {
 

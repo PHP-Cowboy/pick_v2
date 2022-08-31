@@ -11,6 +11,7 @@ func GoodsRoute(g *gin.RouterGroup) {
 	{
 		//列表
 		goodsGroup.GET("/list", handler.GetGoodsList)
+		goodsGroup.GET("/lists", handler.GoodsList)
 		//明细
 		goodsGroup.GET("/detail", handler.GetOrderDetail)
 		//商品列表

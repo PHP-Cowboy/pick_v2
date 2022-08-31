@@ -1,5 +1,10 @@
 package rsp
 
+type GoodsListRsp struct {
+	Total int64       `json:"total"`
+	List  []OrderList `json:"list"`
+}
+
 type CommodityListRsp struct {
 	Code int              `json:"code"`
 	Data []*CommodityList `json:"data"`

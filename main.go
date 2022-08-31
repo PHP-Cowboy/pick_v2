@@ -36,10 +36,14 @@ func main() {
 		}
 	}()
 
-	c, _ := rocketmq.NewPushConsumer(
+	c, mqErr := rocketmq.NewPushConsumer(
 		consumer.WithNameServer([]string{"192.168.1.40:9876"}),
 		consumer.WithGroupName("purchase"),
 	)
+
+	if mqErr != nil {
+		panic("MQ失败:" + mqErr.Error())
+	}
 
 	if err := c.Subscribe("purchase_order", consumer.MessageSelector{}, handler.Order); err != nil {
 		global.SugarLogger.Errorf("消费topic：purchase_order失败:%s", err.Error())
