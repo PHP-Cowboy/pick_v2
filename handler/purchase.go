@@ -13,7 +13,7 @@ import (
 )
 
 func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.ConsumeResult, error) {
-	global.SugarLogger.Info("111111")
+
 	type Form struct {
 		OrderId []int `json:"order_id"`
 	}
@@ -40,6 +40,7 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 	orderRsp, err := GetOrderInfo(form)
 
 	if err != nil {
+		global.SugarLogger.Error(err.Error())
 		return consumer.ConsumeRetryLater, err
 	}
 
@@ -108,17 +109,19 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 
 	tx := global.DB.Begin()
 
-	result := tx.Save(order)
+	result := tx.Save(&order)
 
 	if result.Error != nil {
 		tx.Rollback()
+		global.SugarLogger.Error(err.Error())
 		return consumer.ConsumeRetryLater, result.Error
 	}
 
-	result = tx.Save(orderGoods)
+	result = tx.Save(&orderGoods)
 
 	if result.Error != nil {
 		tx.Rollback()
+		global.SugarLogger.Error(err.Error())
 		return consumer.ConsumeRetryLater, result.Error
 	}
 

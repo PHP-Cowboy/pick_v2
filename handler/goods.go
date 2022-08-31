@@ -21,7 +21,8 @@ import (
 	"pick_v2/utils/xsq_net"
 )
 
-func GoodsList(c *gin.Context) {
+// 订单列表
+func GetGoodsList(c *gin.Context) {
 	var form req.GoodsListForm
 
 	if err := c.ShouldBind(&form); err != nil {
@@ -92,7 +93,7 @@ func GoodsList(c *gin.Context) {
 		return
 	}
 
-	list := make([]rsp.OrderList, 0, form.Size)
+	list := make([]rsp.Order, 0, form.Size)
 
 	for _, o := range orders {
 		latestPickingTime := ""
@@ -101,7 +102,7 @@ func GoodsList(c *gin.Context) {
 			latestPickingTime = o.LatestPickingTime.Format(timeutil.TimeFormat)
 		}
 
-		list = append(list, rsp.OrderList{
+		list = append(list, rsp.Order{
 			Number:            o.Number,
 			PayAt:             o.PayAt,
 			ShopCode:          o.ShopCode,
@@ -112,6 +113,7 @@ func GoodsList(c *gin.Context) {
 			Line:              o.Line,
 			Region:            o.Province + o.City + o.District,
 			OrderRemark:       o.OrderRemark,
+			OrderType:         o.OrderType,
 			LatestPickingTime: latestPickingTime,
 		})
 	}
@@ -122,66 +124,9 @@ func GoodsList(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-// 获取待拣货订单商品列表
-func GetGoodsList(c *gin.Context) {
-
-	var form req.GetGoodsListForm
-
-	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, err)
-		return
-	}
-	//商品系统接口页数为index
-	form.Index = form.Page
-
-	fmt.Printf("%+v", form)
-
-	result, err := RequestGoodsList(form)
-
-	if err != nil {
-		xsq_net.ErrorJSON(c, err)
-		return
-	}
-
-	orderList := OrderList(result.Data.List)
-	xsq_net.SucJson(c, gin.H{"list": orderList, "total": result.Data.Count})
-}
-
-func OrderList(goodsList []*rsp.ApiGoods) []*rsp.OrderList {
-
-	res := make(map[string]struct{}, 0)
-
-	list := make([]*rsp.OrderList, 0, 16)
-
-	for _, goods := range goodsList {
-		if _, ok := res[goods.Number]; ok {
-			continue
-		}
-		res[goods.Number] = struct{}{}
-
-		list = append(list, &rsp.OrderList{
-			Number:            goods.Number,
-			PayAt:             goods.PayAt,
-			ShopCode:          goods.ShopCode,
-			ShopName:          goods.ShopName,
-			ShopType:          goods.ShopType,
-			DistributionType:  goods.DistributionType,
-			SaleUnit:          goods.SaleUnit,
-			PayCount:          goods.PayCount,
-			OutCount:          goods.OutCount,
-			LackCount:         goods.LackCount,
-			Line:              goods.Line,
-			Region:            goods.Province + goods.City + goods.District,
-			OrderRemark:       goods.OrderRemark,
-			LatestPickingTime: goods.LatestPickingTime,
-		})
-	}
-
-	return list
-}
-
 // 订单明细
 func GetOrderDetail(c *gin.Context) {
+
 	var form req.GetOrderDetailForm
 
 	if err := c.ShouldBind(&form); err != nil {
@@ -189,49 +134,85 @@ func GetOrderDetail(c *gin.Context) {
 		return
 	}
 
-	result, err := RequestGoodsList(form)
-
-	if err != nil {
-		xsq_net.ErrorJSON(c, err)
-		return
-	}
-
 	var (
-		mp   = make(map[string]string, 0)
-		list []*rsp.ApiGoods
+		orders     order.Order
+		orderGoods []order.OrderGoods
 	)
 
-	mp, err = cache.GetClassification()
+	db := global.DB
+
+	result := db.Model(&order.Order{}).Where("number = ?", form.Number).First(&orders)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = db.Model(&order.OrderGoods{}).Where("number = ?", form.Number).Find(&orderGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	mp, err := cache.GetClassification()
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
-	for _, l := range result.Data.List {
-		goodsType, ok := mp[l.SecondType]
+	var res rsp.OrderDetail
+
+	detailMap := make(map[string]*rsp.Detail, 0)
+
+	for _, og := range orderGoods {
+		goodsType, ok := mp[og.GoodsType]
 
 		if !ok {
-			xsq_net.ErrorJSON(c, errors.New("商品类型:"+l.SecondType+"数据未同步"))
+			xsq_net.ErrorJSON(c, errors.New("商品类型:"+og.GoodsType+"数据未同步"))
 			return
 		}
 
-		l.GoodsType = goodsType
-		list = append(list, l)
+		if _, detailOk := detailMap[goodsType]; !detailOk {
+			detailMap[goodsType] = &rsp.Detail{
+				Total: 0,
+				List:  make([]*rsp.GoodsDetail, 0),
+			}
+		}
+
+		detailMap[goodsType].Total += og.PayCount
+
+		detailMap[goodsType].List = append(detailMap[goodsType].List, &rsp.GoodsDetail{
+			Name:        og.GoodsName,
+			GoodsSpe:    og.GoodsSpe,
+			Shelves:     og.Shelves,
+			PayCount:    og.PayCount,
+			CloseCount:  og.CloseCount,
+			LackCount:   og.LackCount,
+			GoodsRemark: og.GoodsRemark,
+		})
 	}
 
-	r := OrderDetail(list)
+	res.Number = orders.Number
+	res.PayAt = orders.PayAt
+	res.ShopCode = orders.ShopCode
+	res.ShopName = orders.ShopName
+	res.Line = orders.Line
+	res.Region = orders.Province + orders.City + orders.District
+	res.ShopType = orders.ShopType
+	res.OrderRemark = orders.OrderRemark
+
+	res.Detail = detailMap
 
 	//欠货单 需要查询 历史出库单号
-	if form.IsLack {
+	if orders.OrderType == 3 { //订单类型:1:新订单,2:拣货中,3:欠货单
 		var (
 			pickGoods          []batch.PickGoods
 			pick               []batch.Pick
 			pickIds            []int
 			deliveryOrderNoArr []string
 		)
-
-		db := global.DB
 
 		dbRes := db.Where("number = ?", form.Number).Find(&pickGoods)
 
@@ -270,52 +251,10 @@ func GetOrderDetail(c *gin.Context) {
 			}
 		}
 
-		r.DeliveryOrderNo = deliveryOrderNoArr
+		res.DeliveryOrderNo = deliveryOrderNoArr
 	}
 
-	xsq_net.SucJson(c, r)
-
-}
-
-func OrderDetail(goodsList []*rsp.ApiGoods) rsp.OrderDetail {
-
-	var result rsp.OrderDetail
-
-	detailMap := make(map[string]*rsp.Detail, 0)
-
-	for _, list := range goodsList {
-
-		if _, ok := detailMap[list.GoodsType]; !ok {
-			detailMap[list.GoodsType] = &rsp.Detail{
-				Total: 0,
-				List:  make([]*rsp.GoodsDetail, 0),
-			}
-		}
-
-		detailMap[list.GoodsType].Total += list.PayCount
-		detailMap[list.GoodsType].List = append(detailMap[list.GoodsType].List, &rsp.GoodsDetail{
-			Name:        list.Name,
-			GoodsSpe:    list.GoodsSpe,
-			Shelves:     list.Shelves,
-			PayCount:    list.PayCount,
-			CloseCount:  list.CloseCount,
-			LackCount:   list.LackCount,
-			GoodsRemark: list.GoodsRemark,
-		})
-
-		result.Number = list.Number
-		result.PayAt = list.PayAt
-		result.ShopCode = list.ShopCode
-		result.ShopName = list.ShopName
-		result.Line = list.Line
-		result.Region = list.Province + list.City + list.District
-		result.ShopType = list.ShopType
-		result.OrderRemark = list.OrderRemark
-	}
-
-	result.Detail = detailMap
-
-	return result
+	xsq_net.SucJson(c, res)
 }
 
 func RequestGoodsList(responseData interface{}) (rsp.ApiGoodsListRsp, error) {
@@ -617,26 +556,38 @@ func CompleteOrderDetail(c *gin.Context) {
 }
 
 func Count(c *gin.Context) {
-	var result rsp.CountRsp
 
-	body, err := request.Get("api/v1/remote/order/node/count")
+	type OrderNum struct {
+		Count     int `json:"count"`
+		OrderType int `json:"order_type"`
+	}
 
-	if err != nil {
-		xsq_net.ErrorJSON(c, err)
+	var (
+		dbRes []OrderNum
+		res   rsp.CountRes
+	)
+
+	result := global.DB.Model(&order.Order{}).Select("count(id) as count, order_type").Find(&dbRes)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	err = json.Unmarshal(body, &result)
-
-	fmt.Println(result)
-	if err != nil {
-		xsq_net.ErrorJSON(c, err)
-		return
+	for _, r := range dbRes {
+		switch r.OrderType {
+		case 1: //1:新订单
+			res.NewCount = r.Count
+			break
+		case 2: //2:拣货中
+			res.PickCount = r.Count
+			break
+		case 3: //3:欠货单
+			res.OldCount = r.Count
+			break
+		}
+		res.AllCount += r.Count
 	}
-	if result.Code != 200 {
-		xsq_net.ErrorJSON(c, errors.New(result.Msg))
-		return
-	}
 
-	xsq_net.SucJson(c, result.Data)
+	xsq_net.SucJson(c, res)
 }

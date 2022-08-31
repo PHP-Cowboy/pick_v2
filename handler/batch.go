@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"net/http"
@@ -252,16 +251,16 @@ func CreateBatch(c *gin.Context) {
 
 		if goods.GoodsRemark != "" || goods.OrderRemark != "" {
 			prePickRemark = append(prePickRemark, &batch.PrePickRemark{
-				WarehouseId: form.WarehouseId,
-				BatchId:     batches.Id,
-				OrderInfoId: goods.Id,
-				ShopId:      goods.ShopId,
-				Number:      goods.Number,
-				OrderRemark: goods.OrderRemark,
-				GoodsRemark: goods.GoodsRemark,
-				ShopName:    goods.ShopName,
-				Line:        cacheMpLine,
-				PrePickId:   0,
+				WarehouseId:  form.WarehouseId,
+				BatchId:      batches.Id,
+				OrderGoodsId: goods.Id,
+				ShopId:       goods.ShopId,
+				Number:       goods.Number,
+				OrderRemark:  goods.OrderRemark,
+				GoodsRemark:  goods.GoodsRemark,
+				ShopName:     goods.ShopName,
+				Line:         cacheMpLine,
+				PrePickId:    0,
 			})
 		}
 
@@ -372,34 +371,130 @@ func CreateByOrder(c *gin.Context) {
 		return
 	}
 
-	claims, ok := c.Get("claims")
+	userInfo := GetUserInfo(c)
 
-	if !ok {
+	if userInfo == nil {
 		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
 		return
 	}
 
-	userInfo := claims.(*middlewares.CustomClaims)
+	var (
+		orders     order.Order
+		orderGoods []order.OrderGoods
+	)
+
+	db := global.DB
+
+	result := db.Where("number = ?", form.Number).First(&orders)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	if orders.OrderType == 2 {
+		xsq_net.ErrorJSON(c, errors.New("订单已经在拣货中"))
+		return
+	}
+
+	result = db.Model(&order.OrderGoods{}).Where("number = ?", form.Number).Find(&orderGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	tx := db.Begin()
+
+	//更新订单
+	err := UpdateOrder(orders.Id, form.Number)
+
+	if err != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, errors.New("订单数据更新失败"))
+		return
+	}
+
+	//var (
+	//	payAt           time.Time
+	//	deliveryEndTime time.Time
+	//)
+
+	payAt, err := time.ParseInLocation(timeutil.TimeZoneFormat, orders.PayAt, time.Local)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	deliveryEndTime, err := time.ParseInLocation(timeutil.TimeZoneFormat, orders.DeliveryAt, time.Local)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	var batchId int
+	//批次相关
+	batchId, err = SaveBatch(userInfo, form.Number, 1, 1, orders.PayTotal, orders.DistributionType, payAt, deliveryEndTime)
+
+	if err != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, errors.New("批次数据保存失败"))
+		return
+	}
+
+	err = SavePrePickPool(userInfo, batchId, form)
+
+	tx.Commit()
+}
+
+func GetUserInfo(c *gin.Context) *middlewares.CustomClaims {
+	claims, ok := c.Get("claims")
+
+	if !ok {
+		return nil
+	}
+
+	return claims.(*middlewares.CustomClaims)
+}
+
+func UpdateOrder(orderId int, number string) error {
 
 	tx := global.DB.Begin()
 
-	var (
-		isSaveCond bool
-	)
+	result := tx.Model(&order.Order{}).Where("id = ?", orderId).Update("order_type", 2)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	result = tx.Model(&order.OrderGoods{}).Where("number = ?", number).Update("status", 1)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
+}
+
+func SaveBatch(userInfo *middlewares.CustomClaims, batchName string, shopNum, orderNum, goodsNum, deliveryMethod int, payEndTime, deliveryEndTime time.Time) (int, error) {
+
+	tx := global.DB.Begin()
 
 	now := time.Now()
 
 	//创建批次
 	batches := batch.Batch{
 		WarehouseId:     userInfo.WarehouseId,
-		BatchName:       form.Number,
+		BatchName:       batchName,
 		DeliveryEndTime: nil,
-		ShopNum:         0, //在后续的逻辑中更新处理，调用接口时需传批次id，只能更新，其他方式可能导致订货系统锁住数据，而拣货系统获取不到被锁住的数据
-		OrderNum:        0,
-		GoodsNum:        0,
+		ShopNum:         shopNum, //在后续的逻辑中更新处理，调用接口时需传批次id，只能更新，其他方式可能导致订货系统锁住数据，而拣货系统获取不到被锁住的数据
+		OrderNum:        orderNum,
+		GoodsNum:        goodsNum,
 		UserName:        userInfo.Name,
 		Line:            "",
-		DeliveryMethod:  0,
+		DeliveryMethod:  deliveryMethod,
 		EndTime:         &now,
 		Status:          0,
 		PickNum:         0,
@@ -407,206 +502,157 @@ func CreateByOrder(c *gin.Context) {
 		Sort:            0,
 	}
 
-	if form.BatchNumber == "" {
-		isSaveCond = true
-
-	} else {
-
-		batchId, convErr := strconv.Atoi(form.BatchNumber)
-
-		if convErr != nil {
-			xsq_net.ErrorJSON(c, convErr)
-			return
-		}
-		batches.Id = batchId
-	}
-
 	result := tx.Save(&batches)
 
 	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
+		return 0, result.Error
 	}
 
-	form.BatchNumber = strconv.Itoa(batches.Id)
-
-	goodsRes, err := RequestGoodsList(form)
-	if err != nil {
-		xsq_net.ErrorJSON(c, err)
-		return
+	//批次创建条件
+	condition := batch.BatchCondition{
+		BatchId:         batches.Id,
+		WarehouseId:     userInfo.WarehouseId,
+		PayEndTime:      &payEndTime,
+		DeliveryEndTime: &deliveryEndTime,
+		Line:            "",
+		DeliveryMethod:  deliveryMethod,
+		Sku:             "",
+		Goods:           "",
 	}
 
-	if len(goodsRes.Data.List) <= 0 {
-		xsq_net.ErrorJSON(c, ecode.NoOrderFound)
-		return
+	result = tx.Save(&condition)
+
+	if result.Error != nil {
+		return 0, result.Error
 	}
 
-	var (
-		orders        []order.OrderInfo
-		prePicks      []batch.PrePick
-		prePickGoods  []*batch.PrePickGoods
-		prePickRemark []*batch.PrePickRemark
-	)
+	return batches.Id, nil
+}
+
+func SavePrePickPool(userInfo *middlewares.CustomClaims, batchId int, form req.CreateByOrderReq) error {
+	//缓存中的线路数据
+	lineCacheMp, errCache := cache.GetShopLine()
+
+	if errCache != nil {
+		return errors.New("线路缓存获取失败")
+	}
 
 	mp, err := cache.GetClassification()
 
 	if err != nil {
-		xsq_net.ErrorJSON(c, err)
-		return
+		return err
 	}
+
+	var orderAndGoods []rsp.OrderAndGoods
+
+	db := global.DB
+
+	//todo 筛选条件
+	localDb := db.
+		Table("t_order_goods og").
+		Select("og.*,o.shop_id,o.shop_name,o.shop_code,o.line,o.distribution_type,o.order_remark").
+		Joins("left join t_order o on og.number = o.number").
+		Where("og.status = 0")
+
+	if form.Number != "" {
+		localDb.Where("og.number = ?", form.Number)
+	}
+
+	result := localDb.Scan(&orderAndGoods)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	var (
+		prePicks      []batch.PrePick
+		prePickGoods  []*batch.PrePickGoods
+		prePickRemark []*batch.PrePickRemark
+	)
 
 	//订单相关数据 -店铺数 订单数 商品数
 	goodsNum := 0                              //商品数
 	shopNumMp := make(map[int]struct{}, 0)     //店铺
 	orderNumMp := make(map[string]struct{}, 0) //订单
 
-	params := make(map[string]req.BatchParams, 0)
+	//连表 order order_goods 查询数据
 
-	//缓存中的线路数据
-	lineCacheMp, errCache := cache.GetShopLine()
+	for _, og := range orderAndGoods {
+		goodsNum += og.LackCount
 
-	if errCache != nil {
-		xsq_net.ErrorJSON(c, errors.New("线路缓存获取失败"))
-		return
-	}
-
-	for _, goods := range goodsRes.Data.List {
-
-		//更新批次和批次条件的相关数据使用
-		_, pOk := params[goods.Number]
-		if !pOk {
-			params[goods.Number] = req.BatchParams{
-				DeliveryEndTime: goods.DeliveryAt,
-				PayEndTime:      goods.PayAt,
-				DeliveryMethod:  goods.DistributionType,
-			}
-		}
-
-		goodsNum += goods.LackCount
-
-		orderNumMp[goods.Number] = struct{}{}
-
-		goodsType, mpOk := mp[goods.SecondType]
+		orderNumMp[og.Number] = struct{}{}
+		goodsType, mpOk := mp[og.GoodsType]
 
 		if !mpOk {
-			xsq_net.ErrorJSON(c, errors.New("商品类型:"+goods.SecondType+"数据未同步"))
-			return
+			return errors.New("商品类型:" + og.GoodsType + "数据未同步")
 		}
 
-		cacheMpLine, cacheMpOk := lineCacheMp[goods.ShopId]
+		cacheMpLine, cacheMpOk := lineCacheMp[og.ShopId]
 
 		if !cacheMpOk {
-			xsq_net.ErrorJSON(c, errors.New("店铺:"+goods.ShopName+"线路未同步，请先同步"))
-			return
+			return errors.New("店铺:" + og.ShopName + "线路未同步，请先同步")
 		}
-
-		orders = append(orders, order.OrderInfo{
-			Id:               goods.Id,
-			BatchId:          batches.Id,
-			ShopId:           goods.ShopId,
-			ShopName:         goods.ShopName,
-			ShopType:         goods.ShopType,
-			ShopCode:         goods.ShopCode,
-			HouseCode:        goods.HouseCode,
-			Line:             cacheMpLine,
-			Number:           goods.Number,
-			Status:           goods.Status,
-			DeliveryAt:       goods.DeliveryAt,
-			DistributionType: goods.DistributionType,
-			OrderRemark:      goods.OrderRemark,
-			Province:         goods.Province,
-			City:             goods.City,
-			District:         goods.District,
-			Address:          goods.Address,
-			ConsigneeName:    goods.ConsigneeName,
-			ConsigneeTel:     goods.ConsigneeTel,
-			Name:             goods.Name,
-			Sku:              goods.Sku,
-			GoodsSpe:         goods.GoodsSpe,
-			GoodsType:        goodsType,
-			Shelves:          goods.Shelves,
-			OriginalPrice:    goods.OriginalPrice,
-			DiscountPrice:    int(goods.DiscountPrice * 100),
-			GoodsUnit:        goods.GoodsUnit,
-			SaleUnit:         goods.SaleUnit,
-			SaleCode:         goods.SaleCode,
-			PayCount:         goods.PayCount,
-			CloseCount:       goods.CloseCount,
-			OutCount:         goods.OutCount,
-			GoodsRemark:      goods.GoodsRemark,
-			PickStatus:       goods.PickStatus,
-			PayAt:            goods.PayAt,
-			LackCount:        goods.LackCount,
-			PickTime:         nil,
-		})
 
 		prePickGoods = append(prePickGoods, &batch.PrePickGoods{
 			WarehouseId:      userInfo.WarehouseId,
-			BatchId:          batches.Id,
-			OrderInfoId:      goods.Id,
-			Number:           goods.Number,
+			BatchId:          batchId,
+			OrderInfoId:      og.Id,
+			Number:           og.Number,
 			PrePickId:        0, //后续逻辑变更
-			ShopId:           goods.ShopId,
-			DistributionType: goods.DistributionType,
-			Sku:              goods.Sku,
-			GoodsName:        goods.Name,
+			ShopId:           og.ShopId,
+			DistributionType: og.DistributionType,
+			Sku:              og.Sku,
+			GoodsName:        og.GoodsName,
 			GoodsType:        goodsType,
-			GoodsSpe:         goods.GoodsSpe,
-			Shelves:          goods.Shelves,
-			Unit:             goods.GoodsUnit,
-			NeedNum:          goods.LackCount,
-			CloseNum:         goods.CloseCount,
-			OutCount:         goods.OutCount,
-			NeedOutNum:       goods.LackCount,
+			GoodsSpe:         og.GoodsSpe,
+			Shelves:          og.Shelves,
+			Unit:             og.GoodsUnit,
+			NeedNum:          og.LackCount,
+			CloseNum:         og.CloseCount,
+			OutCount:         0,
+			NeedOutNum:       og.LackCount,
 		})
 
-		if goods.GoodsRemark != "" || goods.OrderRemark != "" {
+		if og.GoodsRemark != "" || og.OrderRemark != "" {
 			prePickRemark = append(prePickRemark, &batch.PrePickRemark{
-				WarehouseId: userInfo.WarehouseId,
-				BatchId:     batches.Id,
-				OrderInfoId: goods.Id,
-				ShopId:      goods.ShopId,
-				PrePickId:   0,
-				Number:      goods.Number,
-				OrderRemark: goods.OrderRemark,
-				GoodsRemark: goods.GoodsRemark,
-				ShopName:    goods.ShopName,
-				Line:        cacheMpLine,
+				WarehouseId:  userInfo.WarehouseId,
+				BatchId:      batchId,
+				OrderGoodsId: og.Id,
+				ShopId:       og.ShopId,
+				PrePickId:    0,
+				Number:       og.Number,
+				OrderRemark:  og.OrderRemark,
+				GoodsRemark:  og.GoodsRemark,
+				ShopName:     og.ShopName,
+				Line:         cacheMpLine,
 			})
 		}
 
-		_, shopMpOk := shopNumMp[goods.ShopId]
+		_, shopMpOk := shopNumMp[og.ShopId]
 
 		if shopMpOk {
 			continue
 		}
 
-		shopNumMp[goods.ShopId] = struct{}{}
+		shopNumMp[og.ShopId] = struct{}{}
 
 		prePicks = append(prePicks, batch.PrePick{
 			WarehouseId: userInfo.WarehouseId,
-			BatchId:     batches.Id,
-			ShopId:      goods.ShopId,
-			ShopCode:    goods.ShopCode,
-			ShopName:    goods.ShopName,
+			BatchId:     batchId,
+			ShopId:      og.ShopId,
+			ShopCode:    og.ShopCode,
+			ShopName:    og.ShopName,
 			Line:        cacheMpLine,
 			Status:      0,
 		})
 	}
 
-	result = tx.Save(&orders)
-	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
+	tx := db.Begin()
 
 	result = tx.Save(&prePicks)
 
 	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
+		return result.Error
 	}
 
 	shopMap := make(map[int]int, 0)
@@ -618,8 +664,7 @@ func CreateByOrder(c *gin.Context) {
 	for k, good := range prePickGoods {
 		val, shopMapOk := shopMap[good.ShopId]
 		if !shopMapOk {
-			xsq_net.ErrorJSON(c, ecode.MapKeyNotExist)
-			return
+			return ecode.MapKeyNotExist
 		}
 		prePickGoods[k].PrePickId = val
 	}
@@ -627,17 +672,14 @@ func CreateByOrder(c *gin.Context) {
 	result = tx.Save(&prePickGoods)
 
 	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
+		return result.Error
 	}
 
 	if len(prePickRemark) > 0 {
 		for k, remark := range prePickRemark {
 			val, shopMapOk := shopMap[remark.ShopId]
 			if !shopMapOk {
-				xsq_net.ErrorJSON(c, ecode.MapKeyNotExist)
-				return
+				return ecode.MapKeyNotExist
 			}
 			prePickRemark[k].PrePickId = val
 		}
@@ -645,9 +687,7 @@ func CreateByOrder(c *gin.Context) {
 		result = tx.Save(&prePickRemark)
 
 		if result.Error != nil {
-			tx.Rollback()
-			xsq_net.ErrorJSON(c, result.Error)
-			return
+			return result.Error
 		}
 	}
 
@@ -656,70 +696,17 @@ func CreateByOrder(c *gin.Context) {
 
 	updates := map[string]interface{}{}
 
-	var (
-		deliveryEndTime    time.Time
-		payEndTime         time.Time
-		errDeliveryEndTime error
-		errPayEndTime      error
-		deliveryMethod     int
-	)
-
-	if p, pOk := params[form.Number]; pOk {
-
-		fmt.Println(p.DeliveryEndTime)
-		fmt.Println(p.PayEndTime)
-
-		deliveryEndTime, errDeliveryEndTime = time.ParseInLocation(timeutil.DateFormat, p.DeliveryEndTime, time.Local)
-
-		payEndTime, errPayEndTime = time.ParseInLocation(timeutil.TimeFormat, p.PayEndTime, time.Local)
-
-		if errDeliveryEndTime != nil || errPayEndTime != nil {
-			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
-			return
-		}
-
-		updates["delivery_end_time"] = &deliveryEndTime
-		updates["pay_end_time"] = &payEndTime
-		deliveryMethod = p.DeliveryMethod
-		updates["delivery_method"] = deliveryMethod
-	}
-
 	updates["goods_num"] = goodsNum
 	updates["shop_num"] = shopNum
 	updates["order_num"] = orderNum
 
-	result = tx.Model(&batch.Batch{}).Where("id = ?", batches.Id).Updates(updates)
+	result = tx.Model(&batch.Batch{}).Where("id = ?", batchId).Updates(map[string]interface{}{"goods_num": goodsNum, "shop_num": shopNum, "order_num": orderNum})
 
 	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
+		return result.Error
 	}
 
-	if isSaveCond {
-		//批次创建条件
-		condition := batch.BatchCondition{
-			BatchId:         batches.Id,
-			WarehouseId:     userInfo.WarehouseId,
-			PayEndTime:      &payEndTime,
-			DeliveryEndTime: &deliveryEndTime,
-			Line:            "",
-			DeliveryMethod:  deliveryMethod,
-			Sku:             "",
-			Goods:           "",
-		}
-
-		tx.Save(&condition)
-
-		if result.Error != nil {
-			xsq_net.ErrorJSON(c, result.Error)
-			return
-		}
-	}
-
-	tx.Commit()
-
-	xsq_net.Success(c)
+	return nil
 }
 
 // 结束拣货批次
@@ -1869,7 +1856,7 @@ func BatchPickByParams(form req.BatchPickForm) error {
 				BatchId:         pre.BatchId,
 				PickId:          pick.Id,
 				PrePickRemarkId: remark.Id,
-				OrderInfoId:     remark.OrderInfoId,
+				OrderInfoId:     remark.OrderGoodsId,
 				Number:          remark.Number,
 				OrderRemark:     remark.OrderRemark,
 				GoodsRemark:     remark.GoodsRemark,
@@ -2190,7 +2177,7 @@ func MergePickByParams(form req.MergePickForm) error {
 				BatchId:         form.BatchId,
 				PickId:          pick.Id,
 				PrePickRemarkId: remark.Id,
-				OrderInfoId:     remark.OrderInfoId,
+				OrderInfoId:     remark.OrderGoodsId,
 				Number:          remark.Number,
 				OrderRemark:     remark.OrderRemark,
 				GoodsRemark:     remark.GoodsRemark,

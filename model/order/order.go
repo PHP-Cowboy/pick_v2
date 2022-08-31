@@ -15,7 +15,7 @@ type Order struct {
 	ShopName          string     `gorm:"type:varchar(64);not null;comment:店铺名称"`
 	ShopType          string     `gorm:"type:varchar(64);not null;comment:店铺类型"`
 	ShopCode          string     `gorm:"type:varchar(255);not null;comment:店铺编号"`
-	Number            string     `gorm:"type:varchar(64);index:number_sku_idx;comment:订单编号"`
+	Number            string     `gorm:"type:varchar(64);unique;comment:订单编号"`
 	HouseCode         string     `gorm:"type:varchar(64);not null;comment:仓库编码"`
 	Line              string     `gorm:"type:varchar(255);not null;comment:线路"`
 	DistributionType  int        `gorm:"type:tinyint;comment:配送方式"`
@@ -51,6 +51,7 @@ type OrderGoods struct {
 	SaleUnit        string    `gorm:"type:varchar(64);comment:销售单位"`
 	SaleCode        string    `gorm:"comment:销售编码"`
 	PayCount        int       `gorm:"comment:下单数量"`
+	CloseCount      int       `gorm:"type:int;default:0;comment:关闭数量"`
 	LackCount       int       `gorm:"type:int;comment:欠货数量"`
 	GoodsRemark     string    `gorm:"type:varchar(255);comment:商品备注"`
 	Status          int       `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:拣货中"`

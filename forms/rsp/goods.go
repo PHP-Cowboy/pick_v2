@@ -1,8 +1,23 @@
 package rsp
 
 type GoodsListRsp struct {
-	Total int64       `json:"total"`
-	List  []OrderList `json:"list"`
+	Total int64   `json:"total"`
+	List  []Order `json:"list"`
+}
+
+type Order struct {
+	Number            string `json:"number"`
+	PayAt             string `json:"pay_time"`
+	ShopCode          string `json:"shop_code"`
+	ShopName          string `json:"shop_name"`
+	ShopType          string `json:"shop_type"`
+	DistributionType  int    `json:"distribution_type"` //配送方式
+	PayCount          int    `json:"pay_count"`         //下单数量
+	Line              string `json:"line"`
+	Region            string `json:"region"`
+	OrderRemark       string `json:"order_remark"` //订单备注
+	OrderType         int    `json:"order_type"`   //1:新订单,2:拣货中,3:欠货单
+	LatestPickingTime string `json:"latest_picking_time"`
 }
 
 type CommodityListRsp struct {
@@ -160,8 +175,9 @@ type CompleteOrderDetailRsp struct {
 	Goods       map[string][]PrePickGoods `json:"goods"`
 }
 
-type CountRsp struct {
-	Code int         `json:"code"`
-	Data interface{} `json:"data"`
-	Msg  string      `json:"msg"`
+type CountRes struct {
+	AllCount  int `json:"all_count"`
+	NewCount  int `json:"new_count"`
+	OldCount  int `json:"old_count"`
+	PickCount int `json:"pick_count"`
 }

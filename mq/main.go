@@ -7,6 +7,7 @@ import (
 	"github.com/apache/rocketmq-client-go/v2/primitive"
 	"github.com/apache/rocketmq-client-go/v2/producer"
 	"os"
+	"strconv"
 )
 
 func main() {
@@ -24,17 +25,20 @@ func main() {
 
 	topic := "purchase_order"
 
-	msg := &primitive.Message{
-		Topic: topic,
-		Body:  []byte("255"),
-	}
+	for i := 200; i < 210; i++ {
 
-	res, err := p.SendSync(context.Background(), msg)
+		msg := &primitive.Message{
+			Topic: topic,
+			Body:  []byte(strconv.Itoa(i)),
+		}
 
-	if err != nil {
-		fmt.Printf("send message error: %s\n", err)
-	} else {
-		fmt.Printf("send message success: result=%s\n", res.String())
+		res, err := p.SendSync(context.Background(), msg)
+
+		if err != nil {
+			fmt.Printf("send message error: %s\n", err)
+		} else {
+			fmt.Printf("send message success: result=%s\n", res.String())
+		}
 	}
 
 	err = p.Shutdown()

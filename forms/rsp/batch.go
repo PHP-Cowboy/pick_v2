@@ -172,3 +172,27 @@ type MergePickNums struct {
 	OrderNum int `json:"order_num"` //订单数
 	NeedNum  int `json:"need_num"`  //需拣
 }
+
+type OrderAndGoods struct {
+	Id               int    `json:"id"`
+	Number           string `json:"number"`
+	GoodsName        string `json:"goods_name"`
+	Sku              string `json:"sku"`
+	GoodsType        string `json:"goods_type"`
+	GoodsSpe         string `json:"goods_spe"`
+	Shelves          string `json:"shelves"`
+	DiscountPrice    int    `json:"discount_price"`
+	GoodsUnit        string `json:"goods_unit"`
+	SaleUnit         string `json:"sale_unit"`
+	SaleCode         string `json:"sale_code"`
+	PayCount         int    `json:"pay_count"`
+	CloseCount       int    `json:"close_count"`
+	LackCount        int    `json:"lack_count"`
+	GoodsRemark      string `json:"goods_remark"`
+	ShopId           int    `json:"shop_id"`
+	ShopName         string `json:"shop_name"`
+	ShopCode         string `json:"shop_code"`
+	Line             string `json:"line"`
+	DistributionType int    `json:"distribution_type"`
+	OrderRemark      string `json:"order_remark"`
+}
