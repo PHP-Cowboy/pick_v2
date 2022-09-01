@@ -53,8 +53,10 @@ type OrderGoods struct {
 	PayCount        int       `gorm:"comment:下单数量"`
 	CloseCount      int       `gorm:"type:int;default:0;comment:关闭数量"`
 	LackCount       int       `gorm:"type:int;comment:欠货数量"`
+	OutCount        int       `gorm:"type:int;comment:出库数量"`
 	GoodsRemark     string    `gorm:"type:varchar(255);comment:商品备注"`
-	Status          int       `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:拣货中"`
+	Status          int       `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:拣货中,2:已出库"`
+	BatchId         int       `gorm:"type:int(11);index;comment:批次id"`
 	DeliveryOrderNo string    `gorm:"type:varchar(16);comment:出库单号"`
 }
 

@@ -567,7 +567,7 @@ func Count(c *gin.Context) {
 		res   rsp.CountRes
 	)
 
-	result := global.DB.Model(&order.Order{}).Select("count(id) as count, order_type").Find(&dbRes)
+	result := global.DB.Model(&order.Order{}).Select("count(id) as count, order_type").Group("order_type").Find(&dbRes)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

@@ -57,7 +57,7 @@ type PrePickGoods struct {
 	model.Base
 	WarehouseId      int    `gorm:"type:int(11);comment:仓库"`
 	BatchId          int    `gorm:"type:int(11) unsigned;comment:批次表id"`
-	OrderInfoId      int    `gorm:"type:int(11) unsigned;comment:订单商品接口返回ID"`
+	OrderGoodsId     int    `gorm:"type:int(11) unsigned;comment:订单商品表ID"`
 	Number           string `gorm:"type:varchar(32);comment:订单编号"`
 	ShopId           int    `gorm:"type:int(11);comment:店铺id"`
 	PrePickId        int    `gorm:"type:int(11) unsigned;index;comment:预拣货表id"` //index
@@ -81,7 +81,7 @@ type PrePickRemark struct {
 	model.Base
 	WarehouseId  int    `gorm:"type:int(11);comment:仓库"`
 	BatchId      int    `gorm:"type:int(11) unsigned;comment:批次表id"`
-	OrderGoodsId int    `gorm:"type:int(11) unsigned;comment:订单商品接口返回ID"`
+	OrderGoodsId int    `gorm:"type:int(11) unsigned;comment:订单商品表ID"`
 	ShopId       int    `gorm:"type:int(11);comment:店铺id"`
 	PrePickId    int    `gorm:"type:int(11) unsigned;index;comment:预拣货表id"`
 	Number       string `gorm:"type:varchar(64);comment:订单编号"`
@@ -125,7 +125,7 @@ type PickGoods struct {
 	PickId           int    `gorm:"type:int(11) unsigned;index:pick_and_batch_idx;comment:拣货表id"`
 	BatchId          int    `gorm:"type:int(11) unsigned;index:pick_and_batch_idx;comment:批次表id"`
 	PrePickGoodsId   int    `gorm:"type:int(11);comment:预拣货商品表id"`
-	OrderInfoId      int    `gorm:"type:int(11) unsigned;comment:订单商品接口返回ID"`
+	OrderGoodsId     int    `gorm:"type:int(11) unsigned;comment:订单商品表ID"`
 	Number           string `gorm:"type:varchar(64);comment:订单编号"`
 	ShopId           int    `gorm:"type:int(11);comment:店铺id"`
 	DistributionType int    `gorm:"type:tinyint unsigned;comment:配送方式:1:公司配送,2:用户自提,3:三方物流,4:快递配送,5:首批物料|设备单"`
@@ -148,7 +148,7 @@ type PickRemark struct {
 	BatchId         int    `gorm:"type:int(11) unsigned;comment:批次表id"`
 	PickId          int    `gorm:"type:int(11) unsigned;comment:拣货表id"`
 	PrePickRemarkId int    `gorm:"type:int(11);comment:预拣货备注表id"`
-	OrderInfoId     int    `gorm:"type:int(11) unsigned;comment:订单商品接口返回ID"`
+	OrderGoodsId    int    `gorm:"type:int(11) unsigned;comment:订单商品表ID"`
 	Number          string `gorm:"type:varchar(64);comment:订单编号"`
 	OrderRemark     string `gorm:"type:varchar(512);comment:订单备注"`
 	GoodsRemark     string `gorm:"type:varchar(255);comment:商品备注"`

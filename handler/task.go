@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -12,6 +11,7 @@ import (
 	"pick_v2/global"
 	"pick_v2/model"
 	"pick_v2/model/batch"
+	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
@@ -27,12 +27,8 @@ func PickTopping(c *gin.Context) {
 		return
 	}
 
-	//redis
-	redis := global.Redis
+	val, err := cache.GetIncrByKey(constant.PICK_TOPPING)
 
-	redisKey := constant.PICK_TOPPING
-
-	val, err := redis.Do(context.Background(), "incr", redisKey).Result()
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return
@@ -217,8 +213,8 @@ func GetPickDetail(c *gin.Context) {
 		val, ok := pickGoodsSkuMp[goods.Sku]
 
 		paramsId := rsp.ParamsId{
-			PickGoodsId: goods.Id,
-			OrderInfoId: goods.OrderInfoId,
+			PickGoodsId:  goods.Id,
+			OrderGoodsId: goods.OrderGoodsId,
 		}
 
 		if !ok {

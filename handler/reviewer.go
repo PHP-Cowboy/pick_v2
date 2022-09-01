@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -12,11 +11,10 @@ import (
 	"pick_v2/middlewares"
 	"pick_v2/model/batch"
 	"pick_v2/model/order"
+	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
-	"pick_v2/utils/str_util"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
-	"strconv"
 	"time"
 )
 
@@ -91,8 +89,8 @@ func ReviewList(c *gin.Context) {
 
 	for _, p := range pick {
 
-		_, ok := remarkMp[p.Id]
-		if ok { //拣货id在拣货备注中存在，即为有备注
+		_, remarkMpOk := remarkMp[p.Id]
+		if remarkMpOk { //拣货id在拣货备注中存在，即为有备注
 			isRemark = true
 		}
 
@@ -203,23 +201,62 @@ func ReviewDetail(c *gin.Context) {
 		return
 	}
 
-	goodsMap := make(map[string][]rsp.PickGoods, 0)
+	pickGoodsSkuMp := make(map[string]rsp.MergePickGoods, 0)
+
+	goodsMap := make(map[string][]rsp.MergePickGoods, 0)
+
+	for _, goods := range pickGoods {
+
+		val, ok := pickGoodsSkuMp[goods.Sku]
+
+		paramsId := rsp.ParamsId{
+			PickGoodsId:  goods.Id,
+			OrderGoodsId: goods.OrderGoodsId,
+		}
+
+		if !ok {
+
+			pickGoodsSkuMp[goods.Sku] = rsp.MergePickGoods{
+				Id:          goods.Id,
+				Sku:         goods.Sku,
+				GoodsName:   goods.GoodsName,
+				GoodsType:   goods.GoodsType,
+				GoodsSpe:    goods.GoodsSpe,
+				Shelves:     goods.Shelves,
+				NeedNum:     goods.NeedNum,
+				CompleteNum: goods.CompleteNum,
+				ReviewNum:   goods.ReviewNum,
+				Unit:        goods.Unit,
+				ParamsId:    []rsp.ParamsId{paramsId},
+			}
+		} else {
+			val.NeedNum += goods.NeedNum
+			val.CompleteNum += goods.CompleteNum
+			val.ParamsId = append(val.ParamsId, paramsId)
+			pickGoodsSkuMp[goods.Sku] = val
+		}
+	}
 
 	needTotal := 0
 	completeTotal := 0
 	reviewTotal := 0
-	for _, goods := range pickGoods {
+
+	for _, goods := range pickGoodsSkuMp {
 		completeTotal += goods.CompleteNum
 		needTotal += goods.NeedNum
 		reviewTotal += goods.ReviewNum
-		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.PickGoods{
+		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.MergePickGoods{
 			Id:          goods.Id,
+			Sku:         goods.Sku,
 			GoodsName:   goods.GoodsName,
+			GoodsType:   goods.GoodsType,
 			GoodsSpe:    goods.GoodsSpe,
 			Shelves:     goods.Shelves,
 			NeedNum:     goods.NeedNum,
 			CompleteNum: goods.CompleteNum,
+			ReviewNum:   goods.ReviewNum,
 			Unit:        goods.Unit,
+			ParamsId:    goods.ParamsId,
 		})
 	}
 
@@ -262,9 +299,10 @@ func ConfirmDelivery(c *gin.Context) {
 	}
 
 	var (
-		pick      batch.Pick
-		pickGoods []batch.PickGoods
-		batches   batch.Batch
+		pick          batch.Pick
+		pickGoods     []batch.PickGoods
+		batches       batch.Batch
+		orderAndGoods []rsp.OrderAndGoods
 	)
 
 	db := global.DB
@@ -286,25 +324,119 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
-	claims, ok := c.Get("claims")
+	userInfo := GetUserInfo(c)
 
-	if !ok {
-		xsq_net.ErrorJSON(c, errors.New("claims 获取失败"))
+	if userInfo == nil {
+		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
 		return
 	}
-
-	userInfo := claims.(*middlewares.CustomClaims)
 
 	if pick.ReviewUser != userInfo.Name {
 		xsq_net.ErrorJSON(c, ecode.DataNotExist)
 		return
 	}
 
-	//复核拣货数量数据 构造map 最终构造成db的save参数
-	pickGoodsMap := make(map[int]int, len(form.CompleteReview))
+	deliveryOrderNo, err := cache.GetIncrNumberByKey(constant.DELIVERY_ORDER_NO)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	var (
+		orderGoodsIds      []int
+		orderPickGoodsIdMp = make(map[int]int, 0)
+		skuCompleteNumMp   = make(map[string]int, 0)
+		totalNum           int //更新拣货池复核数量
+	)
 
 	for _, cp := range form.CompleteReview {
-		pickGoodsMap[cp.Id] = cp.ReviewNum
+
+		//全部订单数据id
+		for _, ids := range cp.ParamsId {
+			orderGoodsIds = append(orderGoodsIds, ids.OrderGoodsId)
+			//map[订单表id]拣货商品表id
+			orderPickGoodsIdMp[ids.OrderGoodsId] = ids.PickGoodsId
+		}
+		//sku完成数量
+		skuCompleteNumMp[cp.Sku] = cp.CompleteNum
+		totalNum += cp.CompleteNum //总复核数量
+	}
+
+	//step: 根据 订单表id切片 查出订单数据 根据支付时间升序
+	result = db.Table("t_order_goods og").
+		Select("og.*").
+		Joins("left join t_order o on og.number = o.number").
+		Where("og.id in (?)", orderGoodsIds).
+		Order("pay_at ASC").
+		Find(&orderAndGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//拣货表 id 和 拣货数量
+	mp := make(map[int]int, 0)
+
+	var (
+		pickGoodsIds []int
+		orderGoods   = make([]order.OrderGoods, 0, len(orderAndGoods))
+	)
+
+	//step: 构造 拣货商品表 id, 完成数量 并扣减 sku 完成数量
+	for _, info := range orderAndGoods {
+		//完成数量
+		completeNum, completeOk := skuCompleteNumMp[info.Sku]
+
+		if !completeOk {
+			continue
+		}
+
+		pickGoodsId, mpOk := orderPickGoodsIdMp[info.Id]
+
+		if !mpOk {
+			continue
+		}
+
+		reviewCompleteNum := 0
+
+		if completeNum >= info.LackCount { //完成数量大于等于需拣数量
+			reviewCompleteNum = info.LackCount
+			skuCompleteNumMp[info.Sku] = completeNum - info.LackCount //减
+		} else {
+			//按下单时间拣货少于需拣时
+			reviewCompleteNum = completeNum
+			skuCompleteNumMp[info.Sku] = 0
+		}
+		pickGoodsIds = append(pickGoodsIds, pickGoodsId)
+		mp[pickGoodsId] = reviewCompleteNum
+
+		//构造更新订单商品表数据
+		orderGoods = append(orderGoods, order.OrderGoods{
+			Id:              info.Id,
+			CreateTime:      info.CreateTime,
+			UpdateTime:      info.UpdateTime,
+			DeleteTime:      info.DeleteTime,
+			Number:          info.Number,
+			GoodsName:       info.GoodsName,
+			Sku:             info.Sku,
+			GoodsType:       info.GoodsType,
+			GoodsSpe:        info.GoodsSpe,
+			Shelves:         info.Shelves,
+			DiscountPrice:   info.DiscountPrice,
+			GoodsUnit:       info.GoodsUnit,
+			SaleUnit:        info.SaleUnit,
+			SaleCode:        info.SaleCode,
+			PayCount:        info.PayCount,
+			CloseCount:      info.CloseCount,
+			LackCount:       info.LackCount - reviewCompleteNum,
+			OutCount:        reviewCompleteNum,
+			GoodsRemark:     info.GoodsRemark,
+			Status:          2,
+			BatchId:         info.BatchId,
+			DeliveryOrderNo: deliveryOrderNo,
+		})
 	}
 
 	//获取拣货商品数据
@@ -318,8 +450,9 @@ func ConfirmDelivery(c *gin.Context) {
 	//构造打印 chan 结构体数据
 	printChMp := make(map[int]struct{}, 0)
 
-	//构造更新 orderInfo 表完成出库数据
-	orderInfoIds := []int{}
+	//构造更新 订单表 订单商品 表完成出库数据
+	completeOrderGoodsIds := []int{}
+	orderNumbers := []string{}
 	for k, pg := range pickGoods {
 		_, printChOk := printChMp[pg.ShopId]
 
@@ -327,60 +460,46 @@ func ConfirmDelivery(c *gin.Context) {
 			printChMp[pg.ShopId] = struct{}{}
 		}
 
-		num, pgOk := pickGoodsMap[pg.Id]
+		completeNum, mpOk := mp[pg.Id]
 
-		if !pgOk {
+		if !mpOk {
 			continue
 		}
 
-		pickGoods[k].ReviewNum = num
+		pickGoods[k].ReviewNum = completeNum
 
-		if pg.NeedNum == num { //需拣和复核数一致，即为完成
-			orderInfoIds = append(orderInfoIds, pg.OrderInfoId)
+		if pg.NeedNum == completeNum { //需拣和复核数一致，即为完成
+			completeOrderGoodsIds = append(completeOrderGoodsIds, pg.OrderGoodsId)
+			orderNumbers = append(orderNumbers, pg.Number)
 		}
 
+	}
+
+	tx := db.Begin()
+
+	result = tx.Save(&orderGoods)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
 	}
 
 	now := time.Now()
 
-	dateStr := now.Format(timeutil.DateNumberFormat)
+	//更新 order 表 最近拣货时间
+	result = tx.Model(&order.Order{}).Where("number in (?)", orderNumbers).Updates(map[string]interface{}{
+		"latest_picking_time": now.Format(timeutil.TimeFormat),
+	})
 
-	//redis
-	redis := global.Redis
-
-	//出库单号key
-	redisKey := constant.DELIVERY_ORDER_NO + dateStr
-
-	val, err := redis.Do(context.Background(), "incr", redisKey).Result()
-	if err != nil {
-		xsq_net.ErrorJSON(c, err)
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	number := strconv.Itoa(int(val.(int64)))
-
-	//填充出库单号编码
-	deliveryOrderNo := str_util.StrPad(number, 3, "0", 0)
-
-	tx := db.Begin()
-
-	if len(orderInfoIds) > 0 { //有完成的
-		//更新orderInfo表数据为完成状态
-		result = tx.Model(&order.OrderInfo{}).
-			Where("id in (?)", orderInfoIds).
-			Updates(map[string]interface{}{
-				"delivery_order_no": deliveryOrderNo,
-				"pick_time":         now.Format(timeutil.TimeFormat),
-			}) //
-		if result.Error != nil {
-			tx.Rollback()
-			xsq_net.ErrorJSON(c, result.Error)
-			return
-		}
-	}
-
 	//更新主表
-	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2, "review_time": &now, "num": form.Num, "delivery_order_no": deliveryOrderNo})
+	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2, "review_time": &now, "num": form.Num, "review_num": totalNum, "delivery_order_no": deliveryOrderNo})
 
 	if result.Error != nil {
 		tx.Rollback()

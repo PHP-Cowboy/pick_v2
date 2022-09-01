@@ -1,23 +1,14 @@
 package req
 
 type CreateBatchForm struct {
-	WarehouseId       int     `json:"warehouse_id" form:"warehouse_id"`
-	Number            string  `json:"number"`
-	Lines             string  `json:"lines" form:"lines"`
-	PayEndTime        string  `json:"pay_end_time"  form:"pay_end_time"`
-	DeliveryStartTime string  `json:"delivery_start_time" form:"delivery_start_time"`
-	DeliveryEndTime   string  `json:"delivery_end_time" form:"delivery_end_time"`
-	DeType            int     `json:"de_type" form:"de_type"` //1-公司配送 2-用户自提 3-三方物流 4-快递配送 5-首批物料|设备单
-	Goods             []Goods `json:"goods" form:"goods"`
-	Sku               string  `json:"sku" form:"sku"`
-	GoodsName         string  `json:"goods_name" form:"goods_name"`
-	BatchNumber       string  `json:"batch_number"`
-	BatchName         string  `json:"batch_name" form:"batch_name"`
-}
-
-type Goods struct {
-	Sku  string `json:"sku" form:"sku"`
-	Name string `json:"name" form:"name"`
+	BatchName         string   `json:"batch_name" form:"batch_name"`
+	DeliveryStartTime string   `json:"delivery_start_time" form:"delivery_start_time"`                //发货开始
+	DeliveryEndTime   string   `json:"delivery_end_time" form:"delivery_end_time" binding:"required"` //发货截止
+	Lines             []string `json:"lines" form:"lines" binding:"required"`                         //线路
+	DistributionType  int      `json:"distribution_type" form:"distribution_type" binding:"required"` //配送方式 1-公司配送 2-用户自提 3-三方物流 4-快递配送 5-首批物料|设备单
+	PayTime           string   `json:"pay_time"  form:"pay_time" binding:"required"`                  //支付时间
+	Sku               []string `json:"sku" form:"sku"`
+	GoodsName         []string `json:"goods_name" form:"goods_name"`
 }
 
 type StopPickForm struct {
@@ -26,8 +17,7 @@ type StopPickForm struct {
 }
 
 type CreateByOrderReq struct {
-	Number      string `json:"number" form:"number"`
-	BatchNumber string `json:"batch_number"`
+	Number string `json:"number" form:"number" binding:"required"`
 }
 
 type BatchParams struct {

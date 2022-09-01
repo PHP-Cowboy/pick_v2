@@ -22,8 +22,8 @@ type CompletePickDetail struct {
 }
 
 type ParamsId struct {
-	PickGoodsId int `json:"pick_goods_id"`
-	OrderInfoId int `json:"order_info_id"`
+	PickGoodsId  int `json:"pick_goods_id"`
+	OrderGoodsId int `json:"order_goods_id"`
 }
 
 type PickingRecordDetailForm struct {

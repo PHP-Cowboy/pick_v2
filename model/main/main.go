@@ -16,7 +16,8 @@ import (
 
 func main() {
 
-	dsn := "root:a900614f907ceae1@tcp(192.168.1.40)/pick_v2?charset=utf8mb4&parseTime=True&loc=Local"
+	//dsn := "root:a900614f907ceae1@tcp(192.168.1.40)/pick_v2?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:bnskdfglnbbgf@tcp(121.196.60.92)/pick_v2?charset=utf8mb4&parseTime=True&loc=Local"
 
 	logger := logger2.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags),

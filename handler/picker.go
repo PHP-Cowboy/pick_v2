@@ -213,9 +213,9 @@ func CompletePick(c *gin.Context) {
 
 	// 这里是否需要做并发处理
 	var (
-		pick      batch.Pick
-		pickGoods []batch.PickGoods
-		orderInfo []order.OrderInfo
+		pick       batch.Pick
+		pickGoods  []batch.PickGoods
+		orderGoods []order.OrderGoods
 	)
 
 	db := global.DB
@@ -264,13 +264,13 @@ func CompletePick(c *gin.Context) {
 	//****************************** 无需拣货逻辑完成 ******************************//
 
 	//****************************** 正常拣货逻辑 ******************************//
-	//step:处理前端传递的拣货数据，构造[订单表id切片,订单表id和拣货商品表id映射,sku完成数量映射]
+	//step:处理前端传递的拣货数据，构造[订单表id切片,订单表id和拣货商品表id map,sku完成数量 map]
 	//step: 根据 订单表id切片 查出订单数据 根据支付时间升序
 	//step: 构造 拣货商品表 id, 完成数量 并扣减 sku 完成数量
 	//step: 更新拣货商品表
 
 	var (
-		orderInfoIds       []int
+		orderGoodsIds      []int
 		orderPickGoodsIdMp = make(map[int]int, 0)
 		skuCompleteNumMp   = make(map[string]int, 0)
 		totalNum           int //更新拣货池拣货数量
@@ -280,16 +280,22 @@ func CompletePick(c *gin.Context) {
 	for _, cp := range form.CompletePick {
 		//全部订单数据id
 		for _, ids := range cp.ParamsId {
-			orderInfoIds = append(orderInfoIds, ids.OrderInfoId)
+			orderGoodsIds = append(orderGoodsIds, ids.OrderGoodsId)
 			//map[订单表id]拣货商品表id
-			orderPickGoodsIdMp[ids.OrderInfoId] = ids.PickGoodsId
+			orderPickGoodsIdMp[ids.OrderGoodsId] = ids.PickGoodsId
 		}
 		//sku完成数量
 		skuCompleteNumMp[cp.Sku] = cp.CompleteNum
+		totalNum += cp.CompleteNum //总拣货数量
 	}
 
 	//step: 根据 订单表id切片 查出订单数据 根据支付时间升序
-	result = db.Where("id in (?)", orderInfoIds).Order("pay_at ASC").Find(&orderInfo)
+	result = db.Table("t_order_goods og").
+		Select("og.*").
+		Joins("left join t_order o on og.number = o.number").
+		Where("og.id in (?)", orderGoodsIds).
+		Order("pay_at ASC").
+		Find(&orderGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -302,7 +308,7 @@ func CompletePick(c *gin.Context) {
 	var pickGoodsIds []int
 
 	//step: 构造 拣货商品表 id, 完成数量 并扣减 sku 完成数量
-	for _, info := range orderInfo {
+	for _, info := range orderGoods {
 		//完成数量
 		completeNum, completeOk := skuCompleteNumMp[info.Sku]
 
@@ -315,8 +321,6 @@ func CompletePick(c *gin.Context) {
 		if !mpOk {
 			continue
 		}
-
-		totalNum += completeNum
 
 		pickCompleteNum := 0
 
@@ -482,14 +486,14 @@ func PickingRecord(c *gin.Context) {
 	pickGoodsMp := make(map[int]Goods, 0)
 
 	for _, pg := range pickGoods {
-		_, ok := pickGoodsMp[pg.PickId]
+		_, pgMpOk := pickGoodsMp[pg.PickId]
 
 		g := Goods{
 			CompleteNum:      pg.CompleteNum,
 			DistributionType: pg.DistributionType,
 		}
 
-		if !ok {
+		if !pgMpOk {
 			pickGoodsMp[pg.PickId] = g
 		} else {
 			g.CompleteNum += pickGoodsMp[pg.PickId].CompleteNum
@@ -500,12 +504,12 @@ func PickingRecord(c *gin.Context) {
 	list := make([]rsp.PickingRecord, 0)
 
 	for _, p := range pick {
-		pgMp, ok := pickGoodsMp[p.Id]
+		pgMp, pgMpOk := pickGoodsMp[p.Id]
 
 		outNum := 0
 		distributionType := 0
 
-		if ok {
+		if pgMpOk {
 			outNum = pgMp.CompleteNum
 			distributionType = pgMp.DistributionType
 		}
@@ -595,8 +599,8 @@ func PickingRecordDetail(c *gin.Context) {
 		val, ok := pickGoodsSkuMp[goods.Sku]
 
 		paramsId := rsp.ParamsId{
-			PickGoodsId: goods.Id,
-			OrderInfoId: goods.OrderInfoId,
+			PickGoodsId:  goods.Id,
+			OrderGoodsId: goods.OrderGoodsId,
 		}
 
 		if !ok {
@@ -615,8 +619,8 @@ func PickingRecordDetail(c *gin.Context) {
 				ParamsId:    []rsp.ParamsId{paramsId},
 			}
 		} else {
-			val.NeedNum += val.NeedNum
-			val.CompleteNum += val.CompleteNum
+			val.NeedNum += goods.NeedNum
+			val.CompleteNum += goods.CompleteNum
 			val.ParamsId = append(val.ParamsId, paramsId)
 			pickGoodsSkuMp[goods.Sku] = val
 		}

@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"pick_v2/forms/req"
@@ -139,8 +140,15 @@ func ShopList(c *gin.Context) {
 
 	res.Total = ret.RowsAffected
 
+	fmt.Println(form)
+
 	if form.IsPage {
 		ret = db.Scopes(model.Paginate(form.Page, form.Size)).Find(&shops)
+
+		if ret.Error != nil {
+			xsq_net.ErrorJSON(c, ret.Error)
+			return
+		}
 	}
 
 	list := make([]*rsp.Shop, 0, form.Size)

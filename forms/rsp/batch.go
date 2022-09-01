@@ -1,5 +1,7 @@
 package rsp
 
+import "time"
+
 type GetBatchListRsp struct {
 	Total int64    `json:"total"`
 	List  []*Batch `json:"list"`
@@ -174,25 +176,41 @@ type MergePickNums struct {
 }
 
 type OrderAndGoods struct {
-	Id               int    `json:"id"`
-	Number           string `json:"number"`
-	GoodsName        string `json:"goods_name"`
-	Sku              string `json:"sku"`
-	GoodsType        string `json:"goods_type"`
-	GoodsSpe         string `json:"goods_spe"`
-	Shelves          string `json:"shelves"`
-	DiscountPrice    int    `json:"discount_price"`
-	GoodsUnit        string `json:"goods_unit"`
-	SaleUnit         string `json:"sale_unit"`
-	SaleCode         string `json:"sale_code"`
-	PayCount         int    `json:"pay_count"`
-	CloseCount       int    `json:"close_count"`
-	LackCount        int    `json:"lack_count"`
-	GoodsRemark      string `json:"goods_remark"`
-	ShopId           int    `json:"shop_id"`
-	ShopName         string `json:"shop_name"`
-	ShopCode         string `json:"shop_code"`
-	Line             string `json:"line"`
-	DistributionType int    `json:"distribution_type"`
-	OrderRemark      string `json:"order_remark"`
+	Id                int        `json:"id"`
+	CreateTime        time.Time  `json:"create_time"`
+	UpdateTime        time.Time  `json:"update_time"`
+	DeleteTime        time.Time  `json:"delete_time"`
+	Number            string     `json:"number"`
+	GoodsName         string     `json:"goods_name"`
+	Sku               string     `json:"sku"`
+	GoodsType         string     `json:"goods_type"`
+	GoodsSpe          string     `json:"goods_spe"`
+	Shelves           string     `json:"shelves"`
+	DiscountPrice     int        `json:"discount_price"`
+	GoodsUnit         string     `json:"goods_unit"`
+	SaleUnit          string     `json:"sale_unit"`
+	SaleCode          string     `json:"sale_code"`
+	PayCount          int        `json:"pay_count"`
+	CloseCount        int        `json:"close_count"`
+	LackCount         int        `json:"lack_count"`
+	OutCount          int        `json:"out_count"`
+	GoodsRemark       string     `json:"goods_remark"`
+	Status            int        `json:"status"`
+	BatchId           int        `json:"batch_id"`
+	DeliveryOrderNo   string     `json:"delivery_order_no"`
+	ShopId            int        `json:"shop_id"`
+	ShopName          string     `json:"shop_name"`
+	ShopCode          string     `json:"shop_code"`
+	Line              string     `json:"line"`
+	DistributionType  int        `json:"distribution_type"`
+	OrderRemark       string     `json:"order_remark"`
+	PayAt             string     `json:"pay_at"`
+	ShopType          string     `json:"shop_type"`
+	HouseCode         string     `json:"house_code"`
+	ConsigneeName     string     `json:"consignee_name"`
+	ConsigneeTel      string     `json:"consignee_tel"`
+	Province          string     `json:"province"`
+	City              string     `json:"city"`
+	District          string     `json:"district"`
+	LatestPickingTime *time.Time `json:"pick_time"`
 }
