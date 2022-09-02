@@ -57,7 +57,7 @@ type OrderGoods struct {
 	GoodsRemark     string    `gorm:"type:varchar(255);comment:商品备注"`
 	Status          int       `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:拣货中,2:已出库"`
 	BatchId         int       `gorm:"type:int(11);index;comment:批次id"`
-	DeliveryOrderNo string    `gorm:"type:varchar(16);comment:出库单号"`
+	DeliveryOrderNo []string  `gorm:"type:varchar(255);comment:出库单号"`
 }
 
 type OrderInfo struct {

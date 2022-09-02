@@ -52,8 +52,7 @@ func CreateBatch(c *gin.Context) {
 	}
 
 	var (
-		deliveryStartTime    time.Time
-		errDeliveryStartTime error
+		deliveryStartTime *time.Time
 	)
 
 	deliveryEndTime, errDeliveryEndTime := time.ParseInLocation(timeutil.TimeFormat, form.DeliveryEndTime, time.Local)
@@ -74,14 +73,15 @@ func CreateBatch(c *gin.Context) {
 	}
 
 	if form.DeliveryStartTime != "" {
-		deliveryStartTime, errDeliveryStartTime = time.ParseInLocation(timeutil.TimeFormat, form.DeliveryStartTime, time.Local)
+		deliveryStart, errDeliveryStartTime := time.ParseInLocation(timeutil.TimeFormat, form.DeliveryStartTime, time.Local)
 		if errDeliveryStartTime != nil {
 			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
 			return
 		}
+		deliveryStartTime = &deliveryStart
 	}
 
-	batchId, err := SaveBatch(tx, userInfo, batchName, lines, sku, goodsName, form.DistributionType, &payTime, &deliveryStartTime, &deliveryEndTime)
+	batchId, err := SaveBatch(tx, userInfo, batchName, lines, sku, goodsName, form.DistributionType, &payTime, deliveryStartTime, &deliveryEndTime)
 	if err != nil {
 		tx.Rollback()
 		xsq_net.ErrorJSON(c, errors.New("批次数据保存失败:"+err.Error()))
@@ -95,7 +95,7 @@ func CreateBatch(c *gin.Context) {
 		return
 	}
 
-	err = UpdateOrder(tx, numbers, orderGoodsIds)
+	err = UpdateOrder(tx, numbers, orderGoodsIds, batchId)
 	if err != nil {
 		tx.Rollback()
 		xsq_net.ErrorJSON(c, errors.New("订单数据更新失败:"+err.Error()))
@@ -176,7 +176,7 @@ func CreateByOrder(c *gin.Context) {
 	}
 
 	//更新订单
-	err = UpdateOrder(tx, numbers, orderGoodsIds)
+	err = UpdateOrder(tx, numbers, orderGoodsIds, batchId)
 
 	if err != nil {
 		tx.Rollback()
@@ -199,7 +199,7 @@ func GetUserInfo(c *gin.Context) *middlewares.CustomClaims {
 	return claims.(*middlewares.CustomClaims)
 }
 
-func UpdateOrder(tx *gorm.DB, numbers []string, orderGoodsIds []int) error {
+func UpdateOrder(tx *gorm.DB, numbers []string, orderGoodsIds []int, batchId int) error {
 
 	result := tx.Model(&order.Order{}).Where("number in (?)", numbers).Update("order_type", 2)
 
@@ -207,7 +207,7 @@ func UpdateOrder(tx *gorm.DB, numbers []string, orderGoodsIds []int) error {
 		return result.Error
 	}
 
-	result = tx.Model(&order.OrderGoods{}).Where("id in (?)", orderGoodsIds).Update("status", 1)
+	result = tx.Model(&order.OrderGoods{}).Where("id in (?)", orderGoodsIds).Updates(map[string]interface{}{"status": 1, "batch_id": batchId})
 
 	if result.Error != nil {
 		return result.Error
@@ -537,6 +537,7 @@ func EndBatch(c *gin.Context) {
 	}
 
 	result = db.Model(&batch.Pick{}).Where("batch_id = ?", form.Id).Find(&pick)
+
 	if result.Error != nil {
 		global.SugarLogger.Error("批次结束成功，但推送u8拣货数据查询失败:" + result.Error.Error())
 		xsq_net.ErrorJSON(c, errors.New("批次结束成功，但推送u8拣货主表数据查询失败"))
@@ -556,7 +557,7 @@ func EndBatch(c *gin.Context) {
 	for _, good := range pickGoods {
 		mpGoods[good.OrderGoodsId] = good
 	}
-
+	// todo 修改
 	outGoods.BatchNumber = strconv.Itoa(batches.Id)
 
 	//批次未完成订单map

@@ -412,6 +412,9 @@ func ConfirmDelivery(c *gin.Context) {
 		pickGoodsIds = append(pickGoodsIds, pickGoodsId)
 		mp[pickGoodsId] = reviewCompleteNum
 
+		deliveryOrderNoArr := make([]string, 0)
+
+		deliveryOrderNoArr = append(deliveryOrderNoArr, info.DeliveryOrderNo, deliveryOrderNo)
 		//构造更新订单商品表数据
 		orderGoods = append(orderGoods, order.OrderGoods{
 			Id:              info.Id,
@@ -435,7 +438,7 @@ func ConfirmDelivery(c *gin.Context) {
 			GoodsRemark:     info.GoodsRemark,
 			Status:          2,
 			BatchId:         info.BatchId,
-			DeliveryOrderNo: deliveryOrderNo,
+			DeliveryOrderNo: deliveryOrderNoArr,
 		})
 	}
 
@@ -451,7 +454,6 @@ func ConfirmDelivery(c *gin.Context) {
 	printChMp := make(map[int]struct{}, 0)
 
 	//构造更新 订单表 订单商品 表完成出库数据
-	completeOrderGoodsIds := []int{}
 	orderNumbers := []string{}
 	for k, pg := range pickGoods {
 		_, printChOk := printChMp[pg.ShopId]
@@ -468,10 +470,8 @@ func ConfirmDelivery(c *gin.Context) {
 
 		pickGoods[k].ReviewNum = completeNum
 
-		if pg.NeedNum == completeNum { //需拣和复核数一致，即为完成
-			completeOrderGoodsIds = append(completeOrderGoodsIds, pg.OrderGoodsId)
-			orderNumbers = append(orderNumbers, pg.Number)
-		}
+		//更新订单表
+		orderNumbers = append(orderNumbers, pg.Number)
 
 	}
 
