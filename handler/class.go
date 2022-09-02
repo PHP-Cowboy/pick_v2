@@ -8,7 +8,6 @@ import (
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
 	"pick_v2/model"
-	"pick_v2/model/other"
 	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/request"
@@ -17,7 +16,7 @@ import (
 
 type ClassResponse struct {
 	Code int                    `json:"code"`
-	Data []other.Classification `json:"data"`
+	Data []model.Classification `json:"data"`
 }
 
 // 同步分类
@@ -42,8 +41,8 @@ func SyncClassification(c *gin.Context) {
 	db := global.DB
 
 	var (
-		class    []other.Classification
-		saveData []other.Classification
+		class    []model.Classification
+		saveData []model.Classification
 	)
 
 	ret := db.Find(&class)
@@ -95,10 +94,10 @@ func ClassList(c *gin.Context) {
 
 	var (
 		res     rsp.ClassListRsp
-		classes []other.Classification
+		classes []model.Classification
 	)
 
-	db := global.DB.Model(other.Classification{})
+	db := global.DB.Model(model.Classification{})
 
 	if form.ClassStatus == 1 { //已设置路线
 		db.Where("goods_class != ''")
@@ -145,7 +144,7 @@ func BatchSetClass(c *gin.Context) {
 		return
 	}
 
-	ret := global.DB.Model(other.Classification{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"warehouse_class": form.WarehouseClass})
+	ret := global.DB.Model(model.Classification{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"warehouse_class": form.WarehouseClass})
 
 	if ret.Error != nil {
 		xsq_net.ErrorJSON(c, ret.Error)
@@ -182,7 +181,7 @@ func ClassNameList(c *gin.Context) {
 
 func GoodsClassList(c *gin.Context) {
 	var (
-		class []other.Classification
+		class []model.Classification
 		res   []*rsp.GoodsClassListRsp
 	)
 

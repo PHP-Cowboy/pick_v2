@@ -1,24 +1,18 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"net/http"
 	"pick_v2/common/constant"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
 	"pick_v2/middlewares"
 	"pick_v2/model"
-	"pick_v2/model/batch"
-	"pick_v2/model/order"
 	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/helper"
-	"pick_v2/utils/request"
-	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"strconv"
@@ -124,7 +118,7 @@ func CreateByOrder(c *gin.Context) {
 	}
 
 	var (
-		orders order.Order
+		orders model.Order
 	)
 
 	db := global.DB
@@ -201,13 +195,13 @@ func GetUserInfo(c *gin.Context) *middlewares.CustomClaims {
 
 func UpdateOrder(tx *gorm.DB, numbers []string, orderGoodsIds []int, batchId int) error {
 
-	result := tx.Model(&order.Order{}).Where("number in (?)", numbers).Update("order_type", 2)
+	result := tx.Model(&model.Order{}).Where("number in (?)", numbers).Update("order_type", 2)
 
 	if result.Error != nil {
 		return result.Error
 	}
 
-	result = tx.Model(&order.OrderGoods{}).Where("id in (?)", orderGoodsIds).Updates(map[string]interface{}{"status": 1, "batch_id": batchId})
+	result = tx.Model(&model.OrderGoods{}).Where("id in (?)", orderGoodsIds).Updates(map[string]interface{}{"status": 1, "batch_id": batchId})
 
 	if result.Error != nil {
 		return result.Error
@@ -221,7 +215,7 @@ func SaveBatch(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchName, line,
 	now := time.Now()
 
 	//创建批次
-	batches := batch.Batch{
+	batches := model.Batch{
 		WarehouseId:     userInfo.WarehouseId,
 		BatchName:       batchName,
 		DeliveryEndTime: deliveryEndTime,
@@ -245,7 +239,7 @@ func SaveBatch(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchName, line,
 	}
 
 	//批次创建条件
-	condition := batch.BatchCondition{
+	condition := model.BatchCondition{
 		BatchId:         batches.Id,
 		WarehouseId:     userInfo.WarehouseId,
 		PayEndTime:      payEndTime,
@@ -321,9 +315,9 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 	}
 
 	var (
-		prePicks      []batch.PrePick
-		prePickGoods  []*batch.PrePickGoods
-		prePickRemark []*batch.PrePickRemark
+		prePicks      []model.PrePick
+		prePickGoods  []*model.PrePickGoods
+		prePickRemark []*model.PrePickRemark
 	)
 
 	//订单相关数据 -店铺数 订单数 商品数
@@ -360,7 +354,7 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 		//店铺数
 		orderNumMp[og.Number] = struct{}{}
 
-		prePickGoods = append(prePickGoods, &batch.PrePickGoods{
+		prePickGoods = append(prePickGoods, &model.PrePickGoods{
 			WarehouseId:      userInfo.WarehouseId,
 			BatchId:          batchId,
 			OrderGoodsId:     og.Id,
@@ -381,7 +375,7 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 		})
 
 		if og.GoodsRemark != "" || og.OrderRemark != "" {
-			prePickRemark = append(prePickRemark, &batch.PrePickRemark{
+			prePickRemark = append(prePickRemark, &model.PrePickRemark{
 				WarehouseId:  userInfo.WarehouseId,
 				BatchId:      batchId,
 				OrderGoodsId: og.Id,
@@ -403,7 +397,7 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 
 		shopNumMp[og.ShopId] = struct{}{}
 
-		prePicks = append(prePicks, batch.PrePick{
+		prePicks = append(prePicks, model.PrePick{
 			WarehouseId: userInfo.WarehouseId,
 			BatchId:     batchId,
 			ShopId:      og.ShopId,
@@ -469,7 +463,7 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 	updates["shop_num"] = shopNum
 	updates["order_num"] = orderNum
 
-	result = tx.Model(&batch.Batch{}).Where("id = ?", batchId).Updates(map[string]interface{}{"goods_num": goodsNum, "shop_num": shopNum, "order_num": orderNum})
+	result = tx.Model(&model.Batch{}).Where("id = ?", batchId).Updates(map[string]interface{}{"goods_num": goodsNum, "shop_num": shopNum, "order_num": orderNum})
 
 	if result.Error != nil {
 		return numbers, orderGoodsId, result.Error
@@ -488,11 +482,10 @@ func EndBatch(c *gin.Context) {
 	}
 
 	var (
-		batches       batch.Batch
-		pickGoods     []batch.PickGoods
-		pick          []batch.Pick
+		batches       model.Batch
+		pickGoods     []model.PickGoods
+		pick          []model.Pick
 		orderAndGoods []rsp.OrderAndGoods
-		outGoods      req.OutGoods
 	)
 
 	db := global.DB
@@ -510,7 +503,7 @@ func EndBatch(c *gin.Context) {
 	}
 
 	//修改批次状态为已结束
-	result = db.Model(&batch.Batch{}).Where("id = ?", batches.Id).Updates(map[string]interface{}{"status": 1})
+	result = db.Model(&model.Batch{}).Where("id = ?", batches.Id).Updates(map[string]interface{}{"status": 1})
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -529,14 +522,14 @@ func EndBatch(c *gin.Context) {
 	}
 
 	//查询批次下全部订单
-	result = db.Model(&batch.PickGoods{}).Where("batch_id = ?", form.Id).Find(&pickGoods)
+	result = db.Model(&model.PickGoods{}).Where("batch_id = ?", form.Id).Find(&pickGoods)
 	if result.Error != nil {
 		global.SugarLogger.Error("批次结束成功，但推送u8拣货数据查询失败:" + result.Error.Error())
 		xsq_net.ErrorJSON(c, errors.New("批次结束成功，但推送u8拣货数据查询失败"))
 		return
 	}
 
-	result = db.Model(&batch.Pick{}).Where("batch_id = ?", form.Id).Find(&pick)
+	result = db.Model(&model.Pick{}).Where("batch_id = ?", form.Id).Find(&pick)
 
 	if result.Error != nil {
 		global.SugarLogger.Error("批次结束成功，但推送u8拣货数据查询失败:" + result.Error.Error())
@@ -545,31 +538,33 @@ func EndBatch(c *gin.Context) {
 	}
 
 	//拣货表数据map
-	mpPick := make(map[int]batch.Pick, 0)
+	mpPick := make(map[int]model.Pick, 0)
 
 	for _, p := range pick {
 		mpPick[p.Id] = p
 	}
 
 	//拣货商品map
-	mpGoods := make(map[int]batch.PickGoods, 0)
+	mpGoods := make(map[int]model.PickGoods, 0)
 
 	for _, good := range pickGoods {
 		mpGoods[good.OrderGoodsId] = good
 	}
-	// todo 修改
-	outGoods.BatchNumber = strconv.Itoa(batches.Id)
 
 	//批次未完成订单map
 	notCompleteOrderMp := make(map[string]struct{}, 0)
 	//批次全部订单map
 	allOrderMp := make(map[string][]rsp.OrderAndGoods, 0)
+
 	for _, info := range orderAndGoods {
 
+		//--------------
 		//构造未完成订单,有出库单号认为已完成（确认出库时，需拣和复核数一致的会写入出库单号）
-		if info.DeliveryOrderNo == "" {
+		if len(info.DeliveryOrderNo) == 0 {
 			notCompleteOrderMp[info.Number] = struct{}{}
 		}
+
+		//--------------
 
 		_, compOk := allOrderMp[info.Number]
 
@@ -580,58 +575,21 @@ func EndBatch(c *gin.Context) {
 		//全部订单 把未完成的过滤掉
 		allOrderMp[info.Number] = append(allOrderMp[info.Number], info)
 
-		goods, ok := mpGoods[info.Id]
-
-		if !ok {
-			//
-			continue
-		}
-
-		var outNumber, exWarehouse string
-
-		pMp, pickOk := mpPick[goods.PickId]
-
-		if pickOk {
-			outNumber = strconv.Itoa(pMp.Id) //拣货单号
-			exWarehouse = pMp.DeliveryOrderNo
-		}
-
-		outGoods.List = append(outGoods.List, req.OutGoodsList{
-			GoodsLogId:   info.Id,
-			Number:       info.Number,
-			OutNumber:    outNumber, //拣货单号
-			CkNumber:     exWarehouse,
-			Sku:          info.Sku,
-			Name:         info.GoodsName,
-			OutCount:     goods.CompleteNum,
-			Price:        info.DiscountPrice,
-			SumPrice:     goods.CompleteNum * info.DiscountPrice,
-			OutAt:        goods.UpdateTime.Format(timeutil.TimeFormat),
-			PayAt:        info.PayAt,
-			GoodsSpe:     info.GoodsSpe,
-			GoodsUnit:    info.GoodsUnit,
-			DeliveryType: info.DistributionType,
-		})
 	}
 
-	//请求接口 释放锁单
-	err := OutGoods(outGoods)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"code": 200,
-			"msg":  "归还订货系统欠货信息失败",
-			"data": nil,
-		})
-		return
-	}
+	//----------
+
+	//mq 存入 商品订单表id
+
+	//----------
 
 	//将要被删除订单表number
 	deleteNumbers := make([]string, 0)
 
 	tx := db.Begin()
 
-	completeOrder := make([]order.CompleteOrder, 0)
-	completeOrderDetail := make([]order.CompleteOrderDetail, 0)
+	completeOrder := make([]model.CompleteOrder, 0)
+	completeOrderDetail := make([]model.CompleteOrderDetail, 0)
 
 	//已完成订单转存入完成订单表 同时删除 订单商品表数据
 	for k, orderSlice := range allOrderMp {
@@ -653,7 +611,7 @@ func EndBatch(c *gin.Context) {
 					return
 				}
 
-				completeOrder = append(completeOrder, order.CompleteOrder{
+				completeOrder = append(completeOrder, model.CompleteOrder{
 					Number:         o.Number,
 					OrderRemark:    o.OrderRemark,
 					ShopId:         o.ShopId,
@@ -672,7 +630,7 @@ func EndBatch(c *gin.Context) {
 					PayAt:          payAt.Format(timeutil.TimeFormat),
 				})
 			}
-			completeOrderDetail = append(completeOrderDetail, order.CompleteOrderDetail{
+			completeOrderDetail = append(completeOrderDetail, model.CompleteOrderDetail{
 				Number:          o.Number,
 				Name:            o.GoodsName,
 				Sku:             o.Sku,
@@ -707,10 +665,10 @@ func EndBatch(c *gin.Context) {
 	}
 
 	//删除订单表数据
-	result = tx.Delete(&order.Order{}, "number in (?)", deleteNumbers)
+	result = tx.Delete(&model.Order{}, "number in (?)", deleteNumbers)
 
 	//删除订单商品表数据
-	result = tx.Delete(&order.OrderGoods{}, "number in (?)", deleteNumbers)
+	result = tx.Delete(&model.OrderGoods{}, "number in (?)", deleteNumbers)
 
 	if result.Error != nil {
 		tx.Rollback()
@@ -720,7 +678,7 @@ func EndBatch(c *gin.Context) {
 
 	tx.Commit()
 
-	err = PushU8(pickGoods)
+	err := PushU8(pickGoods, orderAndGoods)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
@@ -739,7 +697,7 @@ func EditBatch(c *gin.Context) {
 		return
 	}
 
-	result := global.DB.Model(&batch.Batch{}).Where("id = ?", form.Id).Updates(map[string]interface{}{"batch_name": form.BatchName})
+	result := global.DB.Model(&model.Batch{}).Where("id = ?", form.Id).Updates(map[string]interface{}{"batch_name": form.BatchName})
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -749,40 +707,11 @@ func EditBatch(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-func OutGoods(responseData interface{}) error {
-	var result rsp.OutGoodsRsp
+func PushU8(pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods) error {
 
-	path := "api/v1/remote/sync/out/goods"
-	body, err := request.Post(path, responseData)
-
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(body, &result)
-
-	if err != nil {
-		return err
-	}
-
-	if result.Code != 200 {
-		global.SugarLogger.Errorf("path:%s,errMsg:%s", path, result.Msg)
-		return errors.New(result.Msg)
-	}
-
-	return nil
-}
-
-func PushU8(pickGoods []batch.PickGoods) error {
-
-	var orderAndGoods []rsp.OrderAndGoods
-
-	numbers := []string{}
-
-	mpGoods := make(map[string]batch.PickGoods, 0)
+	mpGoods := make(map[string]model.PickGoods, 0)
 
 	for _, good := range pickGoods {
-		numbers = append(numbers, good.Number)
 		//订单数据
 		//step1 map[number+sku]{...}
 		mpGoods[good.Number+good.Sku] = good
@@ -790,20 +719,6 @@ func PushU8(pickGoods []batch.PickGoods) error {
 	}
 
 	global.SugarLogger.Info(mpGoods)
-
-	//去重
-	numbers = slice.UniqueStringSlice(numbers)
-
-	result := global.DB.Table("t_order_goods og").
-		Select("og.*,o.shop_id,o.shop_name,o.shop_code,o.line,o.distribution_type,o.order_remark,o.pay_at,o.province,o.city,o.district,o.shop_type,o.latest_picking_time").
-		Joins("left join t_order o on og.number = o.number").
-		Where("og.number in (?)", numbers).
-		Scan(&orderAndGoods)
-
-	if result.Error != nil {
-		global.SugarLogger.Error("批次结束成功，但推送u8订单数据查询失败:" + result.Error.Error())
-		return errors.New("批次结束成功，但推送u8订单数据查询失败")
-	}
 
 	mpPgv := make(map[string]PickGoodsView, 0)
 
@@ -854,7 +769,7 @@ func PushU8(pickGoods []batch.PickGoods) error {
 func IsPick(c *gin.Context) {
 	var (
 		form   req.EndBatchForm
-		pick   batch.Pick
+		pick   model.Pick
 		status bool
 	)
 
@@ -887,7 +802,7 @@ func ChangeBatch(c *gin.Context) {
 		return
 	}
 
-	var batches batch.Batch
+	var batches model.Batch
 
 	db := global.DB
 
@@ -907,7 +822,7 @@ func ChangeBatch(c *gin.Context) {
 	}
 
 	//查询条件是传递过来的值
-	result = db.Model(&batch.Batch{}).Where("id = ? and status = ?", form.Id, form.Status).Update("status", updateStatus)
+	result = db.Model(&model.Batch{}).Where("id = ? and status = ?", form.Id, form.Status).Update("status", updateStatus)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -930,7 +845,7 @@ func GetBatchList(c *gin.Context) {
 	}
 
 	var (
-		batches      []batch.Batch
+		batches      []model.Batch
 		batchIdSlice []int
 	)
 
@@ -939,10 +854,10 @@ func GetBatchList(c *gin.Context) {
 	//子表数据
 	if form.Sku != "" || form.Number != "" || form.ShopId > 0 {
 
-		var prePickGoods []batch.PrePickGoods
+		var prePickGoods []model.PrePickGoods
 
-		preGoodsRes := global.DB.Model(&batch.PrePickGoods{}).
-			Where(batch.PrePickGoods{
+		preGoodsRes := global.DB.Model(&model.PrePickGoods{}).
+			Where(model.PrePickGoods{
 				Sku:    form.Sku,
 				Number: form.Number,
 				ShopId: form.ShopId,
@@ -993,7 +908,7 @@ func GetBatchList(c *gin.Context) {
 		db = db.Where("status = 1")
 	}
 
-	db.Where(&batch.Batch{DeliveryMethod: form.DeliveryMethod})
+	db.Where(&model.Batch{DeliveryMethod: form.DeliveryMethod})
 
 	result := db.Find(&batches)
 
@@ -1053,7 +968,7 @@ func GetBatchPoolNum(c *gin.Context) {
 		finished  int
 	)
 
-	result := global.DB.Model(&batch.Batch{}).
+	result := global.DB.Model(&model.Batch{}).
 		Select("count(id) as count, status").
 		Group("status").
 		Find(&batchPool)
@@ -1087,8 +1002,8 @@ func GetBase(c *gin.Context) {
 
 	var (
 		form      req.GetBaseForm
-		batchCond batch.BatchCondition
-		batches   batch.Batch
+		batchCond model.BatchCondition
+		batches   model.Batch
 	)
 
 	if err := c.ShouldBind(&form); err != nil {
@@ -1146,14 +1061,14 @@ func GetPrePickList(c *gin.Context) {
 	}
 
 	var (
-		prePicks []batch.PrePick
+		prePicks []model.PrePick
 		//prePickGoods []batch.PrePickGoods
 		prePickIds []int
 	)
 
 	db := global.DB
 
-	result := db.Where("batch_id = ?", form.BatchId).Where(batch.PrePick{ShopId: form.ShopId, Line: form.Line}).Where("status = 0").Find(&prePicks)
+	result := db.Where("batch_id = ?", form.BatchId).Where(model.PrePick{ShopId: form.ShopId, Line: form.Line}).Where("status = 0").Find(&prePicks)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -1162,7 +1077,7 @@ func GetPrePickList(c *gin.Context) {
 
 	res.Total = result.RowsAffected
 
-	db.Where("batch_id = ?", form.BatchId).Where(batch.PrePick{ShopId: form.ShopId, Line: form.Line}).Where("status = 0").Scopes(model.Paginate(form.Page, form.Size)).Find(&prePicks)
+	db.Where("batch_id = ?", form.BatchId).Where(model.PrePick{ShopId: form.ShopId, Line: form.Line}).Where("status = 0").Scopes(model.Paginate(form.Page, form.Size)).Find(&prePicks)
 
 	for _, pick := range prePicks {
 		prePickIds = append(prePickIds, pick.Id)
@@ -1170,7 +1085,7 @@ func GetPrePickList(c *gin.Context) {
 
 	retCount := []rsp.Ret{}
 
-	result = db.Model(&batch.PrePickGoods{}).
+	result = db.Model(&model.PrePickGoods{}).
 		Select("SUM(out_count) as out_c, SUM(need_num) AS need_c, shop_id, goods_type").
 		Where("pre_pick_id in (?)", prePickIds).
 		Where("status = 0"). //状态:0:未处理,1:已进入拣货池
@@ -1224,9 +1139,9 @@ func GetPrePickDetail(c *gin.Context) {
 	}
 
 	var (
-		prePick       batch.PrePick
-		prePickGoods  []batch.PrePickGoods
-		prePickRemark []batch.PrePickRemark
+		prePick       model.PrePick
+		prePickGoods  []model.PrePickGoods
+		prePickRemark []model.PrePickRemark
 	)
 
 	db := global.DB
@@ -1352,7 +1267,7 @@ func Topping(c *gin.Context) {
 
 	sort := int(val.(int64))
 
-	result := global.DB.Model(batch.Batch{}).Where("id = ?", form.Id).Update("sort", sort)
+	result := global.DB.Model(model.Batch{}).Where("id = ?", form.Id).Update("sort", sort)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -1381,14 +1296,14 @@ func GetPoolNum(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Model(&batch.PrePick{}).Select("id").Where("batch_id = ? and status = 0", form.BatchId).Count(&count)
+	result := db.Model(&model.PrePick{}).Select("id").Where("batch_id = ? and status = 0", form.BatchId).Count(&count)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	result = db.Model(&batch.Pick{}).
+	result = db.Model(&model.Pick{}).
 		Select("count(id) as count, status").
 		Where("batch_id = ?", form.BatchId).
 		Group("status").
@@ -1434,7 +1349,7 @@ func BatchPick(c *gin.Context) {
 		return
 	}
 
-	var batches batch.Batch
+	var batches model.Batch
 
 	result := global.DB.First(&batches, form.BatchId)
 
@@ -1475,9 +1390,9 @@ func BatchPickByParams(form req.BatchPickForm) error {
 
 	db := global.DB
 	var (
-		prePick        []batch.PrePick
-		prePickGoods   []batch.PrePickGoods
-		prePickRemarks []batch.PrePickRemark
+		prePick        []model.PrePick
+		prePickGoods   []model.PrePickGoods
+		prePickRemarks []model.PrePickRemark
 		pickNums       []rsp.PickNums
 	)
 
@@ -1491,7 +1406,7 @@ func BatchPickByParams(form req.BatchPickForm) error {
 	local := db.Where("pre_pick_id in (?) and status = 0", form.Ids)
 
 	//计算拣货池 订单、门店、需拣 数量 sql 拼接
-	numCountLocal := db.Model(&batch.PrePickGoods{}).
+	numCountLocal := db.Model(&model.PrePickGoods{}).
 		Select("pre_pick_id,count(DISTINCT(number)) as order_num,count(DISTINCT(shop_id)) as shop_num,sum(need_num) as need_num").
 		Where("pre_pick_id in (?) and status = 0", form.Ids)
 
@@ -1513,7 +1428,7 @@ func BatchPickByParams(form req.BatchPickForm) error {
 		return errors.New("对应的拣货池商品不存在")
 	}
 
-	prePickGoodsMap := make(map[int][]batch.PrePickGoods, 0)
+	prePickGoodsMap := make(map[int][]model.PrePickGoods, 0)
 
 	for _, goods := range prePickGoods {
 		prePickGoodsMap[goods.PrePickId] = append(prePickGoodsMap[goods.PrePickId], goods)
@@ -1538,8 +1453,8 @@ func BatchPickByParams(form req.BatchPickForm) error {
 	var (
 		prePickGoodsIds   []int
 		prePickRemarksIds []int
-		pickGoods         []batch.PickGoods
-		pickRemark        []batch.PickRemark
+		pickGoods         []model.PickGoods
+		pickRemark        []model.PickRemark
 	)
 
 	for _, pre := range prePick {
@@ -1565,7 +1480,7 @@ func BatchPickByParams(form req.BatchPickForm) error {
 			needNum = val.NeedNum
 		}
 
-		pick := batch.Pick{
+		pick := model.Pick{
 			WarehouseId:    form.WarehouseId,
 			BatchId:        pre.BatchId,
 			PrePickIds:     strconv.Itoa(pre.Id),
@@ -1599,7 +1514,7 @@ func BatchPickByParams(form req.BatchPickForm) error {
 			//更新 prePickGoods 使用
 			prePickGoodsIds = append(prePickGoodsIds, goods.Id)
 
-			pickGoods = append(pickGoods, batch.PickGoods{
+			pickGoods = append(pickGoods, model.PickGoods{
 				WarehouseId:      form.WarehouseId,
 				PickId:           pick.Id,
 				BatchId:          pre.BatchId,
@@ -1630,7 +1545,7 @@ func BatchPickByParams(form req.BatchPickForm) error {
 			//更新 prePickRemarks 使用
 			prePickRemarksIds = append(prePickRemarksIds, remark.Id)
 
-			pickRemark = append(pickRemark, batch.PickRemark{
+			pickRemark = append(pickRemark, model.PickRemark{
 				WarehouseId:     form.WarehouseId,
 				BatchId:         pre.BatchId,
 				PickId:          pick.Id,
@@ -1665,7 +1580,7 @@ func BatchPickByParams(form req.BatchPickForm) error {
 
 	//更新预拣池商品表的商品数据状态
 	if len(prePickGoodsIds) > 0 {
-		result = tx.Model(batch.PrePickGoods{}).Where("id in (?)", prePickGoodsIds).Updates(map[string]interface{}{"status": 1})
+		result = tx.Model(model.PrePickGoods{}).Where("id in (?)", prePickGoodsIds).Updates(map[string]interface{}{"status": 1})
 
 		if result.Error != nil {
 			tx.Rollback()
@@ -1675,14 +1590,14 @@ func BatchPickByParams(form req.BatchPickForm) error {
 
 	//预拣池内商品全部进入拣货池时 更新 对应的 预拣池状态
 	if form.Type == 1 { //全单拣货
-		result = tx.Model(batch.PrePick{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"status": 1})
+		result = tx.Model(model.PrePick{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"status": 1})
 		if result.Error != nil {
 			tx.Rollback()
 			return result.Error
 		}
 	} else {
 		//0:未处理,1:已进入拣货池
-		result = tx.Model(&batch.PrePickGoods{}).Where("pre_pick_id in (?) and status = 0", form.Ids).Find(&prePickGoods)
+		result = tx.Model(&model.PrePickGoods{}).Where("pre_pick_id in (?) and status = 0", form.Ids).Find(&prePickGoods)
 		if result.Error != nil {
 			tx.Rollback()
 			return result.Error
@@ -1707,7 +1622,7 @@ func BatchPickByParams(form req.BatchPickForm) error {
 		}
 
 		if len(prePickIds) > 0 {
-			result = tx.Model(batch.PrePick{}).Where("id in (?)", prePickIds).Updates(map[string]interface{}{"status": 1})
+			result = tx.Model(model.PrePick{}).Where("id in (?)", prePickIds).Updates(map[string]interface{}{"status": 1})
 			if result.Error != nil {
 				tx.Rollback()
 				return result.Error
@@ -1717,7 +1632,7 @@ func BatchPickByParams(form req.BatchPickForm) error {
 
 	//更新预拣池商品备注表的数据状态
 	if len(prePickRemarksIds) > 0 {
-		result = tx.Model(batch.PrePickRemark{}).Where("id in (?)", prePickRemarksIds).Updates(map[string]interface{}{"status": 1})
+		result = tx.Model(model.PrePickRemark{}).Where("id in (?)", prePickRemarksIds).Updates(map[string]interface{}{"status": 1})
 
 		if result.Error != nil {
 			tx.Rollback()
@@ -1739,7 +1654,7 @@ func MergePick(c *gin.Context) {
 		return
 	}
 
-	var batches batch.Batch
+	var batches model.Batch
 
 	result := global.DB.First(&batches, form.BatchId)
 
@@ -1781,10 +1696,10 @@ func MergePick(c *gin.Context) {
 
 func MergePickByParams(form req.MergePickForm) error {
 	var (
-		prePickGoods   []batch.PrePickGoods
-		prePickRemarks []batch.PrePickRemark
-		pickGoods      []batch.PickGoods
-		pickRemarks    []batch.PickRemark
+		prePickGoods   []model.PrePickGoods
+		prePickRemarks []model.PrePickRemark
+		pickGoods      []model.PickGoods
+		pickRemarks    []model.PickRemark
 		pickNums       rsp.MergePickNums
 	)
 
@@ -1800,7 +1715,7 @@ func MergePickByParams(form req.MergePickForm) error {
 	local := db.Where("pre_pick_id in (?) and status = 0", form.Ids)
 
 	//计算拣货池 订单、门店、需拣 数量 sql 拼接
-	numCountLocal := db.Model(&batch.PrePickGoods{}).
+	numCountLocal := db.Model(&model.PrePickGoods{}).
 		Select("pre_pick_id,count(DISTINCT(number)) as order_num,count(DISTINCT(shop_id)) as shop_num,sum(need_num) as need_num").
 		Where("pre_pick_id in (?) and status = 0", form.Ids)
 
@@ -1831,7 +1746,7 @@ func MergePickByParams(form req.MergePickForm) error {
 
 	tx := db.Begin()
 
-	pick := batch.Pick{
+	pick := model.Pick{
 		WarehouseId:    form.WarehouseId,
 		BatchId:        form.BatchId,
 		PrePickIds:     prePickIds,
@@ -1862,7 +1777,7 @@ func MergePickByParams(form req.MergePickForm) error {
 
 		orderGoodsIds = append(orderGoodsIds, goods.OrderGoodsId)
 
-		pickGoods = append(pickGoods, batch.PickGoods{
+		pickGoods = append(pickGoods, model.PickGoods{
 			WarehouseId:      form.WarehouseId,
 			PickId:           pick.Id,
 			BatchId:          goods.BatchId,
@@ -1890,7 +1805,7 @@ func MergePickByParams(form req.MergePickForm) error {
 	}
 
 	//更新预拣货池商品相关数据状态
-	result = tx.Model(batch.PrePickGoods{}).Where("id in (?)", prePickGoodsIds).Updates(map[string]interface{}{"status": 1})
+	result = tx.Model(model.PrePickGoods{}).Where("id in (?)", prePickGoodsIds).Updates(map[string]interface{}{"status": 1})
 
 	if result.Error != nil {
 		tx.Rollback()
@@ -1899,14 +1814,14 @@ func MergePickByParams(form req.MergePickForm) error {
 
 	//预拣池内商品全部进入拣货池时 更新 对应的 预拣池状态
 	if form.Type == 1 { //全单拣货
-		result = tx.Model(batch.PrePick{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"status": 1})
+		result = tx.Model(model.PrePick{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"status": 1})
 		if result.Error != nil {
 			tx.Rollback()
 			return result.Error
 		}
 	} else {
 		//0:未处理,1:已进入拣货池
-		result = tx.Model(batch.PrePickGoods{}).Where("pre_pick_id in (?) and status = 0", form.Ids).Find(&prePickGoods)
+		result = tx.Model(model.PrePickGoods{}).Where("pre_pick_id in (?) and status = 0", form.Ids).Find(&prePickGoods)
 		if result.Error != nil {
 			tx.Rollback()
 			return result.Error
@@ -1931,7 +1846,7 @@ func MergePickByParams(form req.MergePickForm) error {
 		}
 
 		if len(prePickIdSlice) > 0 {
-			result = tx.Model(batch.PrePick{}).Where("id in (?)", prePickIdSlice).Updates(map[string]interface{}{"status": 1})
+			result = tx.Model(model.PrePick{}).Where("id in (?)", prePickIdSlice).Updates(map[string]interface{}{"status": 1})
 			if result.Error != nil {
 				tx.Rollback()
 				return result.Error
@@ -1951,7 +1866,7 @@ func MergePickByParams(form req.MergePickForm) error {
 
 			prePickRemarksIds = append(prePickRemarksIds, remark.Id)
 
-			pickRemarks = append(pickRemarks, batch.PickRemark{
+			pickRemarks = append(pickRemarks, model.PickRemark{
 				WarehouseId:     form.WarehouseId,
 				BatchId:         form.BatchId,
 				PickId:          pick.Id,
@@ -1973,7 +1888,7 @@ func MergePickByParams(form req.MergePickForm) error {
 		}
 
 		//更新预拣货池备注相关数据状态
-		result = tx.Model(batch.PrePickRemark{}).Where("id in (?)", prePickRemarksIds).Updates(map[string]interface{}{"status": 1})
+		result = tx.Model(model.PrePickRemark{}).Where("id in (?)", prePickRemarksIds).Updates(map[string]interface{}{"status": 1})
 
 		if result.Error != nil {
 			tx.Rollback()
@@ -2008,21 +1923,21 @@ func PrintCallGet(c *gin.Context) {
 	global.SugarLogger.Infof("%+v", printCh)
 
 	var (
-		pick          batch.Pick
-		pickGoods     []batch.PickGoods
+		pick          model.Pick
+		pickGoods     []model.PickGoods
 		orderAndGoods []rsp.OrderAndGoods
 	)
 
 	db := global.DB
 
-	result := db.Model(&batch.Pick{}).Where("delivery_order_no = ?", printCh.DeliveryOrderNo).Find(&pick)
+	result := db.Model(&model.Pick{}).Where("delivery_order_no = ?", printCh.DeliveryOrderNo).Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	result = db.Model(&batch.PickGoods{}).Where("pick_id = ? and shop_id = ?", pick.Id, printCh.ShopId).Find(&pickGoods)
+	result = db.Model(&model.PickGoods{}).Where("pick_id = ? and shop_id = ?", pick.Id, printCh.ShopId).Find(&pickGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -2033,7 +1948,7 @@ func PrintCallGet(c *gin.Context) {
 
 	orderGoodsIds := make([]int, 0, length)
 
-	goodsMp := make(map[int]batch.PickGoods, length)
+	goodsMp := make(map[int]model.PickGoods, length)
 
 	for _, good := range pickGoods {
 		orderGoodsIds = append(orderGoodsIds, good.OrderGoodsId)

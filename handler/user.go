@@ -22,7 +22,6 @@ import (
 	"pick_v2/global"
 	"pick_v2/middlewares"
 	"pick_v2/model"
-	"pick_v2/model/other"
 	"pick_v2/utils"
 	"pick_v2/utils/xsq_net"
 )
@@ -40,7 +39,7 @@ func CreateUser(ctx *gin.Context) {
 
 	var (
 		user      model.User
-		warehouse other.Warehouse
+		warehouse model.Warehouse
 		lastId    int
 		role      model.Role
 	)

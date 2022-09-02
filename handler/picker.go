@@ -9,15 +9,13 @@ import (
 	"pick_v2/global"
 	"pick_v2/middlewares"
 	"pick_v2/model"
-	"pick_v2/model/batch"
-	"pick_v2/model/order"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"time"
 )
 
-func getPick(pick []batch.Pick) (res rsp.ReceivingOrdersRsp, err error) {
+func getPick(pick []model.Pick) (res rsp.ReceivingOrdersRsp, err error) {
 
 	db := global.DB
 
@@ -31,7 +29,7 @@ func getPick(pick []batch.Pick) (res rsp.ReceivingOrdersRsp, err error) {
 		var (
 			batchIds []int
 			batchMp  = make(map[int]struct{}, 0)
-			pickMp   = make(map[int][]batch.Pick, 0)
+			pickMp   = make(map[int][]model.Pick, 0)
 		)
 
 		//去重，构造批次id切片
@@ -52,7 +50,7 @@ func getPick(pick []batch.Pick) (res rsp.ReceivingOrdersRsp, err error) {
 		}
 
 		var (
-			bat    batch.Batch
+			bat    model.Batch
 			result *gorm.DB
 		)
 
@@ -88,9 +86,9 @@ func getPick(pick []batch.Pick) (res rsp.ReceivingOrdersRsp, err error) {
 func ReceivingOrders(c *gin.Context) {
 	var (
 		res     rsp.ReceivingOrdersRsp
-		pick    []batch.Pick
+		pick    []model.Pick
 		err     error
-		batches []batch.Batch
+		batches []model.Batch
 	)
 
 	db := global.DB
@@ -105,7 +103,7 @@ func ReceivingOrders(c *gin.Context) {
 	userInfo := claims.(*middlewares.CustomClaims)
 
 	// 先查询是否有当前拣货员被分配的任务或已经接单且未完成拣货的数据,如果被分配多条，第一按批次优先级，第二按拣货池优先级 优先拣货
-	result := db.Model(&batch.Pick{}).Where("pick_user = ? and status = 0", userInfo.Name).Find(&pick)
+	result := db.Model(&model.Pick{}).Where("pick_user = ? and status = 0", userInfo.Name).Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -123,7 +121,7 @@ func ReceivingOrders(c *gin.Context) {
 		}
 		//后台分配的单没有接单时间,更新接单时间
 		if res.TakeOrdersTime == nil {
-			result = db.Model(&batch.Pick{}).Where("id = ?", res.Id).Update("take_orders_time", &now)
+			result = db.Model(&model.Pick{}).Where("id = ?", res.Id).Update("take_orders_time", &now)
 
 			if result.Error != nil {
 				xsq_net.ErrorJSON(c, result.Error)
@@ -149,7 +147,7 @@ func ReceivingOrders(c *gin.Context) {
 	}
 
 	//查询未被接单的拣货池数据
-	result = db.Model(&batch.Pick{}).Where("batch_id in (?) and pick_user = '' and status = 0", batchIds).Find(&pick)
+	result = db.Model(&model.Pick{}).Where("batch_id in (?) and pick_user = '' and status = 0", batchIds).Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -167,7 +165,7 @@ func ReceivingOrders(c *gin.Context) {
 		tx := db.Begin()
 
 		//更新拣货池 + version 防并发
-		result = tx.Model(&batch.Pick{}).
+		result = tx.Model(&model.Pick{}).
 			Where("id = ? and version = ?", res.Id, res.Version).
 			Updates(map[string]interface{}{
 				"pick_user":        userInfo.Name,
@@ -182,7 +180,7 @@ func ReceivingOrders(c *gin.Context) {
 		}
 
 		//更新拣货单数量
-		result = tx.Model(batch.Batch{}).
+		result = tx.Model(model.Batch{}).
 			Where("id = ?", res.BatchId).
 			Update("pick_num", gorm.Expr("pick_num + ?", 1))
 
@@ -213,9 +211,9 @@ func CompletePick(c *gin.Context) {
 
 	// 这里是否需要做并发处理
 	var (
-		pick       batch.Pick
-		pickGoods  []batch.PickGoods
-		orderGoods []order.OrderGoods
+		pick       model.Pick
+		pickGoods  []model.PickGoods
+		orderGoods []model.OrderGoods
 	)
 
 	db := global.DB
@@ -253,7 +251,7 @@ func CompletePick(c *gin.Context) {
 	//****************************** 无需拣货 ******************************//
 	if form.Type == 2 {
 		//更新主表 无需拣货直接更新为复核完成
-		result = db.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2})
+		result = db.Model(&model.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2})
 		if result.Error != nil {
 			xsq_net.ErrorJSON(c, result.Error)
 			return
@@ -368,7 +366,7 @@ func CompletePick(c *gin.Context) {
 	}
 
 	//更新主表
-	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 1, "pick_num": totalNum})
+	result = tx.Model(&model.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 1, "pick_num": totalNum})
 
 	if result.Error != nil {
 		tx.Rollback()
@@ -386,7 +384,7 @@ func RemainingQuantity(c *gin.Context) {
 
 	var (
 		count    int64
-		batches  []batch.Batch
+		batches  []model.Batch
 		batchIds []int
 	)
 
@@ -404,7 +402,7 @@ func RemainingQuantity(c *gin.Context) {
 		batchIds = append(batchIds, b.Id)
 	}
 
-	result = db.Model(&batch.Pick{}).Where("batch_id in (?) and status = 0 and pick_user = ''", batchIds).Count(&count)
+	result = db.Model(&model.Pick{}).Where("batch_id in (?) and status = 0 and pick_user = ''", batchIds).Count(&count)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -419,8 +417,8 @@ func PickingRecord(c *gin.Context) {
 	var (
 		form      req.PickingRecordForm
 		res       rsp.PickingRecordRsp
-		pick      []batch.Pick
-		pickGoods []batch.PickGoods
+		pick      []model.Pick
+		pickGoods []model.PickGoods
 		pickIds   []int
 	)
 
@@ -553,9 +551,9 @@ func PickingRecordDetail(c *gin.Context) {
 	}
 
 	var (
-		pick       batch.Pick
-		pickGoods  []batch.PickGoods
-		pickRemark []batch.PickRemark
+		pick       model.Pick
+		pickGoods  []model.PickGoods
+		pickRemark []model.PickRemark
 	)
 
 	db := global.DB

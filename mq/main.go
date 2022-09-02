@@ -25,7 +25,7 @@ func main() {
 
 	topic := "purchase_order"
 
-	for i := 200; i < 210; i++ {
+	for i := 210; i < 260; i++ {
 
 		msg := &primitive.Message{
 			Topic: topic,

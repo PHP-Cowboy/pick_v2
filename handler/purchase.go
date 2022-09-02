@@ -8,8 +8,10 @@ import (
 	"github.com/apache/rocketmq-client-go/v2/primitive"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
-	order2 "pick_v2/model/order"
+	order2 "pick_v2/model"
 	"pick_v2/utils/request"
+	"pick_v2/utils/timeutil"
+	"time"
 )
 
 func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.ConsumeResult, error) {
@@ -83,6 +85,12 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 			hasRemark = 1
 		}
 
+		payAt := info.PayAt
+
+		if payAt == "" {
+			payAt = time.Now().Format(timeutil.TimeFormat)
+		}
+
 		order = append(order, order2.Order{
 			Id:               info.OrderID,
 			ShopId:           info.ShopID,
@@ -113,7 +121,7 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 
 	if result.Error != nil {
 		tx.Rollback()
-		global.SugarLogger.Error(err.Error())
+		global.SugarLogger.Error(result.Error.Error())
 		return consumer.ConsumeRetryLater, result.Error
 	}
 
@@ -121,7 +129,7 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 
 	if result.Error != nil {
 		tx.Rollback()
-		global.SugarLogger.Error(err.Error())
+		global.SugarLogger.Error(result.Error.Error())
 		return consumer.ConsumeRetryLater, result.Error
 	}
 

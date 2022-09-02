@@ -10,7 +10,6 @@ import (
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
 	"pick_v2/model"
-	"pick_v2/model/batch"
 	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
@@ -36,7 +35,7 @@ func PickTopping(c *gin.Context) {
 
 	sort := int(val.(int64))
 
-	result := global.DB.Model(batch.Pick{}).Where("id = ?", form.Id).Update("sort", sort)
+	result := global.DB.Model(model.Pick{}).Where("id = ?", form.Id).Update("sort", sort)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -60,14 +59,14 @@ func PickList(c *gin.Context) {
 	var (
 		ids        []int
 		res        rsp.PickListRsp
-		pick       []batch.Pick
-		pickGoods  []batch.PickGoods
-		pickRemark []batch.PickRemark
+		pick       []model.Pick
+		pickGoods  []model.PickGoods
+		pickRemark []model.PickRemark
 		result     *gorm.DB
 	)
 
 	if form.Goods != "" || form.Number != "" || form.ShopId > 0 {
-		result = db.Where(batch.PickGoods{BatchId: form.BatchId, GoodsName: form.Goods, Number: form.Number, ShopId: form.ShopId}).Find(&pickGoods)
+		result = db.Where(model.PickGoods{BatchId: form.BatchId, GoodsName: form.Goods, Number: form.Number, ShopId: form.ShopId}).Find(&pickGoods)
 		if result.Error != nil {
 			xsq_net.ErrorJSON(c, result.Error)
 			return
@@ -173,9 +172,9 @@ func GetPickDetail(c *gin.Context) {
 	}
 
 	var (
-		pick       batch.Pick
-		pickGoods  []batch.PickGoods
-		pickRemark []batch.PickRemark
+		pick       model.Pick
+		pickGoods  []model.PickGoods
+		pickRemark []model.PickRemark
 	)
 
 	db := global.DB
@@ -292,7 +291,7 @@ func ChangeNum(c *gin.Context) {
 		return
 	}
 
-	var pick batch.Pick
+	var pick model.Pick
 
 	db := global.DB
 
@@ -308,7 +307,7 @@ func ChangeNum(c *gin.Context) {
 		return
 	}
 
-	result = db.Model(&batch.Pick{}).Where("id = ?", form.Id).Update("num", form.Num)
+	result = db.Model(&model.Pick{}).Where("id = ?", form.Id).Update("num", form.Num)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -328,8 +327,8 @@ func PushPrint(c *gin.Context) {
 	}
 
 	var (
-		pick      []batch.Pick
-		pickGoods []batch.PickGoods
+		pick      []model.Pick
+		pickGoods []model.PickGoods
 	)
 
 	db := global.DB
@@ -398,7 +397,7 @@ func Assign(c *gin.Context) {
 
 	var (
 		user  model.User
-		picks []batch.Pick
+		picks []model.Pick
 	)
 
 	db := global.DB
@@ -431,7 +430,7 @@ func Assign(c *gin.Context) {
 	now := time.Now()
 
 	//已有拣货员可以强转
-	result = db.Model(&batch.Pick{}).Where("id in (?)", form.PickIds).Updates(map[string]interface{}{"pick_user": user.Name, "take_orders_time": &now})
+	result = db.Model(&model.Pick{}).Where("id in (?)", form.PickIds).Updates(map[string]interface{}{"pick_user": user.Name, "take_orders_time": &now})
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

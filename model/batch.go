@@ -1,12 +1,11 @@
-package batch
+package model
 
 import (
-	"pick_v2/model"
 	"time"
 )
 
 type BatchCondition struct {
-	model.Base
+	Base
 	BatchId           int        `gorm:"type:int(11);index;comment:批次id"`
 	WarehouseId       int        `gorm:"type:int(11);comment:仓库"`
 	PayEndTime        *time.Time `gorm:"type:datetime;comment:支付截止时间"`
@@ -20,7 +19,7 @@ type BatchCondition struct {
 
 // 批次
 type Batch struct {
-	model.Base
+	Base
 	WarehouseId       int        `gorm:"type:int(11);comment:仓库"`
 	BatchName         string     `gorm:"type:varchar(64);comment:批次名称"`
 	DeliveryStartTime *time.Time `gorm:"type:datetime;default:null;comment:发货起始时间"`
@@ -41,7 +40,7 @@ type Batch struct {
 
 // 预拣货列表
 type PrePick struct {
-	model.Base
+	Base
 	WarehouseId int    `gorm:"type:int(11);comment:仓库"`
 	BatchId     int    `gorm:"type:int(11) unsigned;comment:批次表id"`
 	ShopId      int    `gorm:"type:int(11);comment:店铺id"`
@@ -54,7 +53,7 @@ type PrePick struct {
 
 // 预拣货商品明细
 type PrePickGoods struct {
-	model.Base
+	Base
 	WarehouseId      int    `gorm:"type:int(11);comment:仓库"`
 	BatchId          int    `gorm:"type:int(11) unsigned;comment:批次表id"`
 	OrderGoodsId     int    `gorm:"type:int(11) unsigned;comment:订单商品表ID"`
@@ -78,7 +77,7 @@ type PrePickGoods struct {
 
 // 预拣货备注明细
 type PrePickRemark struct {
-	model.Base
+	Base
 	WarehouseId  int    `gorm:"type:int(11);comment:仓库"`
 	BatchId      int    `gorm:"type:int(11) unsigned;comment:批次表id"`
 	OrderGoodsId int    `gorm:"type:int(11) unsigned;comment:订单商品表ID"`
@@ -94,7 +93,7 @@ type PrePickRemark struct {
 
 // 拣货列表
 type Pick struct {
-	model.Base
+	Base
 	DeliveryOrderNo string     `gorm:"type:varchar(16);index:delivery_order_no_idx;comment:出库单号"`
 	WarehouseId     int        `gorm:"type:int(11);comment:仓库"`
 	BatchId         int        `gorm:"type:int(11) unsigned;comment:批次表id"`
@@ -120,7 +119,7 @@ type Pick struct {
 
 // 拣货商品明细
 type PickGoods struct {
-	model.Base
+	Base
 	WarehouseId      int    `gorm:"type:int(11);comment:仓库"`
 	PickId           int    `gorm:"type:int(11) unsigned;index:pick_and_batch_idx;comment:拣货表id"`
 	BatchId          int    `gorm:"type:int(11) unsigned;index:pick_and_batch_idx;comment:批次表id"`
@@ -143,7 +142,7 @@ type PickGoods struct {
 
 // 拣货备注明细
 type PickRemark struct {
-	model.Base
+	Base
 	WarehouseId     int    `gorm:"type:int(11);comment:仓库"`
 	BatchId         int    `gorm:"type:int(11) unsigned;comment:批次表id"`
 	PickId          int    `gorm:"type:int(11) unsigned;comment:拣货表id"`

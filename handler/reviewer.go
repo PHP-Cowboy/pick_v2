@@ -9,8 +9,7 @@ import (
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
 	"pick_v2/middlewares"
-	"pick_v2/model/batch"
-	"pick_v2/model/order"
+	"pick_v2/model"
 	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
@@ -23,8 +22,8 @@ func ReviewList(c *gin.Context) {
 	var (
 		form       req.ReviewListReq
 		res        rsp.ReviewListRsp
-		pick       []batch.Pick
-		pickRemark []batch.PickRemark
+		pick       []model.Pick
+		pickRemark []model.PickRemark
 		//pickListModel []rsp.PickListModel
 	)
 
@@ -37,7 +36,7 @@ func ReviewList(c *gin.Context) {
 
 	//result := db.Model(&batch.Pick{}).Where("status = ?", form.Status).Where(batch.Pick{PickUser: form.Name}).Find(&pick)
 
-	localDb := db.Model(&batch.Pick{}).Where("status = ?", form.Status)
+	localDb := db.Model(&model.Pick{}).Where("status = ?", form.Status)
 
 	claims, ok := c.Get("claims")
 
@@ -55,7 +54,7 @@ func ReviewList(c *gin.Context) {
 		localDb.Where("review_user = ? ", userInfo.Name)
 	}
 
-	result := localDb.Where(batch.Pick{PickUser: form.Name}).Find(&pick)
+	result := localDb.Where(model.Pick{PickUser: form.Name}).Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -129,7 +128,7 @@ func ReviewDetail(c *gin.Context) {
 	var (
 		form req.ReviewDetailReq
 		res  rsp.ReviewDetailRsp
-		pick batch.Pick
+		pick model.Pick
 	)
 
 	if err := c.ShouldBind(&form); err != nil {
@@ -157,7 +156,7 @@ func ReviewDetail(c *gin.Context) {
 
 		userInfo := claims.(*middlewares.CustomClaims)
 
-		result = db.Model(&batch.Pick{}).
+		result = db.Model(&model.Pick{}).
 			Where("id = ? and version = ?", pick.Id, pick.Version).
 			Updates(map[string]interface{}{"review_user": userInfo.Name, "version": pick.Version + 1})
 
@@ -168,7 +167,7 @@ func ReviewDetail(c *gin.Context) {
 		}
 
 		//更新复核单数量
-		result = db.Model(batch.Batch{}).Where("id = ?", pick.BatchId).Update("recheck_sheet_num", gorm.Expr("recheck_sheet_num + ?", 1))
+		result = db.Model(model.Batch{}).Where("id = ?", pick.BatchId).Update("recheck_sheet_num", gorm.Expr("recheck_sheet_num + ?", 1))
 
 		if result.Error != nil {
 			xsq_net.ErrorJSON(c, ecode.DataSaveError)
@@ -177,8 +176,8 @@ func ReviewDetail(c *gin.Context) {
 	}
 
 	var (
-		pickGoods  []batch.PickGoods
-		pickRemark []batch.PickRemark
+		pickGoods  []model.PickGoods
+		pickRemark []model.PickRemark
 	)
 
 	res.TaskName = pick.TaskName
@@ -299,9 +298,9 @@ func ConfirmDelivery(c *gin.Context) {
 	}
 
 	var (
-		pick          batch.Pick
-		pickGoods     []batch.PickGoods
-		batches       batch.Batch
+		pick          model.Pick
+		pickGoods     []model.PickGoods
+		batches       model.Batch
 		orderAndGoods []rsp.OrderAndGoods
 	)
 
@@ -381,7 +380,7 @@ func ConfirmDelivery(c *gin.Context) {
 
 	var (
 		pickGoodsIds []int
-		orderGoods   = make([]order.OrderGoods, 0, len(orderAndGoods))
+		orderGoods   = make([]model.OrderGoods, 0, len(orderAndGoods))
 	)
 
 	//step: 构造 拣货商品表 id, 完成数量 并扣减 sku 完成数量
@@ -414,9 +413,10 @@ func ConfirmDelivery(c *gin.Context) {
 
 		deliveryOrderNoArr := make([]string, 0)
 
-		deliveryOrderNoArr = append(deliveryOrderNoArr, info.DeliveryOrderNo, deliveryOrderNo)
+		deliveryOrderNoArr = append(deliveryOrderNoArr, info.DeliveryOrderNo...)
+		deliveryOrderNoArr = append(deliveryOrderNoArr, deliveryOrderNo)
 		//构造更新订单商品表数据
-		orderGoods = append(orderGoods, order.OrderGoods{
+		orderGoods = append(orderGoods, model.OrderGoods{
 			Id:              info.Id,
 			CreateTime:      info.CreateTime,
 			UpdateTime:      info.UpdateTime,
@@ -488,7 +488,7 @@ func ConfirmDelivery(c *gin.Context) {
 	now := time.Now()
 
 	//更新 order 表 最近拣货时间
-	result = tx.Model(&order.Order{}).Where("number in (?)", orderNumbers).Updates(map[string]interface{}{
+	result = tx.Model(&model.Order{}).Where("number in (?)", orderNumbers).Updates(map[string]interface{}{
 		"latest_picking_time": now.Format(timeutil.TimeFormat),
 	})
 
@@ -499,7 +499,7 @@ func ConfirmDelivery(c *gin.Context) {
 	}
 
 	//更新主表
-	result = tx.Model(&batch.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2, "review_time": &now, "num": form.Num, "review_num": totalNum, "delivery_order_no": deliveryOrderNo})
+	result = tx.Model(&model.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2, "review_time": &now, "num": form.Num, "review_num": totalNum, "delivery_order_no": deliveryOrderNo})
 
 	if result.Error != nil {
 		tx.Rollback()
@@ -532,7 +532,7 @@ func ConfirmDelivery(c *gin.Context) {
 	}
 
 	if batches.Status == 1 {
-		err = PushU8(pickGoods)
+		err = PushU8(pickGoods, orderAndGoods)
 		if err != nil {
 			tx.Commit() // u8推送失败不能影响仓库出货，只提示，业务继续
 			xsq_net.ErrorJSON(c, err)

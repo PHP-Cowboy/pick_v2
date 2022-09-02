@@ -11,8 +11,9 @@ import (
 
 func GetIncrNumberByKey(key string) (string, error) {
 
+	dateNumber := time.Now().Format(timeutil.DateNumberFormat)
 	//rds key
-	redisKey := key + time.Now().Format(timeutil.DateNumberFormat)
+	redisKey := key + dateNumber
 
 	val, err := global.Redis.Do(context.Background(), "incr", redisKey).Result()
 	if err != nil {
@@ -21,7 +22,9 @@ func GetIncrNumberByKey(key string) (string, error) {
 
 	number := strconv.Itoa(int(val.(int64)))
 
-	return str_util.StrPad(number, 3, "0", 0), nil
+	No := dateNumber + str_util.StrPad(number, 3, "0", 0)
+
+	return No, nil
 }
 
 func GetIncrByKey(key string) (interface{}, error) {

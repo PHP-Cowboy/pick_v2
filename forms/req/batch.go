@@ -20,12 +20,6 @@ type CreateByOrderReq struct {
 	Number string `json:"number" form:"number" binding:"required"`
 }
 
-type BatchParams struct {
-	DeliveryEndTime string `json:"delivery_endTime"`
-	PayEndTime      string `json:"pay_end_time"`
-	DeliveryMethod  int    `json:"delivery_method"`
-}
-
 type EndBatchForm struct {
 	Id int `json:"id" form:"id" binding:"required"`
 }
@@ -33,28 +27,6 @@ type EndBatchForm struct {
 type EditBatchForm struct {
 	Id        int    `json:"id" form:"id" binding:"required"`
 	BatchName string `json:"batch_name"`
-}
-
-type OutGoods struct {
-	BatchNumber string         `json:"batch_number"`
-	List        []OutGoodsList `json:"list"`
-}
-
-type OutGoodsList struct {
-	GoodsLogId   int    `json:"goods_log_id"`
-	Number       string `json:"number"`
-	OutNumber    string `json:"out_number"`
-	CkNumber     string `json:"ck_number"`
-	Sku          string `json:"sku"`
-	Name         string `json:"name"`
-	OutCount     int    `json:"out_count"`
-	Price        int    `json:"price"`
-	SumPrice     int    `json:"sum_price"`
-	OutAt        string `json:"out_at"`
-	PayAt        string `json:"pay_at"`
-	GoodsSpe     string `json:"goods_spe"`
-	GoodsUnit    string `json:"goods_unit"`
-	DeliveryType int    `json:"delivery_type"`
 }
 
 type GetBatchListForm struct {

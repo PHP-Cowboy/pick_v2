@@ -18,6 +18,8 @@ func main() {
 
 	initialize.InitMysql()
 
+	initialize.InitSqlServer()
+
 	initialize.InitRedis()
 
 	g := initialize.InitRouter()

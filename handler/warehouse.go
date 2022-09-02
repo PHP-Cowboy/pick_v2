@@ -5,16 +5,16 @@ import (
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
-	"pick_v2/model/other"
+	"pick_v2/model"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/xsq_net"
 )
 
-//获取仓库列表
+// 获取仓库列表
 func GetWarehouseList(c *gin.Context) {
 
 	var (
-		warehouses []other.Warehouse
+		warehouses []model.Warehouse
 		res        []*rsp.WarehouseList
 	)
 
@@ -38,7 +38,7 @@ func GetWarehouseList(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-//新增仓库
+// 新增仓库
 func CreateWarehouse(c *gin.Context) {
 	var form req.CreateWarehouseForm
 
@@ -48,7 +48,7 @@ func CreateWarehouse(c *gin.Context) {
 	}
 
 	var (
-		warehouse other.Warehouse
+		warehouse model.Warehouse
 	)
 
 	warehouse.WarehouseName = form.WarehouseName
@@ -71,7 +71,7 @@ func CreateWarehouse(c *gin.Context) {
 	xsq_net.SucJson(c, warehouseRsp)
 }
 
-//修改仓库
+// 修改仓库
 func ChangeWarehouse(c *gin.Context) {
 	xsq_net.Success(c)
 }

@@ -3,7 +3,7 @@ package cache
 import (
 	"github.com/patrickmn/go-cache"
 	"pick_v2/global"
-	"pick_v2/model/other"
+	"pick_v2/model"
 	"time"
 )
 
@@ -23,7 +23,7 @@ func GetClassification() (map[string]string, error) {
 	mp := make(map[string]string, 0)
 
 	if !ok {
-		var class []other.Classification
+		var class []model.Classification
 
 		result := global.DB.Find(&class)
 
@@ -47,7 +47,7 @@ func GetClassification() (map[string]string, error) {
 // 更新分类缓存
 func SetClassification() error {
 
-	var class []other.Classification
+	var class []model.Classification
 
 	result := global.DB.Find(&class)
 
@@ -73,7 +73,7 @@ func GetShopLine() (map[int]string, error) {
 	mp := make(map[int]string, 0)
 
 	if !ok {
-		var shops []other.Shop
+		var shops []model.Shop
 
 		result := global.DB.Find(&shops)
 
@@ -96,7 +96,7 @@ func GetShopLine() (map[int]string, error) {
 
 // 更新店铺线路缓存
 func SetShopLine() error {
-	var shops []other.Shop
+	var shops []model.Shop
 
 	result := global.DB.Find(&shops)
 

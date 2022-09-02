@@ -14,6 +14,7 @@ type PrintCh struct {
 
 var (
 	DB           *gorm.DB
+	SqlServer    *gorm.DB
 	Redis        *redis.Client
 	ServerConfig = &config.ServerConfig{}
 	SugarLogger  *zap.SugaredLogger

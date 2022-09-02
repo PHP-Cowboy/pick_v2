@@ -7,8 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"pick_v2/global"
 	"pick_v2/model"
-	"pick_v2/model/batch"
-	"pick_v2/model/order"
 	"pick_v2/utils/cache"
 	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
@@ -31,8 +29,8 @@ func GetGoodsList(c *gin.Context) {
 	}
 
 	var (
-		orders     []order.Order
-		orderGoods []order.OrderGoods
+		orders     []model.Order
+		orderGoods []model.OrderGoods
 		numbers    []string
 	)
 
@@ -51,13 +49,13 @@ func GetGoodsList(c *gin.Context) {
 		}
 	}
 
-	localDb := db.Model(&order.Order{})
+	localDb := db.Model(&model.Order{})
 
 	if len(numbers) > 0 {
 		localDb = localDb.Where("number in (?)", numbers)
 	}
 
-	localDb.Where(&order.Order{
+	localDb.Where(&model.Order{
 		OrderType:        form.OrderType,
 		ShopId:           form.ShopId,
 		Number:           form.Number,
@@ -135,20 +133,20 @@ func GetOrderDetail(c *gin.Context) {
 	}
 
 	var (
-		orders     order.Order
-		orderGoods []order.OrderGoods
+		orders     model.Order
+		orderGoods []model.OrderGoods
 	)
 
 	db := global.DB
 
-	result := db.Model(&order.Order{}).Where("number = ?", form.Number).First(&orders)
+	result := db.Model(&model.Order{}).Where("number = ?", form.Number).First(&orders)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	result = db.Model(&order.OrderGoods{}).Where("number = ?", form.Number).Find(&orderGoods)
+	result = db.Model(&model.OrderGoods{}).Where("number = ?", form.Number).Find(&orderGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -166,7 +164,12 @@ func GetOrderDetail(c *gin.Context) {
 
 	detailMap := make(map[string]*rsp.Detail, 0)
 
+	deliveryOrderNoArr := make([]string, 0)
+
 	for _, og := range orderGoods {
+
+		deliveryOrderNoArr = append(deliveryOrderNoArr, og.DeliveryOrderNo...)
+
 		goodsType, ok := mp[og.GoodsType]
 
 		if !ok {
@@ -205,54 +208,9 @@ func GetOrderDetail(c *gin.Context) {
 
 	res.Detail = detailMap
 
-	//欠货单 需要查询 历史出库单号
-	if orders.OrderType == 3 { //订单类型:1:新订单,2:拣货中,3:欠货单
-		var (
-			pickGoods          []batch.PickGoods
-			pick               []batch.Pick
-			pickIds            []int
-			deliveryOrderNoArr []string
-		)
-
-		dbRes := db.Where("number = ?", form.Number).Find(&pickGoods)
-
-		if dbRes.Error != nil {
-			xsq_net.ErrorJSON(c, dbRes.Error)
-			return
-		}
-
-		//拣货id map 去重
-		pickIdsMp := make(map[int]struct{}, len(pickGoods))
-
-		for _, pg := range pickGoods {
-
-			_, ok := pickIdsMp[pg.PickId]
-
-			if ok {
-				continue
-			}
-
-			//获取复核数量和需拣货数量不一致的
-			if pg.NeedNum != pg.ReviewNum {
-				pickIds = append(pickIds, pg.PickId)
-				pickIdsMp[pg.PickId] = struct{}{}
-			}
-		}
-
-		if len(pickIds) > 0 {
-			dbRes = db.Where("id in (?)", pickIds).Find(&pick)
-			if dbRes.Error != nil {
-				xsq_net.ErrorJSON(c, dbRes.Error)
-				return
-			}
-
-			for _, p := range pick {
-				deliveryOrderNoArr = append(deliveryOrderNoArr, p.DeliveryOrderNo)
-			}
-		}
-
-		res.DeliveryOrderNo = deliveryOrderNoArr
-	}
+	deliveryOrderNoArr = slice.UniqueStringSlice(deliveryOrderNoArr)
+	//历史出库单号
+	res.DeliveryOrderNo = deliveryOrderNoArr
 
 	xsq_net.SucJson(c, res)
 }
@@ -317,7 +275,7 @@ func OrderShippingRecord(c *gin.Context) {
 		return
 	}
 
-	var pick []batch.Pick
+	var pick []model.Pick
 
 	result := global.DB.Where("delivery_order_no in (?)", form.DeliveryOrderNo).Find(&pick)
 
@@ -357,7 +315,7 @@ func ShippingRecordDetail(c *gin.Context) {
 		return
 	}
 
-	var pickGoods []batch.PickGoods
+	var pickGoods []model.PickGoods
 
 	result := global.DB.Where("pick_id in (?)", form.Id).Find(&pickGoods)
 
@@ -398,15 +356,15 @@ func CompleteOrder(c *gin.Context) {
 		return
 	}
 
-	var completeOrder []order.CompleteOrder
+	var completeOrder []model.CompleteOrder
 
 	db := global.DB
 
 	numbers := []string{}
 
 	if form.Sku != "" {
-		var completeOrderDetail []order.CompleteOrderDetail
-		result := db.Model(&order.CompleteOrderDetail{}).Where("sku = ?", form.Sku).Find(&completeOrderDetail)
+		var completeOrderDetail []model.CompleteOrderDetail
+		result := db.Model(&model.CompleteOrderDetail{}).Where("sku = ?", form.Sku).Find(&completeOrderDetail)
 		if result.Error != nil {
 			xsq_net.ErrorJSON(c, result.Error)
 			return
@@ -421,8 +379,8 @@ func CompleteOrder(c *gin.Context) {
 
 	//商品
 	local := db.
-		Model(&order.CompleteOrder{}).
-		Where(&order.CompleteOrder{
+		Model(&model.CompleteOrder{}).
+		Where(&model.CompleteOrder{
 			ShopId:         form.ShopId,
 			Number:         form.Number,
 			Line:           form.Line,
@@ -507,13 +465,13 @@ func CompleteOrderDetail(c *gin.Context) {
 	}
 
 	var (
-		completeOrder       order.CompleteOrder
-		completeOrderDetail []order.CompleteOrderDetail
+		completeOrder       model.CompleteOrder
+		completeOrderDetail []model.CompleteOrderDetail
 	)
 
 	db := global.DB
 
-	result := db.Model(&order.CompleteOrder{}).Where("number = ?", form.Number).First(&completeOrder)
+	result := db.Model(&model.CompleteOrder{}).Where("number = ?", form.Number).First(&completeOrder)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -567,7 +525,7 @@ func Count(c *gin.Context) {
 		res   rsp.CountRes
 	)
 
-	result := global.DB.Model(&order.Order{}).Select("count(id) as count, order_type").Group("order_type").Find(&dbRes)
+	result := global.DB.Model(&model.Order{}).Select("count(id) as count, order_type").Group("order_type").Find(&dbRes)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

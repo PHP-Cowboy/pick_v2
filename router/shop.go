@@ -14,6 +14,8 @@ func ShopRoute(g *gin.RouterGroup) {
 		group.GET("line_list", handler.LineList)
 		//门店列表
 		group.GET("/list", handler.ShopList)
+
+		group.GET("/syncU8Shop", handler.SyncU8Shop)
 	}
 
 	shopGroup := g.Group("/shop", middlewares.JWTAuth(), middlewares.IsSuperAdminAuth())

@@ -8,9 +8,6 @@ import (
 	"log"
 	"os"
 	"pick_v2/model"
-	"pick_v2/model/batch"
-	"pick_v2/model/order"
-	"pick_v2/model/other"
 	"time"
 )
 
@@ -40,37 +37,37 @@ func main() {
 		panic(err)
 	}
 
-	_ = db.Set(model.TableOptions, model.GetOptions("拣货订单数据表")).AutoMigrate(&order.OrderInfo{})
+	_ = db.Set(model.TableOptions, model.GetOptions("拣货订单数据表")).AutoMigrate(&model.OrderInfo{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("订单表")).AutoMigrate(&order.Order{})
+	_ = db.Set(model.TableOptions, model.GetOptions("订单表")).AutoMigrate(&model.Order{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("订单商品表")).AutoMigrate(&order.OrderGoods{})
+	_ = db.Set(model.TableOptions, model.GetOptions("订单商品表")).AutoMigrate(&model.OrderGoods{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("批次生成条件表")).AutoMigrate(&batch.BatchCondition{})
+	_ = db.Set(model.TableOptions, model.GetOptions("批次生成条件表")).AutoMigrate(&model.BatchCondition{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("批次表")).AutoMigrate(&batch.Batch{})
+	_ = db.Set(model.TableOptions, model.GetOptions("批次表")).AutoMigrate(&model.Batch{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("预拣货列表")).AutoMigrate(&batch.PrePick{})
+	_ = db.Set(model.TableOptions, model.GetOptions("预拣货列表")).AutoMigrate(&model.PrePick{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("预拣货商品明细表")).AutoMigrate(&batch.PrePickGoods{})
+	_ = db.Set(model.TableOptions, model.GetOptions("预拣货商品明细表")).AutoMigrate(&model.PrePickGoods{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("预拣货备注明细表")).AutoMigrate(&batch.PrePickRemark{})
+	_ = db.Set(model.TableOptions, model.GetOptions("预拣货备注明细表")).AutoMigrate(&model.PrePickRemark{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("拣货列表")).AutoMigrate(&batch.Pick{})
+	_ = db.Set(model.TableOptions, model.GetOptions("拣货列表")).AutoMigrate(&model.Pick{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("拣货商品明细表")).AutoMigrate(&batch.PickGoods{})
+	_ = db.Set(model.TableOptions, model.GetOptions("拣货商品明细表")).AutoMigrate(&model.PickGoods{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("拣货备注明细表")).AutoMigrate(&batch.PickRemark{})
+	_ = db.Set(model.TableOptions, model.GetOptions("拣货备注明细表")).AutoMigrate(&model.PickRemark{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("店铺表")).AutoMigrate(&other.Shop{})
+	_ = db.Set(model.TableOptions, model.GetOptions("店铺表")).AutoMigrate(&model.Shop{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("分类表")).AutoMigrate(&other.Classification{})
+	_ = db.Set(model.TableOptions, model.GetOptions("分类表")).AutoMigrate(&model.Classification{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("仓库表")).AutoMigrate(&other.Warehouse{})
+	_ = db.Set(model.TableOptions, model.GetOptions("仓库表")).AutoMigrate(&model.Warehouse{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("字典类型表")).AutoMigrate(&other.DictType{})
+	_ = db.Set(model.TableOptions, model.GetOptions("字典类型表")).AutoMigrate(&model.DictType{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("字典表")).AutoMigrate(&other.Dict{})
+	_ = db.Set(model.TableOptions, model.GetOptions("字典表")).AutoMigrate(&model.Dict{})
 
 	_ = db.Set(model.TableOptions, model.GetOptions("用户表")).AutoMigrate(&model.User{})
 
@@ -80,8 +77,10 @@ func main() {
 
 	_ = db.Set(model.TableOptions, model.GetOptions("角色菜单权限表")).AutoMigrate(&model.RoleMenu{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("完成订单表")).AutoMigrate(&order.CompleteOrder{})
+	_ = db.Set(model.TableOptions, model.GetOptions("完成订单表")).AutoMigrate(&model.CompleteOrder{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("完成订单明细表")).AutoMigrate(&order.CompleteOrderDetail{})
+	_ = db.Set(model.TableOptions, model.GetOptions("完成订单明细表")).AutoMigrate(&model.CompleteOrderDetail{})
+
+	_ = db.Set(model.TableOptions, model.GetOptions("推送日志")).AutoMigrate(&model.StockLog{})
 
 }

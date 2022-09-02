@@ -8,7 +8,7 @@ import (
 	"io"
 	"pick_v2/forms/req"
 	"pick_v2/global"
-	"pick_v2/model/batch"
+	"pick_v2/model"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/slice"
 	"pick_v2/utils/xsq_net"
@@ -25,8 +25,8 @@ func FirstMaterial(c *gin.Context) {
 		form req.FirstMaterialExportReq
 		orderNumber,
 		shopName string
-		pick      batch.Pick
-		pickGoods []batch.PickGoods
+		pick      model.Pick
+		pickGoods []model.PickGoods
 	)
 
 	if err := c.ShouldBind(&form); err != nil {
@@ -36,7 +36,7 @@ func FirstMaterial(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Model(&batch.PickGoods{}).Where("pick_id = ?", form.Id).Find(&pickGoods)
+	result := db.Model(&model.PickGoods{}).Where("pick_id = ?", form.Id).Find(&pickGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -123,7 +123,7 @@ func OutboundBatch(c *gin.Context) {
 	var (
 		form      req.OutboundBatchFormReq
 		shopCodes []string
-		batches   batch.Batch
+		batches   model.Batch
 	)
 
 	if err := c.ShouldBind(&form); err != nil {

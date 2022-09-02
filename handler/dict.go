@@ -6,14 +6,13 @@ import (
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
 	"pick_v2/model"
-	"pick_v2/model/other"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"strings"
 )
 
-//字典类型列表
+// 字典类型列表
 func DictTypeList(c *gin.Context) {
 	var form req.DictTypeListForm
 
@@ -24,13 +23,13 @@ func DictTypeList(c *gin.Context) {
 	}
 
 	var (
-		types []other.DictType
+		types []model.DictType
 		res   rsp.DictTypeListRsp
 	)
 
 	db := global.DB
 
-	result := db.Where(other.DictType{Code: form.Code, Name: form.Name}).Find(&types)
+	result := db.Where(model.DictType{Code: form.Code, Name: form.Name}).Find(&types)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -39,7 +38,7 @@ func DictTypeList(c *gin.Context) {
 
 	res.Total = result.RowsAffected
 
-	db.Where(other.DictType{Code: form.Code, Name: form.Name}).Scopes(model.Paginate(form.Page, form.Size)).Find(&types)
+	db.Where(model.DictType{Code: form.Code, Name: form.Name}).Scopes(model.Paginate(form.Page, form.Size)).Find(&types)
 
 	list := make([]*rsp.DictType, 0)
 	for _, t := range types {
@@ -55,7 +54,7 @@ func DictTypeList(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-//新增字典类型
+// 新增字典类型
 func CreateDictType(c *gin.Context) {
 	var form req.CreateDictTypeForm
 
@@ -66,7 +65,7 @@ func CreateDictType(c *gin.Context) {
 
 	db := global.DB
 
-	dict := other.DictType{
+	dict := model.DictType{
 		Code: strings.ToLower(form.Code),
 		Name: form.Name,
 	}
@@ -81,7 +80,7 @@ func CreateDictType(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-//修改字典类型
+// 修改字典类型
 func ChangeDictType(c *gin.Context) {
 	var form req.ChangeDictTypeForm
 
@@ -91,12 +90,12 @@ func ChangeDictType(c *gin.Context) {
 	}
 
 	var (
-		dictType other.DictType
+		dictType model.DictType
 	)
 
 	db := global.DB
 
-	result := db.Where(other.DictType{Code: form.Code}).First(&dictType)
+	result := db.Where(model.DictType{Code: form.Code}).First(&dictType)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -119,7 +118,7 @@ func ChangeDictType(c *gin.Context) {
 
 }
 
-//字典数据列表
+// 字典数据列表
 func DictList(c *gin.Context) {
 	var form req.DictListForm
 
@@ -130,12 +129,12 @@ func DictList(c *gin.Context) {
 	}
 
 	var (
-		dict []other.Dict
+		dict []model.Dict
 	)
 
 	db := global.DB
 
-	result := db.Where(other.Dict{TypeCode: form.Code}).Find(&dict)
+	result := db.Where(model.Dict{TypeCode: form.Code}).Find(&dict)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -157,7 +156,7 @@ func DictList(c *gin.Context) {
 	xsq_net.SucJson(c, list)
 }
 
-//新增字典数据
+// 新增字典数据
 func CreateDict(c *gin.Context) {
 	var form req.CreateDictForm
 
@@ -169,10 +168,10 @@ func CreateDict(c *gin.Context) {
 	db := global.DB
 
 	var (
-		dictType other.DictType
+		dictType model.DictType
 	)
 
-	result := db.Where(&other.DictType{Code: form.TypeCode}).First(&dictType)
+	result := db.Where(&model.DictType{Code: form.TypeCode}).First(&dictType)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -184,7 +183,7 @@ func CreateDict(c *gin.Context) {
 		return
 	}
 
-	dict := other.Dict{
+	dict := model.Dict{
 		Code:     strings.ToLower(form.Code),
 		TypeCode: strings.ToLower(form.TypeCode),
 		Name:     form.Name,
@@ -201,7 +200,7 @@ func CreateDict(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-//修改字典数据
+// 修改字典数据
 func ChangeDict(c *gin.Context) {
 	var form req.ChangeDictForm
 
@@ -211,12 +210,12 @@ func ChangeDict(c *gin.Context) {
 	}
 
 	var (
-		dict other.Dict
+		dict model.Dict
 	)
 
 	db := global.DB
 
-	result := db.Where(other.Dict{TypeCode: form.TypeCode, Code: form.Code}).First(&dict)
+	result := db.Where(model.Dict{TypeCode: form.TypeCode, Code: form.Code}).First(&dict)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
