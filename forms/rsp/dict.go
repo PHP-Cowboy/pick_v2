@@ -16,6 +16,6 @@ type DictListRsp struct {
 	TypeCode   string `json:"type_code"`
 	Name       string `json:"name"`
 	Value      string `json:"value"`
-	IsEdit     bool   `json:"is_edit"`
+	IsEdit     int    `json:"is_edit"`
 	CreateTime string `json:"create_time"`
 }

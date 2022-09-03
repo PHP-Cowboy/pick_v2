@@ -19,6 +19,8 @@ func InitRouter() *gin.Engine {
 	router.RoleRoute(group)
 	//订单商品
 	router.GoodsRoute(group)
+	//拣货单
+	router.OrderRoute(group)
 	//批次
 	router.BatchRoute(group)
 	//任务

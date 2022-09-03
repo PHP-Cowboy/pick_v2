@@ -46,3 +46,7 @@ type CompleteOrderReq struct {
 type CompleteOrderDetailReq struct {
 	Number string `json:"number" form:"number" binding:"required"` //订单号
 }
+
+type CreatePickOrderForm struct {
+	Numbers []string `json:"numbers" form:"numbers" binding:"required"`
+}

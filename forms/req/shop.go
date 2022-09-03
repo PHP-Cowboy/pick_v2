@@ -12,3 +12,8 @@ type BatchSetLineForm struct {
 	Ids  []int  `json:"ids"`
 	Line string `json:"line" binding:"required"`
 }
+
+type BatchSetDistributionTypeForm struct {
+	Ids              []int `json:"ids"`
+	DistributionType int   `json:"distribution_type" binding:"required"`
+}

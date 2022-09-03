@@ -25,5 +25,7 @@ func GoodsRoute(g *gin.RouterGroup) {
 		goodsGroup.GET("/complete_order_detail", handler.CompleteOrderDetail)
 		//订单数
 		goodsGroup.GET("/count", handler.Count)
+		//创建拣货单
+		goodsGroup.POST("/createPickOrder", handler.CreatePickOrder)
 	}
 }

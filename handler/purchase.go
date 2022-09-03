@@ -104,6 +104,7 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 			OrderRemark:      info.OrderRemark,
 			PayAt:            info.PayAt,
 			PayTotal:         payTotal,
+			UnPicked:         payTotal,
 			DeliveryAt:       info.DeliveryAt,
 			Province:         info.Province,
 			City:             info.City,

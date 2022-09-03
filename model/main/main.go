@@ -37,11 +37,13 @@ func main() {
 		panic(err)
 	}
 
-	_ = db.Set(model.TableOptions, model.GetOptions("拣货订单数据表")).AutoMigrate(&model.OrderInfo{})
-
 	_ = db.Set(model.TableOptions, model.GetOptions("订单表")).AutoMigrate(&model.Order{})
 
 	_ = db.Set(model.TableOptions, model.GetOptions("订单商品表")).AutoMigrate(&model.OrderGoods{})
+
+	_ = db.Set(model.TableOptions, model.GetOptions("拣货单")).AutoMigrate(&model.PickOrder{})
+
+	_ = db.Set(model.TableOptions, model.GetOptions("拣货单商品")).AutoMigrate(&model.PickOrderGoods{})
 
 	_ = db.Set(model.TableOptions, model.GetOptions("批次生成条件表")).AutoMigrate(&model.BatchCondition{})
 

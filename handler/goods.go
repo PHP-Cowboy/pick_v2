@@ -215,28 +215,6 @@ func GetOrderDetail(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-func RequestGoodsList(responseData interface{}) (rsp.ApiGoodsListRsp, error) {
-
-	var result rsp.ApiGoodsListRsp
-
-	body, err := request.Post("api/v1/remote/lack/list", responseData)
-
-	if err != nil {
-		return result, err
-	}
-
-	err = json.Unmarshal(body, &result)
-
-	if err != nil {
-		return result, err
-	}
-	if result.Code != 200 {
-		return result, errors.New(result.Msg)
-	}
-
-	return result, nil
-}
-
 // 商品列表
 func CommodityList(c *gin.Context) {
 	var result rsp.CommodityListRsp
@@ -548,4 +526,136 @@ func Count(c *gin.Context) {
 	}
 
 	xsq_net.SucJson(c, res)
+}
+
+// 创建拣货单
+func CreatePickOrder(c *gin.Context) {
+	var form req.CreatePickOrderForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var (
+		order      []model.Order
+		orderGoods []model.OrderGoods
+	)
+
+	db := global.DB
+
+	result := db.Model(&model.Order{}).Where("number in (?)", form.Numbers).Find(&order)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = db.Model(&model.OrderGoods{}).Where("number in (?)", form.Numbers).Find(&orderGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	var (
+		pickOrder      = make([]model.PickOrder, 0)
+		pickOrderGoods = make([]model.PickOrderGoods, 0)
+	)
+
+	for _, o := range order {
+		payAt, err := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
+
+		if err != nil {
+			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+			return
+		}
+
+		deliveryAt, err := time.ParseInLocation(timeutil.TimeZoneFormat, o.DeliveryAt, time.Local)
+
+		if err != nil {
+			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+			return
+		}
+
+		pickOrder = append(pickOrder, model.PickOrder{
+			OrderId:           o.Id,
+			ShopId:            o.ShopId,
+			ShopName:          o.ShopName,
+			ShopType:          o.ShopType,
+			ShopCode:          o.ShopCode,
+			Number:            o.Number,
+			HouseCode:         o.HouseCode,
+			Line:              o.Line,
+			DistributionType:  o.DistributionType,
+			OrderRemark:       o.OrderRemark,
+			PayAt:             payAt.Format(timeutil.TimeFormat),
+			PayTotal:          o.PayTotal,
+			LimitNum:          o.PayTotal, //限发总数 默认等于应发总数
+			DeliveryAt:        deliveryAt.Format(timeutil.TimeFormat),
+			Province:          o.Province,
+			City:              o.City,
+			District:          o.District,
+			Address:           o.Address,
+			ConsigneeName:     o.ConsigneeName,
+			ConsigneeTel:      o.ConsigneeTel,
+			OrderType:         o.OrderType,
+			HasRemark:         o.HasRemark,
+			LatestPickingTime: o.LatestPickingTime,
+		})
+	}
+
+	for _, og := range orderGoods {
+		pickOrderGoods = append(pickOrderGoods, model.PickOrderGoods{
+			OrderGoodsId:    og.Id,
+			Number:          og.Number,
+			GoodsName:       og.GoodsName,
+			Sku:             og.Sku,
+			GoodsType:       og.GoodsType,
+			GoodsSpe:        og.GoodsSpe,
+			Shelves:         og.Shelves,
+			DiscountPrice:   og.DiscountPrice,
+			GoodsUnit:       og.GoodsUnit,
+			SaleUnit:        og.SaleUnit,
+			SaleCode:        og.SaleCode,
+			PayCount:        og.PayCount,
+			CloseCount:      og.CloseCount,
+			LackCount:       og.LackCount,
+			OutCount:        og.OutCount,
+			LimitNum:        og.LackCount,
+			GoodsRemark:     og.GoodsRemark,
+			BatchId:         0,
+			DeliveryOrderNo: og.DeliveryOrderNo,
+		})
+	}
+
+	tx := db.Begin()
+
+	result = tx.Save(&pickOrder)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = tx.Save(&pickOrderGoods)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = tx.Model(&model.Order{}).Where("number in (?)", form.Numbers).Updates(map[string]interface{}{"status": 2})
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	tx.Commit()
+
+	xsq_net.Success(c)
 }

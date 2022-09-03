@@ -11,7 +11,9 @@ var (
 	DataSaveError           = New(503, "数据保存失败")
 	DataQueryError          = New(504, "数据查询失败")
 	DataNotExist            = New(505, "数据不存在")
-	DataQueryTimeOutOfRange = New(506, "超出查询时间范围")
+	DataAlreadyExist        = New(506, "数据已存在")
+	DataCannotBeModified    = New(507, "数据不允许修改")
+	DataQueryTimeOutOfRange = New(599, "超出查询时间范围")
 
 	CommunalSignInvalid    = New(10, "sign参数异常")
 	ParamInvalid           = New(11, "参数不合法")

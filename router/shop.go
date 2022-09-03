@@ -14,8 +14,6 @@ func ShopRoute(g *gin.RouterGroup) {
 		group.GET("line_list", handler.LineList)
 		//门店列表
 		group.GET("/list", handler.ShopList)
-
-		group.GET("/syncU8Shop", handler.SyncU8Shop)
 	}
 
 	shopGroup := g.Group("/shop", middlewares.JWTAuth(), middlewares.IsSuperAdminAuth())
@@ -24,6 +22,7 @@ func ShopRoute(g *gin.RouterGroup) {
 		shopGroup.GET("/sync", handler.SyncShop)
 		//批量设置线路
 		shopGroup.POST("batch_set", handler.BatchSetLine)
-
+		//批量设置配送方式
+		shopGroup.POST("batch_set_distribution_type", handler.BatchSetDistributionType)
 	}
 }

@@ -118,6 +118,39 @@ func ChangeDictType(c *gin.Context) {
 
 }
 
+// 删除字典类型
+func DeleteDictType(c *gin.Context) {
+
+	var form req.DeleteDictTypeForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	tx := global.DB.Begin()
+
+	result := tx.Delete(&model.DictType{}, "code = ?", form.Code)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = tx.Delete(&model.Dict{}, "type_code = ?", form.Code)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	tx.Commit()
+
+	xsq_net.Success(c)
+}
+
 // 字典数据列表
 func DictList(c *gin.Context) {
 	var form req.DictListForm
@@ -178,8 +211,17 @@ func CreateDict(c *gin.Context) {
 		return
 	}
 
-	if result.RowsAffected != 1 {
-		xsq_net.ErrorJSON(c, ecode.DataNotExist)
+	var count int64
+
+	result = db.Model(&model.Dict{}).Where("type_code = ? and code = ?", form.TypeCode, form.Code).Count(&count)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	if count > 0 {
+		xsq_net.ErrorJSON(c, ecode.DataAlreadyExist)
 		return
 	}
 
@@ -191,7 +233,7 @@ func CreateDict(c *gin.Context) {
 		IsEdit:   form.IsEdit,
 	}
 
-	result = db.Save(&dict)
+	result = db.Create(&dict)
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
@@ -222,8 +264,8 @@ func ChangeDict(c *gin.Context) {
 		return
 	}
 
-	if result.RowsAffected == 0 {
-		xsq_net.ErrorJSON(c, ecode.DataNotExist)
+	if dict.IsEdit == 0 {
+		xsq_net.ErrorJSON(c, ecode.DataCannotBeModified)
 		return
 	}
 
@@ -236,4 +278,23 @@ func ChangeDict(c *gin.Context) {
 
 	xsq_net.Success(c)
 
+}
+
+// 删除字典数据
+func DeleteDict(c *gin.Context) {
+	var form req.DeleteDictForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	result := global.DB.Delete(&model.Dict{}, "type_code = ? and code = ?", form.TypeCode, form.Code)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	xsq_net.Success(c)
 }

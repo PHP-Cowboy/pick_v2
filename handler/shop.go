@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"pick_v2/forms/req"
@@ -22,6 +21,7 @@ type ShopResponse struct {
 	Data []model.Shop `json:"data"`
 }
 
+// 同步门店
 func SyncU8Shop(c *gin.Context) {
 
 	type Shop struct {
@@ -46,25 +46,66 @@ func SyncU8Shop(c *gin.Context) {
 		return
 	}
 
-	var shop = make([]model.Shop, 0, len(shopList))
+	var (
+		shopMp = make(map[int]model.Shop, len(shopList))
+		shop   = make([]model.Shop, 0, len(shopList))
+		dbShop []model.Shop
+	)
 
-	for _, s := range shopList {
-		shop = append(shop, model.Shop{
-			Id:        0,
-			ShopId:    s.ShopId,
-			ShopName:  s.ShopName,
-			HouseCode: s.HouseCode,
-			Warehouse: s.Warehouse,
-			Typ:       s.Typ,
-			Province:  s.Province,
-			City:      s.City,
-			District:  s.District,
-			Line:      s.Line,
-			ShopCode:  s.ShopCode,
-		})
+	db := global.DB
+
+	result = db.Find(&dbShop)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
 	}
 
-	xsq_net.SucJson(c, shop)
+	//构造 shop表 map[shop_id]shop
+	for _, s := range dbShop {
+		shopMp[s.ShopId] = s
+	}
+
+	//step1:循环用友店铺数据
+	//step2:如果map中存在用友shop_id更新，没有新增到map中
+	//step3:循环map构造shop表数据
+	for _, sl := range shopList {
+
+		v, ok := shopMp[sl.ShopId]
+
+		val := model.Shop{
+			ShopId:    sl.ShopId,
+			ShopName:  sl.ShopName,
+			HouseCode: sl.HouseCode,
+			Warehouse: sl.Warehouse,
+			Typ:       sl.Typ,
+			Province:  sl.Province,
+			City:      sl.City,
+			District:  sl.District,
+			ShopCode:  sl.ShopCode,
+		}
+		//step2:如果map中存在用友shop_id更新，没有新增到map中
+		if ok {
+			val.Id = v.Id
+			val.Line = v.Line
+		}
+
+		shop = append(shop, val)
+	}
+
+	result = db.Save(&shop)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	if err := cache.SetShopLine(); err != nil {
+		xsq_net.ErrorJSON(c, errors.New("店铺更新成功，但缓存更新失败"))
+		return
+	}
+
+	xsq_net.Success(c)
 }
 
 // 同步门店
@@ -184,8 +225,6 @@ func ShopList(c *gin.Context) {
 
 	res.Total = ret.RowsAffected
 
-	fmt.Println(form)
-
 	if form.IsPage {
 		ret = db.Scopes(model.Paginate(form.Page, form.Size)).Find(&shops)
 
@@ -254,4 +293,23 @@ func LineList(c *gin.Context) {
 	ret.Scan(&res)
 
 	xsq_net.SucJson(c, res)
+}
+
+// 批量设置配送方式
+func BatchSetDistributionType(c *gin.Context) {
+	var form req.BatchSetDistributionTypeForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	ret := global.DB.Model(model.Shop{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"distribution_type": form.DistributionType})
+
+	if ret.Error != nil {
+		xsq_net.ErrorJSON(c, ret.Error)
+		return
+	}
+
+	xsq_net.Success(c)
 }

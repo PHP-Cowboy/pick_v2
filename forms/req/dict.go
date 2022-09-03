@@ -16,12 +16,16 @@ type ChangeDictTypeForm struct {
 	Name string `json:"name"`
 }
 
+type DeleteDictTypeForm struct {
+	Code string `json:"code"`
+}
+
 type CreateDictForm struct {
 	TypeCode string `json:"type_code" binding:"required"`
 	Code     string `json:"code" binding:"required"`
 	Name     string `json:"name" binding:"required"`
 	Value    string `json:"value"`
-	IsEdit   bool   `json:"is_edit"`
+	IsEdit   int    `json:"is_edit"`
 }
 
 type DictListForm struct {
@@ -33,4 +37,9 @@ type ChangeDictForm struct {
 	Code     string `json:"code"`
 	Name     string `json:"name"`
 	Value    string `json:"value"`
+}
+
+type DeleteDictForm struct {
+	TypeCode string `json:"type_code"`
+	Code     string `json:"code"`
 }
