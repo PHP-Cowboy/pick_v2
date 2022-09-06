@@ -380,12 +380,21 @@ func ConfirmDelivery(c *gin.Context) {
 	//拣货表 id 和 拣货数量
 	mp := make(map[int]int, 0)
 
+	type OrderGoods struct {
+		OutCount           int
+		deliveryOrderNoArr []*string
+	}
+
+	orderGoodsMp := make(map[int]OrderGoods, 0)
+
 	var (
 		pickGoodsIds []int
 		//拣订单商品
 		pickOrderGoods = make([]model.PickOrderGoods, 0, len(orderAndGoods))
 		//订单商品
-		orderGoods = make([]model.OrderGoods, 0, len(orderAndGoods))
+		orderGoods []model.OrderGoods
+		//
+		orderGoodsId []int
 	)
 
 	//step: 构造 拣货商品表 id, 完成数量 并扣减 sku 完成数量
@@ -420,6 +429,11 @@ func ConfirmDelivery(c *gin.Context) {
 
 		deliveryOrderNoArr = append(deliveryOrderNoArr, info.DeliveryOrderNo...)
 		deliveryOrderNoArr = append(deliveryOrderNoArr, &deliveryOrderNo)
+
+		orderGoodsMp[info.OrderGoodsId] = OrderGoods{
+			OutCount:           reviewCompleteNum,
+			deliveryOrderNoArr: deliveryOrderNoArr,
+		}
 		//构造更新拣货单商品表数据
 		pickOrderGoods = append(pickOrderGoods, model.PickOrderGoods{
 			Base: model.Base{
@@ -428,6 +442,7 @@ func ConfirmDelivery(c *gin.Context) {
 				UpdateTime: info.UpdateTime,
 				DeleteTime: info.DeleteTime,
 			},
+			OrderGoodsId:    info.OrderGoodsId,
 			Number:          info.Number,
 			GoodsName:       info.GoodsName,
 			Sku:             info.Sku,
@@ -448,30 +463,32 @@ func ConfirmDelivery(c *gin.Context) {
 			DeliveryOrderNo: deliveryOrderNoArr,
 		})
 
-		//构造更新订单商品表数据
-		orderGoods = append(orderGoods, model.OrderGoods{
-			Id:              info.OrderGoodsId,
-			CreateTime:      info.CreateTime,
-			UpdateTime:      info.UpdateTime,
-			DeleteTime:      info.DeleteTime,
-			Number:          info.Number,
-			GoodsName:       info.GoodsName,
-			Sku:             info.Sku,
-			GoodsType:       info.GoodsType,
-			GoodsSpe:        info.GoodsSpe,
-			Shelves:         info.Shelves,
-			DiscountPrice:   info.DiscountPrice,
-			GoodsUnit:       info.GoodsUnit,
-			SaleUnit:        info.SaleUnit,
-			SaleCode:        info.SaleCode,
-			PayCount:        info.PayCount,
-			CloseCount:      info.CloseCount,
-			LackCount:       info.LackCount - reviewCompleteNum,
-			OutCount:        reviewCompleteNum,
-			GoodsRemark:     info.GoodsRemark,
-			BatchId:         info.BatchId,
-			DeliveryOrderNo: deliveryOrderNoArr,
-		})
+		orderGoodsId = append(orderGoodsId, info.OrderGoodsId)
+
+		////构造更新订单商品表数据
+		//orderGoods = append(orderGoods, model.OrderGoods{
+		//	Id:              info.OrderGoodsId,
+		//	CreateTime:      info.CreateTime,
+		//	UpdateTime:      info.UpdateTime,
+		//	DeleteTime:      info.DeleteTime,
+		//	Number:          info.Number,
+		//	GoodsName:       info.GoodsName,
+		//	Sku:             info.Sku,
+		//	GoodsType:       info.GoodsType,
+		//	GoodsSpe:        info.GoodsSpe,
+		//	Shelves:         info.Shelves,
+		//	DiscountPrice:   info.DiscountPrice,
+		//	GoodsUnit:       info.GoodsUnit,
+		//	SaleUnit:        info.SaleUnit,
+		//	SaleCode:        info.SaleCode,
+		//	PayCount:        info.PayCount,
+		//	CloseCount:      info.CloseCount,
+		//	LackCount:       info.LackCount - reviewCompleteNum,
+		//	OutCount:        reviewCompleteNum,
+		//	GoodsRemark:     info.GoodsRemark,
+		//	BatchId:         info.BatchId,
+		//	DeliveryOrderNo: deliveryOrderNoArr,
+		//})
 	}
 
 	//获取拣货商品数据
@@ -507,6 +524,68 @@ func ConfirmDelivery(c *gin.Context) {
 
 	}
 
+	//order_goods
+	result = db.Where("id in (?)", orderGoodsId).Find(&orderGoods)
+
+	orderPickMp := make(map[string]int)
+
+	for i, good := range orderGoods {
+
+		val, ok := orderGoodsMp[good.Id]
+
+		if !ok {
+			continue
+		}
+
+		_, ogMpOk := orderPickMp[good.Number]
+
+		if !ogMpOk {
+			orderPickMp[good.Number] = val.OutCount
+		} else {
+			orderPickMp[good.Number] += val.OutCount
+		}
+
+		orderGoods[i].LackCount = good.LackCount - val.OutCount
+		orderGoods[i].OutCount = val.OutCount
+		orderGoods[i].DeliveryOrderNo = val.deliveryOrderNoArr
+	}
+
+	var order []model.Order
+	//更新订单表 已拣 未拣
+	result = db.Model(&model.Order{}).Where("number in (?)", orderNumbers).Find(&order)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	for i, o := range order {
+		picked, ogMpOk := orderPickMp[o.Number]
+
+		if !ogMpOk {
+			continue
+		}
+
+		order[i].Picked = picked
+		order[i].UnPicked = o.UnPicked - picked
+
+		payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
+
+		if payAtErr != nil {
+			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+			return
+		}
+
+		deliveryAt, DeliveryAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.DeliveryAt, time.Local)
+
+		if DeliveryAtErr != nil {
+			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+			return
+		}
+		order[i].PayAt = payAt.Format(timeutil.TimeFormat)
+		order[i].DeliveryAt = deliveryAt.Format(timeutil.TimeFormat)
+	}
+
 	tx := db.Begin()
 
 	result = tx.Save(&pickOrderGoods)
@@ -517,7 +596,15 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
-	result = tx.Omit("lack_count,out_count,delivery_order_no").Save(&orderGoods)
+	result = tx.Save(&orderGoods)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = tx.Save(&order)
 
 	if result.Error != nil {
 		tx.Rollback()
