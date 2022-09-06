@@ -113,7 +113,7 @@ func SyncShop(c *gin.Context) {
 
 	path := "api/v1/remote/shop/list"
 
-	body, err := request.Get(path)
+	body, err := request.Post(path, nil)
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return

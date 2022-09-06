@@ -10,6 +10,7 @@ import (
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"strings"
+	"time"
 )
 
 // 字典类型列表
@@ -29,7 +30,7 @@ func DictTypeList(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Where(model.DictType{Code: form.Code, Name: form.Name}).Find(&types)
+	result := db.Where(model.DictType{Code: form.Code, Name: form.Name}).Where("delete_time is null").Find(&types)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -38,7 +39,7 @@ func DictTypeList(c *gin.Context) {
 
 	res.Total = result.RowsAffected
 
-	db.Where(model.DictType{Code: form.Code, Name: form.Name}).Scopes(model.Paginate(form.Page, form.Size)).Find(&types)
+	db.Where(model.DictType{Code: form.Code, Name: form.Name}).Where("delete_time is null").Scopes(model.Paginate(form.Page, form.Size)).Find(&types)
 
 	list := make([]*rsp.DictType, 0)
 	for _, t := range types {
@@ -130,7 +131,9 @@ func DeleteDictType(c *gin.Context) {
 
 	tx := global.DB.Begin()
 
-	result := tx.Delete(&model.DictType{}, "code = ?", form.Code)
+	now := time.Now()
+
+	result := tx.Model(&model.DictType{}).Where("code = ?", form.Code).Update("delete_time", &now)
 
 	if result.Error != nil {
 		tx.Rollback()
@@ -138,7 +141,7 @@ func DeleteDictType(c *gin.Context) {
 		return
 	}
 
-	result = tx.Delete(&model.Dict{}, "type_code = ?", form.Code)
+	result = tx.Model(&model.Dict{}).Where("type_code = ?", form.Code).Update("delete_time", &now)
 
 	if result.Error != nil {
 		tx.Rollback()
@@ -289,7 +292,9 @@ func DeleteDict(c *gin.Context) {
 		return
 	}
 
-	result := global.DB.Delete(&model.Dict{}, "type_code = ? and code = ?", form.TypeCode, form.Code)
+	now := time.Now()
+
+	result := global.DB.Model(&model.Dict{}).Where("type_code = ? and code = ?", form.TypeCode, form.Code).Update("delete_time", &now)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

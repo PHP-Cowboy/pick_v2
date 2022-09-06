@@ -372,3 +372,9 @@ func GetPickerList(c *gin.Context) {
 
 	xsq_net.SucJson(c, res)
 }
+
+// 校验登录是否过期
+func Check(c *gin.Context) {
+	//只需要中间件校验登录是否过期即可
+	xsq_net.Success(c)
+}

@@ -180,6 +180,7 @@ type OrderAndGoods struct {
 	CreateTime        time.Time  `json:"create_time"`
 	UpdateTime        time.Time  `json:"update_time"`
 	DeleteTime        time.Time  `json:"delete_time"`
+	OrderGoodsId      int        `json:"order_goods_id"`
 	Number            string     `json:"number"`
 	GoodsName         string     `json:"goods_name"`
 	Sku               string     `json:"sku"`
@@ -193,11 +194,12 @@ type OrderAndGoods struct {
 	PayCount          int        `json:"pay_count"`
 	CloseCount        int        `json:"close_count"`
 	LackCount         int        `json:"lack_count"`
+	LimitNum          int        `json:"limit_num"`
 	OutCount          int        `json:"out_count"`
 	GoodsRemark       string     `json:"goods_remark"`
 	Status            int        `json:"status"`
 	BatchId           int        `json:"batch_id"`
-	DeliveryOrderNo   []string   `json:"delivery_order_no"`
+	DeliveryOrderNo   []*string  `json:"delivery_order_no"`
 	ShopId            int        `json:"shop_id"`
 	ShopName          string     `json:"shop_name"`
 	ShopCode          string     `json:"shop_code"`

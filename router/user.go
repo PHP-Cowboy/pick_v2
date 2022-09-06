@@ -17,6 +17,8 @@ func UserRoute(g *gin.RouterGroup) {
 	{
 		//获取拣货员列表
 		loginGroup.GET("/picker_list", handler.GetPickerList)
+		//校验登录是否过期
+		loginGroup.GET("/check", handler.Check)
 	}
 
 	userGroup := g.Group("/user", middlewares.JWTAuth(), middlewares.IsSuperAdminAuth())

@@ -75,7 +75,7 @@ func GetShopLine() (map[int]string, error) {
 	if !ok {
 		var shops []model.Shop
 
-		result := global.DB.Find(&shops)
+		result := global.DB.Select("shop_id,line").Find(&shops)
 
 		if result.Error != nil {
 			return nil, result.Error

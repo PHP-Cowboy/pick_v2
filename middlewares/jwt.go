@@ -38,11 +38,9 @@ func JWTAuth() gin.HandlerFunc {
 		claims, err := j.ParseToken(token)
 		if err != nil {
 			if err == TokenExpired {
-				if err == TokenExpired {
-					xsq_net.ErrorJSON(c, ecode.TokenExpired)
-					c.Abort()
-					return
-				}
+				xsq_net.ErrorJSON(c, ecode.TokenExpired)
+				c.Abort()
+				return
 			}
 
 			xsq_net.ErrorJSON(c, ecode.UserNotLogin)
@@ -85,13 +83,13 @@ func NewJwt() *Jwt {
 	return &Jwt{Key: []byte(global.ServerConfig.JwtInfo.SigningKey)}
 }
 
-//创建token
+// 创建token
 func (j *Jwt) CreateToken(claims CustomClaims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(j.Key)
 }
 
-//解析token
+// 解析token
 func (j *Jwt) ParseToken(tokenString string) (*CustomClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return j.Key, nil
@@ -122,7 +120,7 @@ func (j *Jwt) ParseToken(tokenString string) (*CustomClaims, error) {
 	}
 }
 
-//更新token
+// 更新token
 func (j *Jwt) RefreshToken(tokenString string) (string, error) {
 	jwt.TimeFunc = func() time.Time {
 		return time.Unix(0, 0)

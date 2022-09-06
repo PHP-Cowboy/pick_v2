@@ -29,6 +29,10 @@ type EditBatchForm struct {
 	BatchName string `json:"batch_name"`
 }
 
+type GetBatchOrderAndGoodsForm struct {
+	Id int `json:"id" form:"id" binding:"required"`
+}
+
 type GetBatchListForm struct {
 	Paging
 	Status         *int   `json:"status" form:"status" binding:"required"` //进行中，已结束

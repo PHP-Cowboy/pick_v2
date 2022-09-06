@@ -288,9 +288,9 @@ func CompletePick(c *gin.Context) {
 	}
 
 	//step: 根据 订单表id切片 查出订单数据 根据支付时间升序
-	result = db.Table("t_order_goods og").
+	result = db.Table("t_pick_order_goods og").
 		Select("og.*").
-		Joins("left join t_order o on og.number = o.number").
+		Joins("left join t_pick_order o on og.number = o.number").
 		Where("og.id in (?)", orderGoodsIds).
 		Order("pay_at ASC").
 		Find(&orderGoods)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"pick_v2/common/constant"
 	"pick_v2/global"
 	"pick_v2/model"
 	"pick_v2/utils/cache"
@@ -108,6 +109,9 @@ func GetGoodsList(c *gin.Context) {
 			ShopType:          o.ShopType,
 			DistributionType:  o.DistributionType,
 			PayCount:          o.PayTotal,
+			Picked:            o.Picked,
+			UnPicked:          o.UnPicked,
+			CloseNum:          o.CloseNum,
 			Line:              o.Line,
 			Region:            o.Province + o.City + o.District,
 			OrderRemark:       o.OrderRemark,
@@ -164,7 +168,7 @@ func GetOrderDetail(c *gin.Context) {
 
 	detailMap := make(map[string]*rsp.Detail, 0)
 
-	deliveryOrderNoArr := make([]string, 0)
+	deliveryOrderNoArr := make([]*string, 0)
 
 	for _, og := range orderGoods {
 
@@ -208,7 +212,7 @@ func GetOrderDetail(c *gin.Context) {
 
 	res.Detail = detailMap
 
-	deliveryOrderNoArr = slice.UniqueStringSlice(deliveryOrderNoArr)
+	deliveryOrderNoArr = slice.UniqueStringSlicePtr(deliveryOrderNoArr)
 	//历史出库单号
 	res.DeliveryOrderNo = deliveryOrderNoArr
 
@@ -467,7 +471,7 @@ func CompleteOrderDetail(c *gin.Context) {
 
 	for _, goods := range completeOrderDetail {
 		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.PrePickGoods{
-			GoodsName:   goods.Name,
+			GoodsName:   goods.GoodsName,
 			GoodsSpe:    goods.GoodsSpe,
 			Shelves:     goods.Shelves,
 			NeedNum:     goods.PayCount,
@@ -521,6 +525,9 @@ func Count(c *gin.Context) {
 		case 3: //3:欠货单
 			res.OldCount = r.Count
 			break
+		case 4: //已关闭
+			res.CloseCount = r.Count
+			break
 		}
 		res.AllCount += r.Count
 	}
@@ -533,7 +540,7 @@ func CreatePickOrder(c *gin.Context) {
 	var form req.CreatePickOrderForm
 
 	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
@@ -578,6 +585,15 @@ func CreatePickOrder(c *gin.Context) {
 			return
 		}
 
+		pickNumber, err := cache.GetIncrNumberByKey(constant.PICK_ORDER_NO, 4)
+
+		if err != nil {
+			xsq_net.ErrorJSON(c, errors.New("拣货单号生成失败"))
+			return
+		}
+
+		total := o.PayTotal - o.Picked
+
 		pickOrder = append(pickOrder, model.PickOrder{
 			OrderId:           o.Id,
 			ShopId:            o.ShopId,
@@ -585,13 +601,15 @@ func CreatePickOrder(c *gin.Context) {
 			ShopType:          o.ShopType,
 			ShopCode:          o.ShopCode,
 			Number:            o.Number,
+			PickNumber:        "JHD" + pickNumber,
 			HouseCode:         o.HouseCode,
 			Line:              o.Line,
 			DistributionType:  o.DistributionType,
 			OrderRemark:       o.OrderRemark,
 			PayAt:             payAt.Format(timeutil.TimeFormat),
-			PayTotal:          o.PayTotal,
-			LimitNum:          o.PayTotal, //限发总数 默认等于应发总数
+			ShipmentsNum:      total,
+			LimitNum:          total, //限发总数 默认等于应发总数
+			CloseNum:          o.CloseNum,
 			DeliveryAt:        deliveryAt.Format(timeutil.TimeFormat),
 			Province:          o.Province,
 			City:              o.City,
@@ -647,7 +665,7 @@ func CreatePickOrder(c *gin.Context) {
 		return
 	}
 
-	result = tx.Model(&model.Order{}).Where("number in (?)", form.Numbers).Updates(map[string]interface{}{"status": 2})
+	result = tx.Model(&model.Order{}).Where("number in (?)", form.Numbers).Updates(map[string]interface{}{"order_type": 2})
 
 	if result.Error != nil {
 		tx.Rollback()

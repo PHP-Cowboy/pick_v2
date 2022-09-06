@@ -13,6 +13,9 @@ type Order struct {
 	ShopType          string `json:"shop_type"`
 	DistributionType  int    `json:"distribution_type"` //配送方式
 	PayCount          int    `json:"pay_count"`         //下单数量
+	Picked            int    `json:"picked"`
+	UnPicked          int    `json:"un_picked"`
+	CloseNum          int    `json:"close_num"`
 	Line              string `json:"line"`
 	Region            string `json:"region"`
 	OrderRemark       string `json:"order_remark"` //订单备注
@@ -109,7 +112,7 @@ type OrderDetail struct {
 	Region          string             `json:"region"`
 	ShopType        string             `json:"shop_type"`
 	Detail          map[string]*Detail `json:"detail"`
-	DeliveryOrderNo []string           `json:"delivery_order_no"`
+	DeliveryOrderNo []*string          `json:"delivery_order_no"`
 }
 
 type Detail struct {
@@ -176,8 +179,9 @@ type CompleteOrderDetailRsp struct {
 }
 
 type CountRes struct {
-	AllCount  int `json:"all_count"`
-	NewCount  int `json:"new_count"`
-	OldCount  int `json:"old_count"`
-	PickCount int `json:"pick_count"`
+	AllCount   int `json:"all_count"`
+	NewCount   int `json:"new_count"`
+	OldCount   int `json:"old_count"`
+	PickCount  int `json:"pick_count"`
+	CloseCount int `json:"close_count"`
 }

@@ -7,19 +7,20 @@ type OrderRsp struct {
 }
 
 type GoodsInfo struct {
-	ID            int    `json:"id"`
-	Name          string `json:"name"`
-	Sku           string `json:"sku"`
-	GoodsType     string `json:"goods_type"`
-	GoodsSpe      string `json:"goods_spe"`
-	Shelves       string `json:"shelves"`
-	DiscountPrice int    `json:"discount_price"`
-	GoodsUnit     string `json:"goods_unit"`
-	SaleUnit      string `json:"sale_unit"`
-	SaleCode      string `json:"sale_code"`
-	PayCount      int    `json:"pay_count"`
-	GoodsRemark   string `json:"goods_remark"`
-	Number        string `json:"number"`
+	ID              int       `json:"id"`
+	Name            string    `json:"name"`
+	Sku             string    `json:"sku"`
+	GoodsType       string    `json:"goods_type"`
+	GoodsSpe        string    `json:"goods_spe"`
+	Shelves         string    `json:"shelves"`
+	DiscountPrice   int       `json:"discount_price"`
+	GoodsUnit       string    `json:"goods_unit"`
+	SaleUnit        string    `json:"sale_unit"`
+	SaleCode        string    `json:"sale_code"`
+	PayCount        int       `json:"pay_count"`
+	GoodsRemark     string    `json:"goods_remark"`
+	Number          string    `json:"number"`
+	DeliveryOrderNo []*string `json:"delivery_order_no"`
 }
 
 type OrderInfo struct {

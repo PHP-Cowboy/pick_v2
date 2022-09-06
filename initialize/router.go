@@ -41,6 +41,8 @@ func InitRouter() *gin.Engine {
 	router.MenuRoute(group)
 	//导出
 	router.ExportRoute(group)
+	//开放数据
+	router.OpenRoute(group)
 
 	return r
 }

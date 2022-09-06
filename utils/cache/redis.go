@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func GetIncrNumberByKey(key string) (string, error) {
+func GetIncrNumberByKey(key string, padLength int) (string, error) {
 
 	dateNumber := time.Now().Format(timeutil.DateNumberFormat)
 	//rds key
@@ -22,7 +22,7 @@ func GetIncrNumberByKey(key string) (string, error) {
 
 	number := strconv.Itoa(int(val.(int64)))
 
-	No := dateNumber + str_util.StrPad(number, 3, "0", 0)
+	No := dateNumber + str_util.StrPad(number, padLength, "0", 0)
 
 	return No, nil
 }
