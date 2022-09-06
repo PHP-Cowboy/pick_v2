@@ -1,7 +1,11 @@
 package handler
 
 import (
+	"context"
 	"errors"
+	"github.com/apache/rocketmq-client-go/v2"
+	"github.com/apache/rocketmq-client-go/v2/primitive"
+	"github.com/apache/rocketmq-client-go/v2/producer"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"pick_v2/common/constant"
@@ -687,13 +691,186 @@ func EndBatch(c *gin.Context) {
 		return
 	}
 
-	//----------
-
-	//mq 存入 商品订单表id
-
-	//----------
+	//mq 存入 批次id
+	err = SyncBatch(form.Id)
+	if err != nil {
+		xsq_net.ErrorJSON(c, errors.New("写入mq失败"))
+		return
+	}
 
 	xsq_net.Success(c)
+}
+
+func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
+	db := global.DB
+
+	var (
+		order      []model.Order
+		orderGoods []model.OrderGoods
+	)
+
+	result := db.Model(&model.OrderGoods{}).Where("batch_id = ?", batchId).Find(&orderGoods)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	var numbers []string
+
+	for _, good := range orderGoods {
+		numbers = append(numbers, good.Number)
+	}
+
+	numbers = slice.UniqueStringSlice(numbers)
+
+	result = db.Model(&model.Order{}).Where("number in (?)", numbers).Find(&order)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	var (
+		//完成订单map
+		//key => number
+		completeMp = make(map[string]interface{}, 0)
+		//待删除订单表id
+		deleteIds           []int
+		completeOrder       = make([]model.CompleteOrder, 0)
+		completeOrderDetail = make([]model.CompleteOrderDetail, 0)
+		//待更新为欠货订单表id
+		lackIds []int
+	)
+
+	for _, o := range order {
+		//还有欠货
+		if o.UnPicked > 0 {
+			lackIds = append(lackIds, o.Id)
+			continue
+		}
+
+		deleteIds = append(deleteIds, o.Id)
+
+		completeMp[o.Number] = struct{}{}
+
+		//完成订单
+		completeOrder = append(completeOrder, model.CompleteOrder{
+			Number:         o.Number,
+			OrderRemark:    o.OrderRemark,
+			ShopId:         o.ShopId,
+			ShopName:       o.ShopName,
+			ShopType:       o.ShopType,
+			ShopCode:       o.ShopCode,
+			Line:           o.Line,
+			DeliveryMethod: o.DistributionType,
+			PayCount:       o.PayTotal,
+			CloseCount:     o.CloseNum,
+			OutCount:       o.Picked,
+			Province:       o.Province,
+			City:           o.City,
+			District:       o.District,
+			PickTime:       o.LatestPickingTime,
+			PayAt:          o.PayAt,
+		})
+	}
+
+	for _, og := range orderGoods {
+		//完成订单map中不存在订单的跳过
+		_, ok := completeMp[og.Number]
+
+		if !ok {
+			continue
+		}
+		//完成订单详情
+		completeOrderDetail = append(completeOrderDetail, model.CompleteOrderDetail{
+			Number:          og.Number,
+			GoodsName:       og.GoodsName,
+			Sku:             og.Sku,
+			GoodsSpe:        og.GoodsSpe,
+			GoodsType:       og.GoodsType,
+			Shelves:         og.Shelves,
+			PayCount:        og.PayCount,
+			CloseCount:      og.CloseCount,
+			ReviewCount:     og.OutCount,
+			GoodsRemark:     og.GoodsRemark,
+			DeliveryOrderNo: og.DeliveryOrderNo,
+		})
+	}
+
+	result = tx.Delete(&model.Order{}, "id in (?)", deleteIds)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	result = tx.Model(&model.Order{}).Where("id in (?)", lackIds).Updates(map[string]interface{}{
+		"order_type": 3,
+	})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	//保存完成订单
+	result = tx.Save(&completeOrder)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	//保存完成订单详情
+	result = tx.Save(&completeOrderDetail)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	//更新pickOrder为已完成
+	result = tx.Model(&model.PickOrder{}).Where("number in (?)", numbers).Updates(map[string]interface{}{
+		"order_type": 4,
+	})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
+}
+
+func SyncBatch(batchId int) error {
+	p, _ := rocketmq.NewProducer(
+		producer.WithNsResolver(primitive.NewPassthroughResolver([]string{"192.168.1.40:9876"})),
+		producer.WithRetry(2),
+	)
+
+	err := p.Start()
+
+	if err != nil {
+		global.SugarLogger.Errorf("start producer error: %s", err.Error())
+		return err
+	}
+
+	topic := "pick_batch"
+
+	msg := &primitive.Message{
+		Topic: topic,
+		Body:  []byte(strconv.Itoa(batchId)),
+	}
+
+	res, err := p.SendSync(context.Background(), msg)
+
+	if err != nil {
+		global.SugarLogger.Errorf("send message error: %s\n", err)
+		return err
+	} else {
+		global.SugarLogger.Infof("send message success: result=%s\n", res.String())
+	}
+
+	err = p.Shutdown()
+
+	if err != nil {
+		global.SugarLogger.Errorf("shutdown producer error: %s", err.Error())
+		return err
+	}
+
+	return nil
 }
 
 // 编辑批次
@@ -764,13 +941,49 @@ func PushU8(pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods) erro
 
 	global.SugarLogger.Info(mpPgv)
 
+	var stockLog = make([]model.StockLog, 0)
+
 	for _, view := range mpPgv {
 		//推送u8
 		xml := GenU8Xml(view, view.ShopId, view.ShopName, view.HouseCode) //店铺属性中获 HouseCode
-		SendShopXml(xml)
+		shopXml, err := SendShopXml(xml)
+		if err != nil {
+			stockLog = append(stockLog, model.StockLog{
+				Number:      view.SaleNumber,
+				PickId:      0,
+				Status:      2, //失败
+				RequestXml:  xml,
+				ResponseXml: shopXml,
+				Msg:         "",
+				ResponseNo:  "",
+				ShopName:    view.ShopName,
+			})
+		} else {
+			stockLog = append(stockLog, model.StockLog{
+				Number:      view.SaleNumber,
+				PickId:      0,
+				Status:      1, //成功
+				RequestXml:  xml,
+				ResponseXml: shopXml,
+				Msg:         "",
+				ResponseNo:  "",
+				ShopName:    view.ShopName,
+			})
+		}
+	}
+
+	if len(stockLog) > 0 {
+		result := global.DB.Save(&stockLog)
+		if result.Error != nil {
+			return result.Error
+		}
 	}
 
 	return nil
+}
+
+func RePush(c *gin.Context) {
+
 }
 
 func GetBatchOrderAndGoods(c *gin.Context) {

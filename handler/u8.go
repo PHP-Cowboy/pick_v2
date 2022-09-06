@@ -39,7 +39,7 @@ type PickGoods struct {
 	SlaveUnit    string `json:"slave_unit"`     //辅计量单位 sale_unit
 }
 
-func SendShopXml(xml string) string {
+func SendShopXml(xml string) (string, error) {
 	global.SugarLogger.Info(xml)
 	var (
 		requestUrl string
@@ -53,23 +53,23 @@ func SendShopXml(xml string) string {
 	request, err = http.NewRequest(http.MethodPost, requestUrl, strings.NewReader(xml))
 	if err != nil {
 		global.SugarLogger.Error("请求失败", err)
-		return ""
+		return "", err
 	}
 	request.Header.Set("Content-Type", "application/xml")
 	client := &http.Client{}
 	response, err = client.Do(request)
 	if err != nil {
 		global.SugarLogger.Error("请求用友失败1", err)
-		return ""
+		return "", err
 	}
 	defer response.Body.Close()
 
 	rspBody, err = io.ReadAll(response.Body)
 	if err != nil {
 		global.SugarLogger.Error("请求用友失败2", err)
-		return ""
+		return "", err
 	}
-	return string(rspBody)
+	return string(rspBody), nil
 
 }
 
