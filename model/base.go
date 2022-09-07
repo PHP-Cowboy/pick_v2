@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"database/sql/driver"
+	"encoding/json"
+	"time"
+)
 
 const TableOptions string = "gorm:table_options"
 
@@ -18,4 +22,15 @@ type Base struct {
 type Creator struct {
 	CreatorId int    `gorm:"type:int(11) unsigned;comment:操作人id"`
 	Creator   string `gorm:"type:varchar(32);comment:操作人昵称"`
+}
+
+type GormList []string
+
+func (g GormList) Value() (driver.Value, error) {
+	return json.Marshal(g)
+}
+
+// 实现 sql.Scanner 接口，Scan 将 value 扫描至 Jsonb
+func (g *GormList) Scan(value interface{}) error {
+	return json.Unmarshal(value.([]byte), &g)
 }

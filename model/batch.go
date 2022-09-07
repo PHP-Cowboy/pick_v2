@@ -94,7 +94,7 @@ type PrePickRemark struct {
 // 拣货列表
 type Pick struct {
 	Base
-	DeliveryOrderNo string     `gorm:"type:varchar(16);index:delivery_order_no_idx;comment:出库单号"`
+	DeliveryOrderNo GormList   `gorm:"type:varchar(255);index:delivery_order_no_idx;comment:出库单号"`
 	WarehouseId     int        `gorm:"type:int(11);comment:仓库"`
 	BatchId         int        `gorm:"type:int(11) unsigned;comment:批次表id"`
 	PrePickIds      string     `gorm:"type:varchar(255);comment:预拣货ids"`

@@ -14,6 +14,7 @@ import (
 	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
+	"time"
 )
 
 // 拣货单列表
@@ -98,10 +99,18 @@ func PickOrderList(c *gin.Context) {
 			latestPickingTime = o.LatestPickingTime.Format(timeutil.TimeFormat)
 		}
 
+		payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
+
+		if payAtErr != nil {
+			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+			return
+		}
+
 		list = append(list, rsp.PickOrder{
+			Id:                o.Id,
 			Number:            o.Number,
 			PickNumber:        o.PickNumber,
-			PayAt:             o.PayAt,
+			PayAt:             payAt.Format(timeutil.TimeFormat),
 			ShopCode:          o.ShopCode,
 			ShopName:          o.ShopName,
 			ShopType:          o.ShopType,
@@ -165,7 +174,7 @@ func GetPickOrderDetail(c *gin.Context) {
 
 	detailMap := make(map[string]*rsp.Detail, 0)
 
-	deliveryOrderNoArr := make([]*string, 0)
+	deliveryOrderNoArr := make(model.GormList, 0)
 
 	for _, og := range orderGoods {
 
@@ -209,7 +218,7 @@ func GetPickOrderDetail(c *gin.Context) {
 
 	res.Detail = detailMap
 
-	deliveryOrderNoArr = slice.UniqueStringSlicePtr(deliveryOrderNoArr)
+	deliveryOrderNoArr = slice.UniqueStringSlice(deliveryOrderNoArr)
 	//历史出库单号
 	res.DeliveryOrderNo = deliveryOrderNoArr
 
@@ -374,7 +383,7 @@ func RestrictedShipment(c *gin.Context) {
 
 		restrictedShipment = append(restrictedShipment, model.RestrictedShipment{
 			PickOrderGoodsId: good.Id,
-			Number:           good.Number,
+			PickNumber:       pickOrder.PickNumber,
 			ShopName:         good.GoodsName,
 			GoodsSpe:         good.GoodsSpe,
 			LimitNum:         num,
@@ -422,23 +431,27 @@ func BatchRestrictedShipment(c *gin.Context) {
 	}
 
 	var (
-		pickOrderGoods     []model.PickOrderGoods
 		restrictedShipment = make([]model.RestrictedShipment, 0)
+		orderAndGoods      []rsp.OrderAndGoods
 	)
 
 	db := global.DB
 
-	result := db.Model(&model.PickOrderGoods{}).Where("sku = ? and status = 0", form.Sku).Find(&pickOrderGoods)
+	result := db.Table("t_pick_order_goods og").
+		Select("og.*,o.pick_number").
+		Joins("left join t_pick_order o on og.number = o.number").
+		Where("og.sku = (?)", form.Sku).
+		Find(&orderAndGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	for _, pg := range pickOrderGoods {
+	for _, pg := range orderAndGoods {
 		restrictedShipment = append(restrictedShipment, model.RestrictedShipment{
 			PickOrderGoodsId: pg.Id,
-			Number:           pg.Number,
+			PickNumber:       pg.Number,
 			ShopName:         pg.GoodsName,
 			GoodsSpe:         pg.GoodsSpe,
 			LimitNum:         form.LimitNum,
@@ -470,7 +483,7 @@ func GoodsNum(c *gin.Context) {
 
 	var sum int
 
-	result := global.DB.Model(&model.PickOrderGoods{}).Select("sum(lack_count) as sum").Where("sku = ? and status = 0", form.Sku).Scan(&sum)
+	result := global.DB.Model(&model.PickOrderGoods{}).Select("IFNULL(sum(lack_count),0) as sum").Where("sku = ? and status = 0", form.Sku).Scan(&sum)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -510,7 +523,7 @@ func RestrictedShipmentList(c *gin.Context) {
 		return
 	}
 
-	xsq_net.SucJson(c, restrictedShipment)
+	xsq_net.SucJson(c, gin.H{"total": total, "list": restrictedShipment})
 }
 
 // 撤销限发
@@ -526,7 +539,7 @@ func RevokeRestrictedShipment(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Model(&model.PickOrderGoods{}).Where("id = ?", form.PickOrderGoodsId).First(&pickOrderGoods)
+	result := db.Model(&model.PickOrderGoods{}).Omit("delivery_order_no").Where("id = ?", form.PickOrderGoodsId).First(&pickOrderGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

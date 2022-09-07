@@ -14,6 +14,7 @@ import (
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
+	"strings"
 	"time"
 )
 
@@ -344,7 +345,7 @@ func PushPrint(c *gin.Context) {
 	pickMp := make(map[int]string, 0)
 
 	for _, p := range pick {
-		pickMp[p.Id] = p.DeliveryOrderNo
+		pickMp[p.Id] = strings.Join(p.DeliveryOrderNo, ",")
 	}
 
 	result = db.Where("pick_id in (?)", form.Ids).Find(&pickGoods)

@@ -1,5 +1,7 @@
 package rsp
 
+import "pick_v2/model"
+
 type GoodsListRsp struct {
 	Total int64   `json:"total"`
 	List  []Order `json:"list"`
@@ -112,7 +114,7 @@ type OrderDetail struct {
 	Region          string             `json:"region"`
 	ShopType        string             `json:"shop_type"`
 	Detail          map[string]*Detail `json:"detail"`
-	DeliveryOrderNo []*string          `json:"delivery_order_no"`
+	DeliveryOrderNo []string           `json:"delivery_order_no"`
 }
 
 type Detail struct {
@@ -135,13 +137,13 @@ type OrderShippingRecordRsp struct {
 }
 
 type OrderShippingRecord struct {
-	Id              int    `json:"id"`
-	TakeOrdersTime  string `json:"take_orders_time"`
-	PickUser        string `json:"pick_user"`
-	ReviewUser      string `json:"review_user"`
-	ReviewTime      string `json:"review_time"`
-	ReviewNum       int    `json:"review_num"`
-	DeliveryOrderNo string `json:"delivery_order_no"`
+	Id              int            `json:"id"`
+	TakeOrdersTime  string         `json:"take_orders_time"`
+	PickUser        string         `json:"pick_user"`
+	ReviewUser      string         `json:"review_user"`
+	ReviewTime      string         `json:"review_time"`
+	ReviewNum       int            `json:"review_num"`
+	DeliveryOrderNo model.GormList `json:"delivery_order_no"`
 }
 
 type ShippingRecordDetailRsp struct {
@@ -168,14 +170,15 @@ type CompleteOrder struct {
 }
 
 type CompleteOrderDetailRsp struct {
-	ShopName    string                    `json:"shop_name"`
-	ShopCode    string                    `json:"shop_code"`
-	Line        string                    `json:"line"`
-	Region      string                    `json:"regin"`
-	ShopType    string                    `json:"shop_type"`
-	Number      string                    `json:"number"`
-	OrderRemark string                    `json:"order_remark"`
-	Goods       map[string][]PrePickGoods `json:"goods"`
+	ShopName        string                    `json:"shop_name"`
+	ShopCode        string                    `json:"shop_code"`
+	Line            string                    `json:"line"`
+	Region          string                    `json:"regin"`
+	ShopType        string                    `json:"shop_type"`
+	Number          string                    `json:"number"`
+	OrderRemark     string                    `json:"order_remark"`
+	DeliveryOrderNo model.GormList            `json:"delivery_order_no"`
+	Goods           map[string][]PrePickGoods `json:"goods"`
 }
 
 type CountRes struct {

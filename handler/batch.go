@@ -87,14 +87,14 @@ func CreateBatch(c *gin.Context) {
 		return
 	}
 
-	numbers, orderGoodsIds, err := SavePrePickPool(tx, userInfo, batchId, "", &form)
+	numbers, pickOrderGoodsId, orderGoodsIds, err := SavePrePickPool(tx, userInfo, batchId, "", &form)
 	if err != nil {
 		tx.Rollback()
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
-	err = UpdateOrder(tx, numbers, orderGoodsIds, batchId)
+	err = UpdateOrder(tx, numbers, pickOrderGoodsId, orderGoodsIds, batchId)
 	if err != nil {
 		tx.Rollback()
 		xsq_net.ErrorJSON(c, errors.New("订单数据更新失败:"+err.Error()))
@@ -166,7 +166,7 @@ func CreateByOrder(c *gin.Context) {
 		return
 	}
 
-	numbers, orderGoodsIds, err := SavePrePickPool(tx, userInfo, batchId, form.Number, nil)
+	numbers, pickOrderGoodsId, orderGoodsIds, err := SavePrePickPool(tx, userInfo, batchId, form.Number, nil)
 
 	if err != nil {
 		tx.Rollback()
@@ -175,7 +175,7 @@ func CreateByOrder(c *gin.Context) {
 	}
 
 	//更新订单
-	err = UpdateOrder(tx, numbers, orderGoodsIds, batchId)
+	err = UpdateOrder(tx, numbers, pickOrderGoodsId, orderGoodsIds, batchId)
 
 	if err != nil {
 		tx.Rollback()
@@ -198,7 +198,7 @@ func GetUserInfo(c *gin.Context) *middlewares.CustomClaims {
 	return claims.(*middlewares.CustomClaims)
 }
 
-func UpdateOrder(tx *gorm.DB, numbers []string, orderGoodsIds []int, batchId int) error {
+func UpdateOrder(tx *gorm.DB, numbers []string, pickOrderGoodsId []int, orderGoodsIds []int, batchId int) error {
 
 	result := tx.Model(&model.PickOrder{}).Where("number in (?)", numbers).Update("order_type", 2)
 
@@ -206,7 +206,15 @@ func UpdateOrder(tx *gorm.DB, numbers []string, orderGoodsIds []int, batchId int
 		return result.Error
 	}
 
-	result = tx.Model(&model.PickOrderGoods{}).Where("id in (?)", orderGoodsIds).Updates(map[string]interface{}{"status": 1, "batch_id": batchId})
+	result = tx.Model(&model.PickOrderGoods{}).Where("id in (?)", pickOrderGoodsId).Updates(map[string]interface{}{"status": 1, "batch_id": batchId})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	//查询orderGoods id
+
+	tx.Model(&model.OrderGoods{}).Where("id in (?)", orderGoodsIds).Updates(map[string]interface{}{"batch_id": batchId})
 
 	if result.Error != nil {
 		return result.Error
@@ -268,25 +276,26 @@ func SaveBatch(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchName, line,
 	return batches.Id, nil
 }
 
-func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId int, number string, form *req.CreateBatchForm) ([]string, []int, error) {
+func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId int, number string, form *req.CreateBatchForm) ([]string, []int, []int, error) {
 
 	//返回给调用方更新订单和订单商品状态
 	var (
-		numbers      []string
-		orderGoodsId []int
+		numbers          []string
+		pickOrderGoodsId []int
+		orderGoodsId     []int
 	)
 
 	//缓存中的线路数据
 	lineCacheMp, errCache := cache.GetShopLine()
 
 	if errCache != nil {
-		return numbers, orderGoodsId, errors.New("线路缓存获取失败")
+		return numbers, pickOrderGoodsId, orderGoodsId, errors.New("线路缓存获取失败")
 	}
 
 	mp, err := cache.GetClassification()
 
 	if err != nil {
-		return numbers, orderGoodsId, err
+		return numbers, pickOrderGoodsId, orderGoodsId, err
 	}
 
 	var orderAndGoods []rsp.OrderAndGoods
@@ -313,10 +322,10 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 		}
 	}
 
-	result := localDb.Where("og.status = 0").Scan(&orderAndGoods)
+	result := localDb.Where("og.status = 0").Find(&orderAndGoods)
 
 	if result.Error != nil {
-		return numbers, orderGoodsId, result.Error
+		return numbers, pickOrderGoodsId, orderGoodsId, result.Error
 	}
 
 	var (
@@ -331,21 +340,23 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 	orderNumMp := make(map[string]struct{}, 0) //订单
 
 	for _, og := range orderAndGoods {
-		//订单商品表id
-		orderGoodsId = append(orderGoodsId, og.Id)
+		//拣货单单商品表id
+		pickOrderGoodsId = append(pickOrderGoodsId, og.Id)
+		//
+		orderGoodsId = append(orderGoodsId, og.OrderGoodsId)
 		//商品总数量
 		goodsNum += og.LackCount
 		//商品类型
 		goodsType, mpOk := mp[og.GoodsType]
 
 		if !mpOk {
-			return numbers, orderGoodsId, errors.New("商品类型:" + og.GoodsType + "数据未同步")
+			return numbers, pickOrderGoodsId, orderGoodsId, errors.New("商品类型:" + og.GoodsType + "数据未同步")
 		}
 		//线路
 		cacheMpLine, cacheMpOk := lineCacheMp[og.ShopId]
 
 		if !cacheMpOk {
-			return numbers, orderGoodsId, errors.New("店铺:" + og.ShopName + "线路未同步，请先同步")
+			return numbers, pickOrderGoodsId, orderGoodsId, errors.New("店铺:" + og.ShopName + "线路未同步，请先同步")
 		}
 
 		//店铺mp 订单号去重使用
@@ -421,13 +432,13 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 	}
 
 	if len(prePicks) == 0 {
-		return numbers, orderGoodsId, ecode.NoOrderFound
+		return numbers, pickOrderGoodsId, orderGoodsId, ecode.NoOrderFound
 	}
 
 	result = tx.Save(&prePicks)
 
 	if result.Error != nil {
-		return numbers, orderGoodsId, result.Error
+		return numbers, pickOrderGoodsId, orderGoodsId, result.Error
 	}
 
 	shopMap := make(map[int]int, 0)
@@ -439,7 +450,7 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 	for k, good := range prePickGoods {
 		val, shopMapOk := shopMap[good.ShopId]
 		if !shopMapOk {
-			return numbers, orderGoodsId, ecode.MapKeyNotExist
+			return numbers, pickOrderGoodsId, orderGoodsId, ecode.MapKeyNotExist
 		}
 		prePickGoods[k].PrePickId = val
 	}
@@ -447,14 +458,14 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 	result = tx.Save(&prePickGoods)
 
 	if result.Error != nil {
-		return numbers, orderGoodsId, result.Error
+		return numbers, pickOrderGoodsId, orderGoodsId, result.Error
 	}
 
 	if len(prePickRemark) > 0 {
 		for k, remark := range prePickRemark {
 			val, shopMapOk := shopMap[remark.ShopId]
 			if !shopMapOk {
-				return numbers, orderGoodsId, ecode.MapKeyNotExist
+				return numbers, pickOrderGoodsId, orderGoodsId, ecode.MapKeyNotExist
 			}
 			prePickRemark[k].PrePickId = val
 		}
@@ -462,7 +473,7 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 		result = tx.Save(&prePickRemark)
 
 		if result.Error != nil {
-			return numbers, orderGoodsId, result.Error
+			return numbers, pickOrderGoodsId, orderGoodsId, result.Error
 		}
 	}
 
@@ -478,10 +489,10 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 	result = tx.Model(&model.Batch{}).Where("id = ?", batchId).Updates(map[string]interface{}{"goods_num": goodsNum, "shop_num": shopNum, "order_num": orderNum})
 
 	if result.Error != nil {
-		return numbers, orderGoodsId, result.Error
+		return numbers, pickOrderGoodsId, orderGoodsId, result.Error
 	}
 
-	return numbers, orderGoodsId, nil
+	return numbers, pickOrderGoodsId, orderGoodsId, nil
 }
 
 // 结束拣货批次
@@ -526,7 +537,7 @@ func EndBatch(c *gin.Context) {
 		Select("og.*,o.shop_id,o.shop_name,o.shop_code,o.line,o.distribution_type,o.order_remark,o.pay_at,o.province,o.city,o.district,o.shop_type,o.latest_picking_time").
 		Joins("left join t_order o on og.number = o.number").
 		Where("batch_id = ?", form.Id).
-		Scan(&orderAndGoods)
+		Find(&orderAndGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -563,129 +574,15 @@ func EndBatch(c *gin.Context) {
 		mpGoods[good.OrderGoodsId] = good
 	}
 
-	//批次未完成订单map
-	notCompleteOrderMp := make(map[string]struct{}, 0)
-	//批次全部订单map
-	allOrderMp := make(map[string][]rsp.OrderAndGoods, 0)
-
-	for _, info := range orderAndGoods {
-
-		//--------------
-		//构造未完成订单,有出库单号认为已完成（确认出库时，需拣和复核数一致的会写入出库单号）
-		if len(info.DeliveryOrderNo) == 0 {
-			notCompleteOrderMp[info.Number] = struct{}{}
-		}
-
-		//--------------
-
-		_, compOk := allOrderMp[info.Number]
-
-		if !compOk {
-			allOrderMp[info.Number] = make([]rsp.OrderAndGoods, 0)
-		}
-
-		//全部订单 把未完成的过滤掉
-		allOrderMp[info.Number] = append(allOrderMp[info.Number], info)
-
-	}
-
-	//将要被删除订单表number
-	deleteNumbers := make([]string, 0)
-
-	tx := db.Begin()
-
-	completeOrder := make([]model.CompleteOrder, 0)
-	completeOrderDetail := make([]model.CompleteOrderDetail, 0)
-
-	//已完成订单转存入完成订单表 同时删除 订单商品表数据
-	for k, orderSlice := range allOrderMp {
-		//订单号在未完成订单map中，过滤掉
-		_, ok := notCompleteOrderMp[k]
-		if ok {
-			continue
-		}
-		//不在未完成订单map中，
-		//step1:存入 将要被删除订单主键
-		deleteNumbers = append(deleteNumbers, k)
-		//step2:构造存入完成订单表相关数据
-		for i, o := range orderSlice {
-			if i == 0 { //第一条中取出完成订单表数据
-				payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
-
-				if payAtErr != nil {
-					xsq_net.ErrorJSON(c, ecode.DataTransformationError)
-					return
-				}
-
-				completeOrder = append(completeOrder, model.CompleteOrder{
-					Number:         o.Number,
-					OrderRemark:    o.OrderRemark,
-					ShopId:         o.ShopId,
-					ShopName:       o.ShopName,
-					ShopType:       o.ShopType,
-					ShopCode:       o.ShopCode,
-					Line:           o.Line,
-					DeliveryMethod: o.DistributionType,
-					PayCount:       o.PayCount,
-					CloseCount:     o.CloseCount,
-					OutCount:       o.OutCount,
-					Province:       o.Province,
-					City:           o.City,
-					District:       o.District,
-					PickTime:       o.LatestPickingTime,
-					PayAt:          payAt.Format(timeutil.TimeFormat),
-				})
-			}
-			completeOrderDetail = append(completeOrderDetail, model.CompleteOrderDetail{
-				Number:          o.Number,
-				GoodsName:       o.GoodsName,
-				Sku:             o.Sku,
-				GoodsSpe:        o.GoodsSpe,
-				GoodsType:       o.GoodsType,
-				Shelves:         o.Shelves,
-				PayCount:        o.PayCount,
-				CloseCount:      o.CloseCount,
-				ReviewCount:     o.LackCount, //这里可能有问题
-				GoodsRemark:     o.GoodsRemark,
-				DeliveryOrderNo: o.DeliveryOrderNo,
-			})
-		}
-	}
-
-	//添加完成订单主表数据
-	result = tx.Create(&completeOrder)
-
-	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	//添加完成订单明细表数据
-	result = tx.Create(&completeOrderDetail)
-
-	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	//删除订单表数据
-	result = tx.Delete(&model.Order{}, "number in (?)", deleteNumbers)
-
-	//删除订单商品表数据
-	result = tx.Delete(&model.OrderGoods{}, "number in (?)", deleteNumbers)
-
-	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	tx.Commit()
-
 	err := PushU8(pickGoods, orderAndGoods)
 
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	//这里会删数据，要放在推u8之后处理，失败重试要加上这里的逻辑
+	err = UpdateCompleteOrder(form.Id)
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return
@@ -701,7 +598,7 @@ func EndBatch(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
+func UpdateCompleteOrder(batchId int) error {
 	db := global.DB
 
 	var (
@@ -735,6 +632,7 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 		completeMp = make(map[string]interface{}, 0)
 		//待删除订单表id
 		deleteIds           []int
+		deleteNumbers       []string //删除订单商品表
 		completeOrder       = make([]model.CompleteOrder, 0)
 		completeOrderDetail = make([]model.CompleteOrderDetail, 0)
 		//待更新为欠货订单表id
@@ -752,6 +650,13 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 
 		completeMp[o.Number] = struct{}{}
 
+		deleteNumbers = append(deleteNumbers, o.Number)
+
+		payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
+
+		if payAtErr != nil {
+			return ecode.DataTransformationError
+		}
 		//完成订单
 		completeOrder = append(completeOrder, model.CompleteOrder{
 			Number:         o.Number,
@@ -769,7 +674,7 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 			City:           o.City,
 			District:       o.District,
 			PickTime:       o.LatestPickingTime,
-			PayAt:          o.PayAt,
+			PayAt:          payAt.Format(timeutil.TimeFormat),
 		})
 	}
 
@@ -796,30 +701,52 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 		})
 	}
 
+	tx := db.Begin()
+
 	result = tx.Delete(&model.Order{}, "id in (?)", deleteIds)
 
 	if result.Error != nil {
+		tx.Rollback()
 		return result.Error
 	}
 
-	result = tx.Model(&model.Order{}).Where("id in (?)", lackIds).Updates(map[string]interface{}{
-		"order_type": 3,
-	})
+	if len(deleteNumbers) > 0 {
+		deleteNumbers = slice.UniqueStringSlice(deleteNumbers)
 
-	if result.Error != nil {
-		return result.Error
+		result = tx.Delete(&model.OrderGoods{}, "number in (?)", deleteNumbers)
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+	}
+
+	if len(lackIds) > 0 {
+		result = tx.Model(&model.Order{}).Where("id in (?)", lackIds).Updates(map[string]interface{}{
+			"order_type": 3,
+		})
+
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
 	}
 
 	//保存完成订单
-	result = tx.Save(&completeOrder)
-	if result.Error != nil {
-		return result.Error
+	if len(completeOrder) > 0 {
+		result = tx.Save(&completeOrder)
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
 	}
 
 	//保存完成订单详情
-	result = tx.Save(&completeOrderDetail)
-	if result.Error != nil {
-		return result.Error
+	if len(completeOrderDetail) > 0 {
+		result = tx.Save(&completeOrderDetail)
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
 	}
 
 	//更新pickOrder为已完成
@@ -828,8 +755,11 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 	})
 
 	if result.Error != nil {
+		tx.Rollback()
 		return result.Error
 	}
+
+	tx.Commit()
 
 	return nil
 }
@@ -937,6 +867,8 @@ func PushU8(pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods) erro
 			GoodsUnit:    info.GoodsUnit,
 			SlaveUnit:    info.SaleUnit,
 		})
+
+		mpPgv[info.Number] = pgv
 	}
 
 	global.SugarLogger.Info(mpPgv)
@@ -1041,7 +973,7 @@ func GetBatchOrderAndGoods(c *gin.Context) {
 			GoodsUnit:       good.GoodsUnit,
 			SaleUnit:        good.SaleUnit,
 			SaleCode:        good.SaleCode,
-			PayCount:        good.PayCount,
+			PayCount:        good.LackCount,
 			GoodsRemark:     good.GoodsRemark,
 			Number:          good.Number,
 			DeliveryOrderNo: good.DeliveryOrderNo,
@@ -1087,7 +1019,7 @@ func GetBatchOrderAndGoods(c *gin.Context) {
 		})
 	}
 
-	xsq_net.SucJson(c, res)
+	xsq_net.SucJson(c, gin.H{"count": len(pickOrderGoods), "list": res})
 }
 
 // 当前批次是否有接单
@@ -1357,15 +1289,13 @@ func GetBase(c *gin.Context) {
 		deliveryStartTime = batchCond.DeliveryStartTime.Format(timeutil.TimeFormat)
 	}
 
-	line := batches.BatchName
-
 	ret := rsp.GetBaseRsp{
 		CreateTime:        batchCond.CreateTime.Format(timeutil.TimeFormat),
 		PayEndTime:        batchCond.PayEndTime.Format(timeutil.TimeFormat),
 		DeliveryStartTime: deliveryStartTime,
 		DeliveryEndTime:   batchCond.DeliveryEndTime.Format(timeutil.TimeFormat),
 		DeliveryMethod:    batchCond.DeliveryMethod,
-		Line:              line,
+		Line:              batchCond.Line,
 		Goods:             batchCond.Goods,
 		Status:            batches.Status,
 	}

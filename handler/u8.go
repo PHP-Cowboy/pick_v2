@@ -1,10 +1,15 @@
 package handler
 
 import (
+	"github.com/gin-gonic/gin"
 	"io"
 	"math"
 	"net/http"
+	"pick_v2/forms/req"
 	"pick_v2/global"
+	"pick_v2/model"
+	"pick_v2/utils/ecode"
+	"pick_v2/utils/xsq_net"
 	"strconv"
 	"strings"
 	"time"
@@ -256,4 +261,50 @@ func SubKeepNum(a string, b string, num int32) string {
 	da, _ := decimal.NewFromString(a)
 	db, _ := decimal.NewFromString(b)
 	return da.Sub(db).StringFixed(num)
+}
+
+func LogList(c *gin.Context) {
+	var form req.LogListForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var (
+		total    int64
+		stockLog []model.StockLog
+	)
+
+	db := global.DB
+
+	result := db.Model(&model.StockLog{}).Where("").Count(&total)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	localDb := db.Model(&model.StockLog{}).Where(model.StockLog{Status: form.Status})
+
+	if form.StartTime != "" {
+		localDb = localDb.Where("create_time >= ?", form.StartTime)
+	}
+
+	if form.EndTime != "" {
+		localDb = localDb.Where("create_time <= ?", form.EndTime)
+	}
+
+	localDb.Scopes(model.Paginate(form.Page, form.Size)).Find(&stockLog)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	xsq_net.SucJson(c, gin.H{"total": total, "list": stockLog})
+}
+
+func BatchSupplement(c *gin.Context) {
+	xsq_net.Success(c)
 }

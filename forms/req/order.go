@@ -2,7 +2,7 @@ package req
 
 type PickOrderListForm struct {
 	Paging
-	OrderType        int    `json:"order_type" form:"order_type" binding:"oneof=0 1 2 3"`
+	OrderType        int    `json:"order_type" form:"order_type" binding:"oneof=0 1 2 3 4"`
 	ShopId           int    `json:"shop_id" form:"shop_id"`
 	Sku              string `json:"sku" form:"sku"`
 	Number           string `json:"number" form:"number"`

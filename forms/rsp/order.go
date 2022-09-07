@@ -6,6 +6,7 @@ type PickOrderGoodsListRsp struct {
 }
 
 type PickOrder struct {
+	Id                int    `json:"id"`
 	Number            string `json:"number"`
 	PickNumber        string `json:"pick_number"`
 	PayAt             string `json:"pay_time"`

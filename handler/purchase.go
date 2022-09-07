@@ -31,6 +31,7 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 			global.SugarLogger.Errorf("解析json失败:%s", err.Error())
 			return consumer.ConsumeRetryLater, nil
 		}
+		form.OrderId = append(form.OrderId, Id)
 	}
 
 	orderRsp, err := GetOrderInfo(form)

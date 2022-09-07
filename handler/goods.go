@@ -85,7 +85,7 @@ func GetGoodsList(c *gin.Context) {
 		return
 	}
 
-	result = localDb.Scopes(model.Paginate(form.Page, form.Size)).Find(&orders)
+	result = localDb.Order("pay_at").Scopes(model.Paginate(form.Page, form.Size)).Find(&orders)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -101,9 +101,16 @@ func GetGoodsList(c *gin.Context) {
 			latestPickingTime = o.LatestPickingTime.Format(timeutil.TimeFormat)
 		}
 
+		payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
+
+		if payAtErr != nil {
+			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+			return
+		}
+
 		list = append(list, rsp.Order{
 			Number:            o.Number,
-			PayAt:             o.PayAt,
+			PayAt:             payAt.Format(timeutil.TimeFormat),
 			ShopCode:          o.ShopCode,
 			ShopName:          o.ShopName,
 			ShopType:          o.ShopType,
@@ -168,7 +175,7 @@ func GetOrderDetail(c *gin.Context) {
 
 	detailMap := make(map[string]*rsp.Detail, 0)
 
-	deliveryOrderNoArr := make([]*string, 0)
+	deliveryOrderNoArr := make(model.GormList, 0)
 
 	for _, og := range orderGoods {
 
@@ -212,7 +219,7 @@ func GetOrderDetail(c *gin.Context) {
 
 	res.Detail = detailMap
 
-	deliveryOrderNoArr = slice.UniqueStringSlicePtr(deliveryOrderNoArr)
+	deliveryOrderNoArr = slice.UniqueStringSlice(deliveryOrderNoArr)
 	//历史出库单号
 	res.DeliveryOrderNo = deliveryOrderNoArr
 
@@ -413,6 +420,13 @@ func CompleteOrder(c *gin.Context) {
 	list := make([]rsp.CompleteOrder, 0, form.Size)
 
 	for _, o := range completeOrder {
+
+		pickTime := ""
+
+		if o.PickTime != nil {
+			pickTime = o.PickTime.Format(timeutil.TimeFormat)
+		}
+
 		list = append(list, rsp.CompleteOrder{
 			Number:      o.Number,
 			PayAt:       o.PayAt,
@@ -424,7 +438,7 @@ func CompleteOrder(c *gin.Context) {
 			CloseCount:  o.CloseCount,
 			Line:        o.Line,
 			Region:      fmt.Sprintf("%s-%s-%s", o.Province, o.City, o.District),
-			PickTime:    o.PickTime.Format(timeutil.TimeFormat),
+			PickTime:    pickTime,
 			OrderRemark: o.OrderRemark,
 		})
 	}
@@ -469,6 +483,8 @@ func CompleteOrderDetail(c *gin.Context) {
 
 	goodsMap := make(map[string][]rsp.PrePickGoods, 0)
 
+	deliveryOrderNoArr := make(model.GormList, 0)
+
 	for _, goods := range completeOrderDetail {
 		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.PrePickGoods{
 			GoodsName:   goods.GoodsName,
@@ -480,7 +496,10 @@ func CompleteOrderDetail(c *gin.Context) {
 			NeedOutNum:  goods.PayCount,
 			GoodsRemark: goods.GoodsRemark,
 		})
+		deliveryOrderNoArr = append(deliveryOrderNoArr, goods.DeliveryOrderNo...)
 	}
+
+	deliveryOrderNoArr = slice.UniqueStringSlice(deliveryOrderNoArr)
 
 	res.Goods = goodsMap
 
@@ -491,6 +510,7 @@ func CompleteOrderDetail(c *gin.Context) {
 	res.ShopType = completeOrder.ShopType
 	res.Number = completeOrder.Number
 	res.OrderRemark = completeOrder.OrderRemark
+	res.DeliveryOrderNo = deliveryOrderNoArr
 
 	xsq_net.SucJson(c, res)
 }

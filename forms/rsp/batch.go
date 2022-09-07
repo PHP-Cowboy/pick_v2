@@ -199,7 +199,8 @@ type OrderAndGoods struct {
 	GoodsRemark       string     `json:"goods_remark"`
 	Status            int        `json:"status"`
 	BatchId           int        `json:"batch_id"`
-	DeliveryOrderNo   []*string  `json:"delivery_order_no"`
+	DeliveryOrderNo   []string   `json:"delivery_order_no"`
+	PickNumber        string     `json:"pick_number"`
 	ShopId            int        `json:"shop_id"`
 	ShopName          string     `json:"shop_name"`
 	ShopCode          string     `json:"shop_code"`

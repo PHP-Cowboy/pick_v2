@@ -382,7 +382,7 @@ func ConfirmDelivery(c *gin.Context) {
 
 	type OrderGoods struct {
 		OutCount           int
-		deliveryOrderNoArr []*string
+		deliveryOrderNoArr model.GormList
 	}
 
 	orderGoodsMp := make(map[int]OrderGoods, 0)
@@ -425,10 +425,10 @@ func ConfirmDelivery(c *gin.Context) {
 		pickGoodsIds = append(pickGoodsIds, pickGoodsId)
 		mp[pickGoodsId] = reviewCompleteNum
 
-		deliveryOrderNoArr := make([]*string, 0)
+		deliveryOrderNoArr := make(model.GormList, 0)
 
 		deliveryOrderNoArr = append(deliveryOrderNoArr, info.DeliveryOrderNo...)
-		deliveryOrderNoArr = append(deliveryOrderNoArr, &deliveryOrderNo)
+		deliveryOrderNoArr = append(deliveryOrderNoArr, deliveryOrderNo)
 
 		orderGoodsMp[info.OrderGoodsId] = OrderGoods{
 			OutCount:           reviewCompleteNum,
@@ -464,31 +464,6 @@ func ConfirmDelivery(c *gin.Context) {
 		})
 
 		orderGoodsId = append(orderGoodsId, info.OrderGoodsId)
-
-		////构造更新订单商品表数据
-		//orderGoods = append(orderGoods, model.OrderGoods{
-		//	Id:              info.OrderGoodsId,
-		//	CreateTime:      info.CreateTime,
-		//	UpdateTime:      info.UpdateTime,
-		//	DeleteTime:      info.DeleteTime,
-		//	Number:          info.Number,
-		//	GoodsName:       info.GoodsName,
-		//	Sku:             info.Sku,
-		//	GoodsType:       info.GoodsType,
-		//	GoodsSpe:        info.GoodsSpe,
-		//	Shelves:         info.Shelves,
-		//	DiscountPrice:   info.DiscountPrice,
-		//	GoodsUnit:       info.GoodsUnit,
-		//	SaleUnit:        info.SaleUnit,
-		//	SaleCode:        info.SaleCode,
-		//	PayCount:        info.PayCount,
-		//	CloseCount:      info.CloseCount,
-		//	LackCount:       info.LackCount - reviewCompleteNum,
-		//	OutCount:        reviewCompleteNum,
-		//	GoodsRemark:     info.GoodsRemark,
-		//	BatchId:         info.BatchId,
-		//	DeliveryOrderNo: deliveryOrderNoArr,
-		//})
 	}
 
 	//获取拣货商品数据
@@ -559,6 +534,8 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
+	now := time.Now()
+
 	for i, o := range order {
 		picked, ogMpOk := orderPickMp[o.Number]
 
@@ -584,6 +561,7 @@ func ConfirmDelivery(c *gin.Context) {
 		}
 		order[i].PayAt = payAt.Format(timeutil.TimeFormat)
 		order[i].DeliveryAt = deliveryAt.Format(timeutil.TimeFormat)
+		order[i].LatestPickingTime = &now
 	}
 
 	tx := db.Begin()
@@ -612,8 +590,6 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
-	now := time.Now()
-
 	//更新 order 表 最近拣货时间
 	result = tx.Model(&model.PickOrder{}).
 		Where("number in (?)", orderNumbers).
@@ -627,6 +603,20 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
+	//var no model.GormList
+	//
+	//no = append(no,deliveryOrderNo)
+
+	no := model.GormList{deliveryOrderNo}
+
+	val, err := no.Value()
+
+	if err != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
 	//更新主表
 	result = tx.Model(&model.Pick{}).
 		Where("id = ?", pick.Id).
@@ -635,7 +625,7 @@ func ConfirmDelivery(c *gin.Context) {
 			"review_time":       &now,
 			"num":               form.Num,
 			"review_num":        totalNum,
-			"delivery_order_no": deliveryOrderNo,
+			"delivery_order_no": val,
 		})
 
 	if result.Error != nil {
