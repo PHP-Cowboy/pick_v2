@@ -583,7 +583,7 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
-	//更新 order 表 最近拣货时间
+	//更新 pick_order 表 最近拣货时间
 	result = tx.Model(&model.PickOrder{}).
 		Where("number in (?)", orderNumbers).
 		Updates(map[string]interface{}{

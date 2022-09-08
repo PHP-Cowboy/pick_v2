@@ -440,3 +440,337 @@ func Assign(c *gin.Context) {
 
 	xsq_net.Success(c)
 }
+
+//修改复核数
+func ChangeReviewNum(c *gin.Context) {
+	var form req.ChangeReviewNumForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var (
+		batch          model.Batch
+		pick           model.Pick
+		pickGoods      []model.PickGoods
+		pickOrderGoods []model.PickOrderGoods
+		order          []model.Order
+		orderGoods     []model.OrderGoods
+	)
+
+	db := global.DB
+
+	result := db.First(&batch, form.BatchId)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//只允许改进行中的批次数据
+	if batch.Status != 0 {
+		xsq_net.ErrorJSON(c, errors.New("只能修改进行中的批次数据"))
+		return
+	}
+
+	result = db.First(&pick, form.PickId)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//只允许修改复核完成状态的数据
+	if pick.Status != 2 {
+		xsq_net.ErrorJSON(c, errors.New("只能修改拣货复核完成的数据"))
+		return
+	}
+
+	result = db.Model(&model.PickGoods{}).Where("pick_id = ? and sku = ?", form.PickId, form.Sku).Find(&pickGoods)
+
+	var (
+		reviewTotal     int
+		needTotal       int
+		numbers         []string
+		numberPickNumMp = make(map[string]int) //订单本次复核数map
+	)
+	//计算 pick_goods sku 复核总数 需拣总数
+	for _, good := range pickGoods {
+		reviewTotal += good.ReviewNum
+		needTotal += good.NeedNum
+
+		numbers = append(numbers, good.Number) //不需要去重，一个拣货任务 订单号和sku本来就是唯一的
+
+		numberPickNumMp[good.Number] = good.ReviewNum
+	}
+
+	num := form.Num
+
+	if *num > needTotal {
+		xsq_net.ErrorJSON(c, errors.New("修改后的复核数大于需拣数，请核对"))
+		return
+	}
+
+	//复核数 差值 = 原来sku复核总数 - form.Num
+	reviewNumDiff := reviewTotal - *num
+
+	if reviewNumDiff == 0 { //没改，不折腾了
+		xsq_net.Success(c)
+		return
+	}
+
+	//拣货池 复核总数 = 复核总数 - 复核数 差值
+	pick.ReviewNum = pick.ReviewNum - reviewNumDiff
+
+	result = db.Model(&model.Order{}).Where("number in (?)", numbers).Order("pay_at asc").Find(&order)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	for i, o := range order {
+		if reviewNumDiff == 0 { //开始就小于0或大于0
+			break
+		}
+
+		//订单本次复核数
+		reviewNum, ok := numberPickNumMp[o.Number]
+
+		if !ok {
+			continue
+		}
+
+		//这里 需要 确认下 closeNum逻辑
+		//当前单需拣数
+		orderNeed := o.PayTotal - o.CloseNum
+
+		if reviewNumDiff > 0 { //修改后的复核数比原来大 已拣要加 未拣要减
+			//当前剩余需拣 是否有往上加的空间
+			if orderNeed > 0 { //剩余需拣大于0 有加的空间
+				//能加几个
+				if orderNeed >= reviewNumDiff { //能加满
+					order[i].Picked += reviewNumDiff
+					order[i].UnPicked -= reviewNumDiff
+					reviewNumDiff = 0
+				} else {
+					order[i].Picked += orderNeed //加到可以加的数量
+					order[i].UnPicked -= orderNeed
+					reviewNumDiff -= orderNeed
+				}
+			} //没有else ，没有空间加了，给下一条加
+
+		} else { //修改后的复核数比原来小 已拣要扣，未拣要增
+			reviewNumDiff = 0 - reviewNumDiff //不想用绝对值，直接减吧
+			//确认出库前 已拣数量 未拣数量
+			//历史已拣数量
+			beforePicked := o.Picked - reviewNum
+			//历史未拣数量
+			beforeUnPicked := o.UnPicked + reviewNum
+			//历史剩余需拣 = 需拣 - 历史已拣
+			surplus := orderNeed - beforePicked
+			//历史剩余需拣 大于等于 复核差值
+			if surplus >= reviewNumDiff {
+				order[i].Picked -= reviewNumDiff
+				order[i].UnPicked += reviewNumDiff
+				reviewNumDiff = 0
+			} else {
+				//历史剩余需拣 比 复核差值小
+				order[i].Picked = beforePicked           //已拣直接扣回到历史已拣
+				order[i].UnPicked = beforeUnPicked       //未拣还原到历史未拣
+				reviewNumDiff -= o.Picked - beforePicked //差值 -= (复核数恢复前-即当前记录的拣货数 - 历史已拣)
+			}
+		}
+	}
+
+	result = db.Table("t_order_goods og").
+		Select("og.*").
+		Joins("left join t_order o on og.number = o.number").
+		Where("number in (?) and sku = ?", numbers, form.Sku).
+		Order("o.pay_at asc").
+		Find(&orderGoods)
+
+	for i, og := range orderGoods {
+		if reviewNumDiff == 0 {
+			break
+		}
+
+		//订单本次复核数
+		reviewNum, ok := numberPickNumMp[og.Number]
+
+		if !ok {
+			continue
+		}
+
+		//这里 需要 确认下 closeNum逻辑
+		//当前单需拣数
+		orderNeed := og.PayCount - og.CloseCount
+
+		if reviewNumDiff > 0 { //修改后的复核数比原来大 已拣要加 未拣要减
+			//当前剩余需拣 是否有往上加的空间
+			if orderNeed > 0 { //剩余需拣大于0 有加的空间
+				//能加几个
+				if orderNeed >= reviewNumDiff { //能加满
+					orderGoods[i].OutCount += reviewNumDiff
+					orderGoods[i].LackCount -= reviewNumDiff
+					reviewNumDiff = 0
+				} else {
+					orderGoods[i].OutCount += orderNeed //加到可以加的数量
+					orderGoods[i].LackCount -= orderNeed
+					reviewNumDiff -= orderNeed
+				}
+			} //没有else ，没有空间加了，给下一条加
+
+		} else { //修改后的复核数比原来小 已拣要扣，未拣要增
+			reviewNumDiff = 0 - reviewNumDiff //不想用绝对值，直接减吧
+			//确认出库前 已拣数量 未拣数量
+			//历史已拣数量
+			beforePicked := og.OutCount - reviewNum
+			//历史未拣数量
+			beforeUnPicked := og.LackCount + reviewNum
+			//历史剩余需拣 = 需拣 - 历史已拣
+			surplus := orderNeed - beforePicked
+			//历史剩余需拣 大于等于 复核差值
+			if surplus >= reviewNumDiff {
+				orderGoods[i].OutCount -= reviewNumDiff
+				orderGoods[i].LackCount += reviewNumDiff
+				reviewNumDiff = 0
+			} else {
+				//历史剩余需拣 比 复核差值小
+				orderGoods[i].OutCount = beforePicked       //已拣直接扣回到历史已拣
+				orderGoods[i].LackCount = beforeUnPicked    //未拣还原到历史未拣
+				reviewNumDiff -= og.OutCount - beforePicked //差值 -= (复核数恢复前-即当前记录的拣货数 - 历史已拣)
+			}
+		}
+
+		//if reviewNumDiff > 0 {
+		//	if reviewNumDiff <= og.OutCount {
+		//		orderGoods[i].OutCount -= reviewNumDiff
+		//		orderGoods[i].LackCount += reviewNumDiff
+		//	}else {
+		//		//修改后的复核数比原来大
+		//
+		//		//最多只能加到 下单数
+		//
+		//		//已拣要加 未拣要减
+		//		orderGoods[i].OutCount += reviewNumDiff
+		//		orderGoods[i].LackCount -= reviewNumDiff
+		//	}
+		//}
+
+	}
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//pick_order_goods
+	result = db.Table("t_pick_order_goods og").
+		Select("og.*").
+		Joins("left join t_pick_order o on og.number = o.number").
+		Where("number in (?) and sku = ?", numbers, form.Sku).
+		Order("o.pay_at asc").
+		Find(&pickOrderGoods)
+
+	//todo 订单可以多次生成拣货单 这个逻辑有问题
+	for i, og := range pickOrderGoods {
+		if reviewNumDiff == 0 {
+			break
+		}
+
+		//订单本次复核数
+		reviewNum, ok := numberPickNumMp[og.Number]
+
+		if !ok {
+			continue
+		}
+
+		//这里 需要 确认下 closeNum逻辑
+		//当前单需拣数
+		orderNeed := og.PayCount - og.CloseCount
+
+		if reviewNumDiff > 0 { //修改后的复核数比原来大 已拣要加 未拣要减
+			//当前剩余需拣 是否有往上加的空间
+			if orderNeed > 0 { //剩余需拣大于0 有加的空间
+				//能加几个
+				if orderNeed >= reviewNumDiff { //能加满
+					pickOrderGoods[i].OutCount += reviewNumDiff
+					pickOrderGoods[i].LackCount -= reviewNumDiff
+					reviewNumDiff = 0
+				} else {
+					pickOrderGoods[i].OutCount += orderNeed //加到可以加的数量
+					pickOrderGoods[i].LackCount -= orderNeed
+					reviewNumDiff -= orderNeed
+				}
+			} //没有else ，没有空间加了，给下一条加
+
+		} else { //修改后的复核数比原来小 已拣要扣，未拣要增
+			reviewNumDiff = 0 - reviewNumDiff //不想用绝对值，直接减吧
+			//确认出库前 已拣数量 未拣数量
+			//历史已拣数量
+			beforePicked := og.OutCount - reviewNum
+			//历史未拣数量
+			beforeUnPicked := og.LackCount + reviewNum
+			//历史剩余需拣 = 需拣 - 历史已拣
+			surplus := orderNeed - beforePicked
+			//历史剩余需拣 大于等于 复核差值
+			if surplus >= reviewNumDiff {
+				pickOrderGoods[i].OutCount -= reviewNumDiff
+				pickOrderGoods[i].LackCount += reviewNumDiff
+				reviewNumDiff = 0
+			} else {
+				//历史剩余需拣 比 复核差值小
+				pickOrderGoods[i].OutCount = beforePicked    //已拣直接扣回到历史已拣
+				pickOrderGoods[i].LackCount = beforeUnPicked //未拣还原到历史未拣
+				reviewNumDiff -= og.OutCount - beforePicked  //差值 -= (复核数恢复前-即当前记录的拣货数 - 历史已拣)
+			}
+		}
+
+	}
+
+	tx := db.Begin()
+
+	result = tx.
+		Select("id", "update_time", "shop_code", "shop_name", "line", "review_num"). //这里要改下表结构
+		Save(&pick)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = tx.
+		Select("id", "update_time", "picked", "un_picked").
+		Save(&order)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = tx.
+		Select("id", "lack_count", "out_count").
+		Save(&orderGoods)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = tx.
+		Select("id", "lack_count", "out_count").
+		Save(&pickOrderGoods)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//pick_goods 咋改 以拣货单为突破口，向上 向下更新 订单 和 pick_goods
+}

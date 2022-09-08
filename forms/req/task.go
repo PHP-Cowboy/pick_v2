@@ -30,3 +30,10 @@ type AssignReq struct {
 	UserId  int   `json:"user_id" binding:"required"`
 	PickIds []int `json:"pick_ids" binding:"required"`
 }
+
+type ChangeReviewNumForm struct {
+	BatchId int    `json:"batchId" binding:"required"`
+	PickId  int    `json:"pickId" binding:"required"`
+	Sku     string `json:"sku" binding:"required"`
+	Num     *int   `json:"num" binding:"required"`
+}
