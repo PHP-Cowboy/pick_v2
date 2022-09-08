@@ -6,13 +6,13 @@ import (
 	"pick_v2/middlewares"
 )
 
-func U8Route(g *gin.RouterGroup) {
+func YongYouRoute(g *gin.RouterGroup) {
 
-	u8Group := g.Group("/user", middlewares.JWTAuth(), middlewares.IsSuperAdminAuth())
+	yongYouRouteGroup := g.Group("/yongYou", middlewares.JWTAuth(), middlewares.IsSuperAdminAuth())
 	{
-		//用户列表
-		u8Group.GET("/list", handler.LogList)
+		//u8推送日志列表
+		yongYouRouteGroup.GET("/list", handler.LogList)
 		//批量补单
-		u8Group.POST("/batchSupplement", handler.BatchSupplement)
+		yongYouRouteGroup.POST("/batchSupplement", handler.BatchSupplement)
 	}
 }

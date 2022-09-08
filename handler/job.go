@@ -1,38 +1,25 @@
 package handler
 
-import "pick_v2/global"
+import (
+	"pick_v2/global"
+	"time"
+)
 
-// 单仓 写入
-func AddPrintJob(ch *global.PrintCh) {
-	global.Job <- ch
-}
-
-// 单仓 读取消费
-func GetPrintJob() *global.PrintCh {
-
-	select {
-	case printCh := <-global.Job:
-		return printCh
-	default:
-		return nil
-	}
-}
-
-// 多仓 写入
+// 打印 写入
 func AddPrintJobMap(warehouseCode string, printCh *global.PrintCh) {
-	_, ok := global.JobMap[warehouseCode]
+	_, ok := global.PrintMapCh[warehouseCode]
 
 	if !ok {
 		ch := make(chan *global.PrintCh, 1000)
-		global.JobMap[warehouseCode] = ch
+		global.PrintMapCh[warehouseCode] = ch
 	}
 
-	global.JobMap[warehouseCode] <- printCh
+	global.PrintMapCh[warehouseCode] <- printCh
 }
 
-// 多仓 读取消费
+// 打印 读取消费
 func GetPrintJobMap(warehouseCode string) *global.PrintCh {
-	job, ok := global.JobMap[warehouseCode]
+	job, ok := global.PrintMapCh[warehouseCode]
 
 	if !ok {
 		return nil
@@ -43,5 +30,22 @@ func GetPrintJobMap(warehouseCode string) *global.PrintCh {
 		return printCh
 	default:
 		return nil
+	}
+}
+
+// u8 生成者
+func YongYouProducer(id int) {
+	global.YongYouCh <- id
+}
+
+// u8 消费者
+func YongYouConsumer() {
+	for {
+		select {
+		case id := <-global.YongYouCh:
+			PushYongYou(id)
+			time.Sleep(3 * time.Second)
+		case <-time.After(30 * time.Second):
+		}
 	}
 }

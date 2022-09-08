@@ -18,6 +18,6 @@ var (
 	Redis        *redis.Client
 	ServerConfig = &config.ServerConfig{}
 	SugarLogger  *zap.SugaredLogger
-	Job          = make(chan *PrintCh, 1000)
-	JobMap       = make(map[string]chan *PrintCh, 0)
+	PrintMapCh   = make(map[string]chan *PrintCh, 0)
+	YongYouCh    = make(chan int, 1000)
 )

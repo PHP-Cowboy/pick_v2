@@ -21,7 +21,9 @@ func main() {
 
 	initialize.InitMysql()
 
-	initialize.InitSqlServer()
+	//initialize.InitSqlServer()
+
+	initialize.InitJob()
 
 	initialize.InitRedis()
 

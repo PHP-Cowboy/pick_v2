@@ -43,6 +43,8 @@ func InitRouter() *gin.Engine {
 	router.ExportRoute(group)
 	//开放数据
 	router.OpenRoute(group)
+	//u8
+	router.YongYouRoute(group)
 
 	return r
 }

@@ -158,7 +158,7 @@ func CreateByOrder(c *gin.Context) {
 
 	var batchId int
 	//批次相关
-	batchId, err = SaveBatch(tx, userInfo, form.Number, pickOrder.Line, "", "", pickOrder.DistributionType, &payAt, nil, &deliveryEndTime)
+	batchId, err = SaveBatch(tx, userInfo, pickOrder.ShopName, pickOrder.Line, "", "", pickOrder.DistributionType, &payAt, nil, &deliveryEndTime)
 
 	if err != nil {
 		tx.Rollback()
@@ -574,7 +574,7 @@ func EndBatch(c *gin.Context) {
 		mpGoods[good.OrderGoodsId] = good
 	}
 
-	err := PushU8(pickGoods, orderAndGoods)
+	err := YongYouLog(pickGoods, orderAndGoods, form.Id)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
@@ -822,7 +822,8 @@ func EditBatch(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-func PushU8(pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods) error {
+// 推送u8 日志记录生成
+func YongYouLog(pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods, batchId int) error {
 
 	mpGoods := make(map[string]model.PickGoods, 0)
 
@@ -849,6 +850,7 @@ func PushU8(pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods) erro
 		if !ok {
 			pgv = PickGoodsView{}
 		}
+
 		pgv.SaleNumber = info.Number
 		pgv.ShopId = int64(info.ShopId)
 		pgv.ShopName = info.ShopName
@@ -873,49 +875,34 @@ func PushU8(pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods) erro
 
 	global.SugarLogger.Info(mpPgv)
 
-	var stockLog = make([]model.StockLog, 0)
+	var stockLogs = make([]model.StockLog, 0)
 
 	for _, view := range mpPgv {
 		//推送u8
-		xml := GenU8Xml(view, view.ShopId, view.ShopName, view.HouseCode) //店铺属性中获 HouseCode
-		shopXml, err := SendShopXml(xml)
-		if err != nil {
-			stockLog = append(stockLog, model.StockLog{
-				Number:      view.SaleNumber,
-				PickId:      0,
-				Status:      2, //失败
-				RequestXml:  xml,
-				ResponseXml: shopXml,
-				Msg:         "",
-				ResponseNo:  "",
-				ShopName:    view.ShopName,
-			})
-		} else {
-			stockLog = append(stockLog, model.StockLog{
-				Number:      view.SaleNumber,
-				PickId:      0,
-				Status:      1, //成功
-				RequestXml:  xml,
-				ResponseXml: shopXml,
-				Msg:         "",
-				ResponseNo:  "",
-				ShopName:    view.ShopName,
-			})
-		}
+		xml := GenU8Xml(view, view.ShopId, view.ShopName, "05") //店铺属性中获 HouseCode
+
+		stockLogs = append(stockLogs, model.StockLog{
+			Number:      view.SaleNumber,
+			BatchId:     batchId,
+			Status:      2, //失败
+			RequestXml:  xml,
+			ResponseXml: "",
+			ShopName:    view.ShopName,
+		})
 	}
 
-	if len(stockLog) > 0 {
-		result := global.DB.Save(&stockLog)
+	if len(stockLogs) > 0 {
+		result := global.DB.Save(&stockLogs)
 		if result.Error != nil {
 			return result.Error
+		}
+
+		for _, log := range stockLogs {
+			YongYouProducer(log.Id)
 		}
 	}
 
 	return nil
-}
-
-func RePush(c *gin.Context) {
-
 }
 
 func GetBatchOrderAndGoods(c *gin.Context) {

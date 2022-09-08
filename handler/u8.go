@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"io"
 	"math"
 	"net/http"
 	"pick_v2/forms/req"
+	"pick_v2/forms/rsp"
 	"pick_v2/global"
 	"pick_v2/model"
 	"pick_v2/utils/ecode"
@@ -263,27 +265,22 @@ func SubKeepNum(a string, b string, num int32) string {
 	return da.Sub(db).StringFixed(num)
 }
 
+// u8推送日志列表
 func LogList(c *gin.Context) {
 	var form req.LogListForm
 
 	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
 	var (
 		total    int64
 		stockLog []model.StockLog
+		res      rsp.LogListRsp
 	)
 
 	db := global.DB
-
-	result := db.Model(&model.StockLog{}).Where("").Count(&total)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
 
 	localDb := db.Model(&model.StockLog{}).Where(model.StockLog{Status: form.Status})
 
@@ -295,6 +292,15 @@ func LogList(c *gin.Context) {
 		localDb = localDb.Where("create_time <= ?", form.EndTime)
 	}
 
+	result := localDb.Count(&total)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	res.Total = total
+
 	localDb.Scopes(model.Paginate(form.Page, form.Size)).Find(&stockLog)
 
 	if result.Error != nil {
@@ -302,9 +308,84 @@ func LogList(c *gin.Context) {
 		return
 	}
 
-	xsq_net.SucJson(c, gin.H{"total": total, "list": stockLog})
+	list := make([]rsp.LogList, 0, len(stockLog))
+
+	for _, log := range stockLog {
+		list = append(list, rsp.LogList{
+			Id:          log.Id,
+			Number:      log.Number,
+			BatchId:     log.BatchId,
+			Status:      log.Status,
+			RequestXml:  log.RequestXml,
+			ResponseXml: log.ResponseXml,
+			ResponseNo:  log.ResponseNo,
+			Msg:         log.Msg,
+			ShopName:    log.ShopName,
+		})
+	}
+
+	res.List = list
+
+	xsq_net.SucJson(c, res)
 }
 
+// u8 批量补单
 func BatchSupplement(c *gin.Context) {
+	var form req.BatchSupplementForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	for _, id := range form.Ids {
+		YongYouProducer(id)
+	}
+
 	xsq_net.Success(c)
+}
+
+// u8 推送
+func PushYongYou(id int) {
+	var (
+		stockLog model.StockLog
+		db       = global.DB
+	)
+
+	result := db.First(&stockLog, id)
+
+	if result.Error != nil {
+		return
+	}
+
+	shopXml, err := SendShopXml(stockLog.RequestXml)
+
+	doc := etree.NewDocument()
+
+	if err != nil {
+		stockLog.Msg = fmt.Sprintf("SendShopXml err:", err.Error())
+	} else {
+		xmlErr := doc.ReadFromString(shopXml)
+
+		if xmlErr != nil {
+			stockLog.Msg = fmt.Sprintf("解析用友响应错误=", xmlErr.Error())
+		} else {
+			item := doc.SelectElement("ufinterface").SelectElement("item")
+			code := item.SelectAttr("succeed").Value
+
+			if code == "0" { //成功
+				stockLog.ResponseNo = item.SelectAttr("u8key").Value
+				stockLog.Status = 1
+			} else {
+				stockLog.Status = 2
+			}
+
+			stockLog.Msg = item.SelectAttr("dsc").Value
+		}
+	}
+
+	stockLog.UpdateTime = time.Now()
+
+	//db.Omit("create_time", "number", "batch_id", "shop_name","delete_time").Save(stockLog)
+	db.Select("id", "update_time", "status", "request_xml", "response_xml", "msg").Save(stockLog)
 }

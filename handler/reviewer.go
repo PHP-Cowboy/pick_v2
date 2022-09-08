@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"pick_v2/common/constant"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
@@ -328,7 +329,7 @@ func ConfirmDelivery(c *gin.Context) {
 	userInfo := GetUserInfo(c)
 
 	if userInfo == nil {
-		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
+		xsq_net.ErrorJSON(c, errors.New("获取用户数据失败"))
 		return
 	}
 
@@ -337,6 +338,7 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
+	//生成出库单号
 	deliveryOrderNo, err := cache.GetIncrNumberByKey(constant.DELIVERY_ORDER_NO, 3)
 
 	if err != nil {
@@ -546,21 +548,6 @@ func ConfirmDelivery(c *gin.Context) {
 		order[i].Picked = picked
 		order[i].UnPicked = o.UnPicked - picked
 
-		payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
-
-		if payAtErr != nil {
-			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
-			return
-		}
-
-		deliveryAt, DeliveryAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.DeliveryAt, time.Local)
-
-		if DeliveryAtErr != nil {
-			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
-			return
-		}
-		order[i].PayAt = payAt.Format(timeutil.TimeFormat)
-		order[i].DeliveryAt = deliveryAt.Format(timeutil.TimeFormat)
 		order[i].LatestPickingTime = &now
 	}
 
@@ -582,7 +569,13 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
-	result = tx.Save(&order)
+	result = tx.
+		Omit("number", "pay_at", "delivery_at", "has_remark", "address", "order_remark").
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"latest_picking_time", "picked", "un_picked"}),
+		}).
+		Save(&order)
 
 	if result.Error != nil {
 		tx.Rollback()
@@ -602,10 +595,6 @@ func ConfirmDelivery(c *gin.Context) {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
-
-	//var no model.GormList
-	//
-	//no = append(no,deliveryOrderNo)
 
 	no := model.GormList{deliveryOrderNo}
 
@@ -659,7 +648,7 @@ func ConfirmDelivery(c *gin.Context) {
 	}
 
 	if batch.Status == 1 {
-		err = PushU8(pickGoods, orderAndGoods)
+		err = YongYouLog(pickGoods, orderAndGoods, pick.BatchId)
 		if err != nil {
 			tx.Commit() // u8推送失败不能影响仓库出货，只提示，业务继续
 			xsq_net.ErrorJSON(c, err)
