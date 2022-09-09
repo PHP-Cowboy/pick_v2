@@ -21,5 +21,7 @@ func TaskRoute(g *gin.RouterGroup) {
 		taskGroup.POST("/push_print", handler.PushPrint)
 		//指派
 		taskGroup.POST("/assign", handler.Assign)
+		//修改复核数
+		taskGroup.POST("/changeReviewNum", handler.ChangeReviewNum)
 	}
 }

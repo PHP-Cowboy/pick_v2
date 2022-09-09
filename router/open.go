@@ -18,7 +18,7 @@ func OpenRoute(g *gin.RouterGroup) {
 		openGroup.POST("/closeOrder", handler.CloseOrder)
 		//关闭商品
 		openGroup.POST("/closeOrderGoods", handler.CloseOrderGoods)
-		//批次出库
+		//批次出库订单和商品明细
 		openGroup.POST("/getBatchOrderAndGoods", handler.GetBatchOrderAndGoods)
 	}
 }

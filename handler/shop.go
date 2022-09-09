@@ -304,10 +304,54 @@ func BatchSetDistributionType(c *gin.Context) {
 		return
 	}
 
-	ret := global.DB.Model(model.Shop{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"distribution_type": form.DistributionType})
+	db := global.DB
 
-	if ret.Error != nil {
-		xsq_net.ErrorJSON(c, ret.Error)
+	var shopIds []int
+
+	result := db.Model(&model.Shop{}).Select("shop_id").Where("id in (?)", form.Ids).Find(&shopIds)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	type Res struct {
+		Code int         `json:"code"`
+		Data interface{} `json:"data"`
+		Msg  string      `json:"msg"`
+	}
+
+	var (
+		res Res
+		mp  = make(map[string]interface{}, 8)
+	)
+
+	mp["shop_ids"] = shopIds
+	mp["delivery_id"] = form.DistributionType
+
+	body, err := request.Post("api/v1/remote/update/shop", mp)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	err = json.Unmarshal(body, &res)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	if res.Code != 200 {
+		xsq_net.ErrorJSON(c, errors.New(res.Msg))
+		return
+	}
+
+	result = db.Model(model.Shop{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"distribution_type": form.DistributionType})
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 

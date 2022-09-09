@@ -21,6 +21,7 @@ type Batch struct {
 	DeliveryMethod    int    `json:"delivery_method"`
 	EndTime           string `json:"end_time"`
 	Status            int    `json:"status"`
+	PrePickNum        int    `json:"pre_pick_num"`
 	PickNum           int    `json:"pick_num"`
 	RecheckSheetNum   int    `json:"recheck_sheet_num"`
 }

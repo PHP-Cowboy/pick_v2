@@ -168,14 +168,6 @@ func ReviewDetail(c *gin.Context) {
 			xsq_net.ErrorJSON(c, result.Error)
 			return
 		}
-
-		//更新复核单数量
-		result = db.Model(model.Batch{}).Where("id = ?", pick.BatchId).Update("recheck_sheet_num", gorm.Expr("recheck_sheet_num + ?", 1))
-
-		if result.Error != nil {
-			xsq_net.ErrorJSON(c, ecode.DataSaveError)
-			return
-		}
 	}
 
 	var (
@@ -615,6 +607,7 @@ func ConfirmDelivery(c *gin.Context) {
 			"num":               form.Num,
 			"review_num":        totalNum,
 			"delivery_order_no": val,
+			"delivery_no":       deliveryOrderNo,
 		})
 
 	if result.Error != nil {
@@ -654,6 +647,14 @@ func ConfirmDelivery(c *gin.Context) {
 			xsq_net.ErrorJSON(c, err)
 			return
 		}
+	}
+
+	err = UpdateBatchPickNums(tx, pick.BatchId)
+
+	if err != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
 	}
 
 	tx.Commit()

@@ -142,7 +142,7 @@ func ReceivingOrders(c *gin.Context) {
 	}
 
 	if len(batchIds) == 0 {
-		xsq_net.ErrorJSON(c, errors.New("已停止拣货,无法接单"))
+		xsq_net.ErrorJSON(c, errors.New("没有进行中的批次,无法接单"))
 		return
 	}
 
@@ -172,17 +172,6 @@ func ReceivingOrders(c *gin.Context) {
 				"take_orders_time": &now,
 				"version":          gorm.Expr("version + ?", 1),
 			})
-
-		if result.Error != nil {
-			tx.Rollback()
-			xsq_net.ErrorJSON(c, ecode.DataSaveError)
-			return
-		}
-
-		//更新拣货单数量
-		result = tx.Model(model.Batch{}).
-			Where("id = ?", res.BatchId).
-			Update("pick_num", gorm.Expr("pick_num + ?", 1))
 
 		if result.Error != nil {
 			tx.Rollback()
@@ -248,14 +237,28 @@ func CompletePick(c *gin.Context) {
 		return
 	}
 
+	tx := db.Begin()
+
 	//****************************** 无需拣货 ******************************//
 	if form.Type == 2 {
 		//更新主表 无需拣货直接更新为复核完成
-		result = db.Model(&model.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2})
+		result = tx.Model(&model.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2})
 		if result.Error != nil {
+			tx.Rollback()
 			xsq_net.ErrorJSON(c, result.Error)
 			return
 		}
+
+		err := UpdateBatchPickNums(tx, pick.BatchId)
+
+		if err != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+
+		tx.Commit()
+
 		xsq_net.Success(c)
 		return
 	}
@@ -335,8 +338,6 @@ func CompletePick(c *gin.Context) {
 
 	}
 
-	tx := db.Begin()
-
 	//查出拣货商品数据
 	result = tx.Where("id in (?)", pickGoodsIds).Find(&pickGoods)
 
@@ -369,6 +370,14 @@ func CompletePick(c *gin.Context) {
 	result = tx.Model(&model.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 1, "pick_num": totalNum})
 
 	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	err := UpdateBatchPickNums(tx, pick.BatchId)
+
+	if err != nil {
 		tx.Rollback()
 		xsq_net.ErrorJSON(c, result.Error)
 		return

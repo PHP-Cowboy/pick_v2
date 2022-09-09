@@ -73,6 +73,8 @@ func GetGoodsList(c *gin.Context) {
 		localDb = localDb.Where("pay_at >= ?", form.PayEndTime)
 	}
 
+	localDb.Where("order_type != 2") //不要拣货中的
+
 	var (
 		total int64
 		res   rsp.GoodsListRsp
@@ -266,7 +268,7 @@ func OrderShippingRecord(c *gin.Context) {
 
 	var pick []model.Pick
 
-	result := global.DB.Where("delivery_order_no in (?)", form.DeliveryOrderNo).Find(&pick)
+	result := global.DB.Where("delivery_no in (?)", form.DeliveryOrderNo).Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -428,18 +430,19 @@ func CompleteOrder(c *gin.Context) {
 		}
 
 		list = append(list, rsp.CompleteOrder{
-			Number:      o.Number,
-			PayAt:       o.PayAt,
-			ShopCode:    o.ShopCode,
-			ShopName:    o.ShopName,
-			ShopType:    o.ShopType,
-			PayCount:    o.PayCount,
-			OutCount:    o.OutCount,
-			CloseCount:  o.CloseCount,
-			Line:        o.Line,
-			Region:      fmt.Sprintf("%s-%s-%s", o.Province, o.City, o.District),
-			PickTime:    pickTime,
-			OrderRemark: o.OrderRemark,
+			Number:         o.Number,
+			PayAt:          o.PayAt,
+			ShopCode:       o.ShopCode,
+			ShopName:       o.ShopName,
+			ShopType:       o.ShopType,
+			PayCount:       o.PayCount,
+			OutCount:       o.OutCount,
+			CloseCount:     o.CloseCount,
+			Line:           o.Line,
+			DeliveryMethod: o.DeliveryMethod,
+			Region:         fmt.Sprintf("%s-%s-%s", o.Province, o.City, o.District),
+			PickTime:       pickTime,
+			OrderRemark:    o.OrderRemark,
 		})
 	}
 
@@ -540,8 +543,9 @@ func Count(c *gin.Context) {
 			res.NewCount = r.Count
 			break
 		case 2: //2:拣货中
-			res.PickCount = r.Count
-			break
+			continue //不统计拣货中的
+			//res.PickCount = r.Count
+			//break
 		case 3: //3:欠货单
 			res.OldCount = r.Count
 			break

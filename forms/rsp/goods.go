@@ -155,18 +155,19 @@ type CompleteOrderRsp struct {
 }
 
 type CompleteOrder struct {
-	Number      string `json:"number"`
-	PayAt       string `json:"pay_at"`
-	ShopCode    string `json:"shop_code"`
-	ShopName    string `json:"shop_name"`
-	ShopType    string `json:"shop_type"`
-	PayCount    int    `json:"pay_count"`
-	OutCount    int    `json:"out_count"`
-	CloseCount  int    `json:"close_count"`
-	Line        string `json:"line"`
-	Region      string `json:"region"`
-	PickTime    string `json:"pick_time"`
-	OrderRemark string `json:"order_remark"`
+	Number         string `json:"number"`
+	PayAt          string `json:"pay_at"`
+	ShopCode       string `json:"shop_code"`
+	ShopName       string `json:"shop_name"`
+	ShopType       string `json:"shop_type"`
+	PayCount       int    `json:"pay_count"`
+	OutCount       int    `json:"out_count"`
+	CloseCount     int    `json:"close_count"`
+	Line           string `json:"line"`
+	DeliveryMethod int    `json:"delivery_method"`
+	Region         string `json:"region"`
+	PickTime       string `json:"pick_time"`
+	OrderRemark    string `json:"order_remark"`
 }
 
 type CompleteOrderDetailRsp struct {

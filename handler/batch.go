@@ -101,6 +101,14 @@ func CreateBatch(c *gin.Context) {
 		return
 	}
 
+	err = UpdateBatchPickNums(tx, batchId)
+
+	if err != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, errors.New("批次拣货池数量更新失败:"+err.Error()))
+		return
+	}
+
 	tx.Commit()
 
 	xsq_net.Success(c)
@@ -180,6 +188,14 @@ func CreateByOrder(c *gin.Context) {
 	if err != nil {
 		tx.Rollback()
 		xsq_net.ErrorJSON(c, errors.New("订单数据更新失败:"+err.Error()))
+		return
+	}
+
+	err = UpdateBatchPickNums(tx, batchId)
+
+	if err != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, errors.New("批次拣货池数量更新失败:"+err.Error()))
 		return
 	}
 
@@ -431,7 +447,10 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 		})
 	}
 
-	if len(prePicks) == 0 {
+	//预拣池数量
+	prePickNum := len(prePicks)
+
+	if prePickNum == 0 {
 		return numbers, pickOrderGoodsId, orderGoodsId, ecode.NoOrderFound
 	}
 
@@ -486,7 +505,14 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 	updates["shop_num"] = shopNum
 	updates["order_num"] = orderNum
 
-	result = tx.Model(&model.Batch{}).Where("id = ?", batchId).Updates(map[string]interface{}{"goods_num": goodsNum, "shop_num": shopNum, "order_num": orderNum})
+	result = tx.Model(&model.Batch{}).
+		Where("id = ?", batchId).
+		Updates(map[string]interface{}{
+			"goods_num":    goodsNum,
+			"shop_num":     shopNum,
+			"order_num":    orderNum,
+			"pre_pick_num": prePickNum,
+		})
 
 	if result.Error != nil {
 		return numbers, pickOrderGoodsId, orderGoodsId, result.Error
@@ -905,6 +931,7 @@ func YongYouLog(pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods, 
 	return nil
 }
 
+// 批次出库订单和商品明细
 func GetBatchOrderAndGoods(c *gin.Context) {
 	var form req.GetBatchOrderAndGoodsForm
 
@@ -917,8 +944,8 @@ func GetBatchOrderAndGoods(c *gin.Context) {
 		batch          model.Batch
 		pickOrder      []model.PickOrder
 		pickOrderGoods []model.PickOrderGoods
-		res            = make([]rsp.OrderInfo, 0)
-		mp             = make(map[string][]rsp.GoodsInfo)
+		data           rsp.GetBatchOrderAndGoodsRsp
+		mp             = make(map[string][]rsp.OutGoods)
 		numbers        = make([]string, 0)
 	)
 
@@ -946,25 +973,25 @@ func GetBatchOrderAndGoods(c *gin.Context) {
 		_, ok := mp[good.Number]
 
 		if !ok {
-			mp[good.Number] = make([]rsp.GoodsInfo, 0)
+			mp[good.Number] = make([]rsp.OutGoods, 0)
 		}
 
-		mp[good.Number] = append(mp[good.Number], rsp.GoodsInfo{
-			ID:              good.OrderGoodsId,
-			Name:            good.GoodsName,
-			Sku:             good.Sku,
-			GoodsType:       good.GoodsType,
-			GoodsSpe:        good.GoodsSpe,
-			Shelves:         good.Shelves,
-			DiscountPrice:   good.DiscountPrice,
-			GoodsUnit:       good.GoodsUnit,
-			SaleUnit:        good.SaleUnit,
-			SaleCode:        good.SaleCode,
-			PayCount:        good.LackCount,
-			GoodsRemark:     good.GoodsRemark,
-			Number:          good.Number,
-			DeliveryOrderNo: good.DeliveryOrderNo,
+		mp[good.Number] = append(mp[good.Number], rsp.OutGoods{
+			Id:            good.OrderGoodsId,
+			Name:          good.GoodsName,
+			Sku:           good.Sku,
+			GoodsType:     good.GoodsType,
+			GoodsSpe:      good.GoodsSpe,
+			DiscountPrice: good.DiscountPrice,
+			GoodsUnit:     good.GoodsUnit,
+			SaleUnit:      good.SaleUnit,
+			SaleCode:      good.SaleCode,
+			OutCount:      good.OutCount,
+			OutAt:         good.UpdateTime.Format(timeutil.TimeFormat),
+			Number:        good.Number,
+			CkNumber:      strings.Join(good.DeliveryOrderNo, ","),
 		})
+
 	}
 
 	numbers = slice.UniqueStringSlice(numbers)
@@ -976,6 +1003,8 @@ func GetBatchOrderAndGoods(c *gin.Context) {
 		return
 	}
 
+	list := make([]rsp.OutOrder, 0, len(pickOrder))
+
 	for _, order := range pickOrder {
 		goodsInfo, ok := mp[order.Number]
 
@@ -983,30 +1012,20 @@ func GetBatchOrderAndGoods(c *gin.Context) {
 			xsq_net.ErrorJSON(c, ecode.DataQueryError)
 			return
 		}
-		res = append(res, rsp.OrderInfo{
-			ShopID:           order.ShopId,
-			ShopName:         order.ShopName,
-			ShopType:         order.ShopType,
-			Number:           order.Number,
-			HouseCode:        order.HouseCode,
-			Line:             order.Line,
-			ShopCode:         order.ShopCode,
+
+		list = append(list, rsp.OutOrder{
 			DistributionType: order.DistributionType,
-			OrderRemark:      order.OrderRemark,
 			PayAt:            order.PayAt,
-			DeliveryAt:       order.DeliveryAt,
-			Province:         order.Province,
-			City:             order.City,
-			District:         order.District,
-			OrderID:          order.OrderId,
-			Address:          order.Address,
-			ConsigneeName:    order.ConsigneeName,
-			ConsigneeTel:     order.ConsigneeTel,
+			OrderId:          order.OrderId,
 			GoodsInfo:        goodsInfo,
 		})
 	}
 
-	xsq_net.SucJson(c, gin.H{"count": len(pickOrderGoods), "list": res})
+	data.Count = len(pickOrderGoods)
+
+	data.List = list
+
+	xsq_net.SucJson(c, data)
 }
 
 // 当前批次是否有接单
@@ -1192,6 +1211,7 @@ func GetBatchList(c *gin.Context) {
 			DeliveryMethod:    b.DeliveryMethod,
 			EndTime:           b.EndTime.Format(timeutil.TimeFormat),
 			Status:            b.Status,
+			PrePickNum:        b.PrePickNum,
 			PickNum:           b.PickNum,
 			RecheckSheetNum:   b.RecheckSheetNum,
 		})
@@ -1882,7 +1902,81 @@ func BatchPickByParams(form req.BatchPickForm) error {
 		}
 	}
 
+	err := UpdateBatchPickNums(tx, form.BatchId)
+
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	tx.Commit()
+
+	return nil
+}
+
+func UpdateBatchPickNums(tx *gorm.DB, batchId int) error {
+
+	//更新批次 预拣货单 拣货单 复核单 数
+	var (
+		prePickNum int64 //预拣货单
+		pickNum    int
+		reviewNum  int
+	)
+
+	result := tx.Model(&model.PrePick{}).Select("id").Where("batch_id = ? and status = 0", batchId).Count(&prePickNum)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	type Count struct {
+		Count  int `json:"count"`
+		Status int `json:"status"`
+	}
+
+	var ct []Count
+
+	result = tx.Model(&model.Pick{}).
+		Select("count(id) as count,status").
+		Where("batch_id = ? and status in (0,1)", batchId).
+		Find(&ct)
+
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	for _, c := range ct {
+		switch c.Status {
+		case 0:
+			pickNum += c.Count
+			break
+		case 1:
+			reviewNum += c.Count
+			break
+		}
+	}
+
+	var batch model.Batch
+
+	result = tx.First(&batch, batchId)
+
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	result = tx.Model(&model.Batch{}).Where("id = ? and version = ?", batchId, batch.Version).Updates(map[string]interface{}{
+		"pre_pick_num":      prePickNum,
+		"pick_num":          pickNum,
+		"recheck_sheet_num": reviewNum,
+		"version":           gorm.Expr("version + ?", 1),
+	})
+
+	if result.Error != nil {
+		tx.Rollback()
+		return errors.New("更新批次拣货单数等失败，请重试.错误:" + result.Error.Error())
+	}
 
 	return nil
 }
@@ -2138,6 +2232,13 @@ func MergePickByParams(form req.MergePickForm) error {
 		}
 	}
 
+	err := UpdateBatchPickNums(tx, form.BatchId)
+
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	tx.Commit()
 
 	return nil
@@ -2172,7 +2273,7 @@ func PrintCallGet(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Model(&model.Pick{}).Where("delivery_order_no = ?", printCh.DeliveryOrderNo).Find(&pick)
+	result := db.Model(&model.Pick{}).Where("delivery_no = ?", printCh.DeliveryOrderNo).Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

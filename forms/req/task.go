@@ -32,8 +32,12 @@ type AssignReq struct {
 }
 
 type ChangeReviewNumForm struct {
-	BatchId int    `json:"batchId" binding:"required"`
-	PickId  int    `json:"pickId" binding:"required"`
-	Sku     string `json:"sku" binding:"required"`
-	Num     *int   `json:"num" binding:"required"`
+	BatchId   int         `json:"batch_id" binding:"required"`
+	PickId    int         `json:"pick_id" binding:"required"`
+	SkuReview []SkuReview `json:"sku_review"`
+}
+
+type SkuReview struct {
+	Sku string `json:"sku" binding:"required"`
+	Num *int   `json:"num" binding:"required"`
 }

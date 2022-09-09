@@ -47,3 +47,33 @@ type OrderInfo struct {
 	ConsigneeTel     string      `json:"consignee_tel"`
 	GoodsInfo        []GoodsInfo `json:"goods_info"`
 }
+
+// 返回给订货系统
+
+type GetBatchOrderAndGoodsRsp struct {
+	Count int        `json:"count"`
+	List  []OutOrder `json:"list"`
+}
+
+type OutOrder struct {
+	DistributionType int        `json:"distribution_type"`
+	PayAt            string     `json:"pay_at"`
+	OrderId          int        `json:"order_id"`
+	GoodsInfo        []OutGoods `json:"goods_info"`
+}
+
+type OutGoods struct {
+	Id            int    `json:"id"`
+	Name          string `json:"name"`
+	Sku           string `json:"sku"`
+	GoodsType     string `json:"goods_type"`
+	GoodsSpe      string `json:"goods_spe"`
+	DiscountPrice int    `json:"discount_price"`
+	GoodsUnit     string `json:"goods_unit"`
+	SaleUnit      string `json:"sale_unit"`
+	SaleCode      string `json:"sale_code"`
+	OutCount      int    `json:"out_count"`
+	OutAt         string `json:"out_at"`
+	Number        string `json:"number"`
+	CkNumber      string `json:"ck_number"`
+}
