@@ -7,7 +7,7 @@ type PickGoods struct {
 	PickId           int    `gorm:"type:int(11) unsigned;index:pick_and_batch_idx;comment:拣货表id"`
 	BatchId          int    `gorm:"type:int(11) unsigned;index:pick_and_batch_idx;comment:批次表id"`
 	PrePickGoodsId   int    `gorm:"type:int(11);comment:预拣货商品表id"`
-	OrderGoodsId     int    `gorm:"type:int(11) unsigned;comment:订单商品表ID"`
+	OrderGoodsId     int    `gorm:"type:int(11) unsigned;comment:订单商品表ID"` //t_pick_order_goods 表 id
 	Number           string `gorm:"type:varchar(64);comment:订单编号"`
 	ShopId           int    `gorm:"type:int(11);comment:店铺id"`
 	DistributionType int    `gorm:"type:tinyint unsigned;comment:配送方式:1:公司配送,2:用户自提,3:三方物流,4:快递配送,5:首批物料|设备单"`

@@ -5,7 +5,7 @@ type PrePickGoods struct {
 	Base
 	WarehouseId      int    `gorm:"type:int(11);comment:仓库"`
 	BatchId          int    `gorm:"type:int(11) unsigned;comment:批次表id"`
-	OrderGoodsId     int    `gorm:"type:int(11) unsigned;comment:订单商品表ID"`
+	OrderGoodsId     int    `gorm:"type:int(11) unsigned;comment:订单商品表ID"` //t_pick_order_goods 表 id
 	Number           string `gorm:"type:varchar(32);comment:订单编号"`
 	ShopId           int    `gorm:"type:int(11);comment:店铺id"`
 	PrePickId        int    `gorm:"type:int(11) unsigned;index;comment:预拣货表id"` //index
