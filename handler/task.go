@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"math"
 	"pick_v2/common/constant"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
@@ -12,6 +13,7 @@ import (
 	"pick_v2/model"
 	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
+	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"strings"
@@ -451,6 +453,310 @@ func ChangeReviewNum(c *gin.Context) {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
+
+	var (
+		mpForm         = make(map[string]int, len(form.SkuReview)) // sku 变更 数量 map
+		skuSlice       []string                                    //查询
+		batch          model.Batch
+		pick           model.Pick
+		pickGoods      []model.PickGoods
+		pickOrderGoods []model.PickOrderGoods
+		order          []model.Order
+		orderGoods     []model.OrderGoods
+	)
+
+	db := global.DB
+
+	result := db.First(&batch, form.BatchId)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//只允许改进行中的批次数据
+	if batch.Status != 0 {
+		xsq_net.ErrorJSON(c, errors.New("只能修改进行中的批次数据"))
+		return
+	}
+
+	result = db.First(&pick, form.PickId)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//只允许修改复核完成状态的数据
+	if pick.Status != 2 {
+		xsq_net.ErrorJSON(c, errors.New("只能修改拣货复核完成的数据"))
+		return
+	}
+
+	for _, review := range form.SkuReview {
+		mpForm[review.Sku] = *review.Num
+		skuSlice = append(skuSlice, review.Sku)
+	}
+
+	result = db.Model(&model.PickGoods{}).Where("pick_id = ? and sku in (?)", form.PickId, skuSlice).Find(&pickGoods)
+
+	var (
+		skuReviewTotalMp   = make(map[string]int)
+		skuNeedTotalMp     = make(map[string]int)
+		numbers            []string
+		numberSkuPickNumMp = make(map[string]int) //订单本次复核数map
+	)
+
+	//计算 pick_goods sku 复核总数 需拣总数
+	for _, good := range pickGoods {
+		reviewNum, reviewOk := skuReviewTotalMp[good.Sku]
+
+		if !reviewOk {
+			reviewNum = 0
+		}
+
+		reviewNum += good.ReviewNum
+
+		skuReviewTotalMp[good.Sku] = reviewNum
+
+		needNum, needOk := skuNeedTotalMp[good.Sku]
+
+		if !needOk {
+			needNum = 0
+		}
+
+		needNum += good.NeedNum
+
+		skuNeedTotalMp[good.Sku] = needNum
+
+		numbers = append(numbers, good.Number) //不需要去重，一个拣货任务 订单号和sku本来就是唯一的
+
+		numberSkuPickNumMp[good.Number+good.Sku] = good.ReviewNum
+	}
+
+	numbers = slice.UniqueStringSlice(numbers)
+
+	//复核数 差值 = 原来sku复核总数 - form.Num
+	var (
+		reviewNumDiffMp    = make(map[string]int, len(form.SkuReview))
+		reviewNumDiffTotal = 0 //复核数 总差值
+	)
+
+	for _, sr := range form.SkuReview {
+		num, sntOk := skuNeedTotalMp[sr.Sku]
+
+		if !sntOk {
+			xsq_net.ErrorJSON(c, errors.New("sku:"+sr.Sku+"需拣数未找到"))
+			return
+		}
+
+		if *sr.Num > num {
+			xsq_net.ErrorJSON(c, errors.New("修改后的复核数大于需拣数，请核对"))
+			return
+		}
+
+		mpReviewNum, srtOK := skuReviewTotalMp[sr.Sku]
+
+		if !srtOK {
+			xsq_net.ErrorJSON(c, errors.New("sku:"+sr.Sku+"复核数未找到"))
+			return
+		}
+
+		reviewNumDiffMp[sr.Sku] = mpReviewNum - *sr.Num
+
+		reviewNumDiffTotal += reviewNumDiffMp[sr.Sku]
+	}
+
+	//拣货池 复核总数 = 复核总数 - 复核数 差值
+	pick.ReviewNum = pick.ReviewNum - reviewNumDiffTotal
+
+	var (
+		numberConsumeMp       = make(map[string]int, 0) //order相关消费复核差值map
+		orderGoodsIdConsumeMp = make(map[int]int, 0)    //orderGoods相关消费复核差值map
+		pickOrderGoodsIdSlice []int                     //pick_order_goods 表 id map
+		orderGoodsIdSlice     []int
+	)
+
+	//pick_goods pay_at
+	for i, good := range pickGoods {
+		reviewNumDiff, reviewNumDiffOk := reviewNumDiffMp[good.Sku]
+
+		if !reviewNumDiffOk {
+			continue
+		}
+
+		if reviewNumDiff == 0 {
+			continue
+		}
+
+		numberConsumeNum, numberConsumeOk := numberConsumeMp[good.Number]
+
+		if !numberConsumeOk {
+			numberConsumeNum = 0
+		}
+
+		orderGoodsIdConsumeNum, orderGoodsIdConsumeOk := orderGoodsIdConsumeMp[good.OrderGoodsId]
+
+		if !orderGoodsIdConsumeOk {
+			orderGoodsIdConsumeNum = 0
+		}
+
+		if reviewNumDiff > 0 { //修改后的复核数比原来大 已拣要加 未拣要减
+			if good.NeedNum > good.ReviewNum { //需拣大于复核数，还有欠货，复核数可以加
+				surplus := good.NeedNum - good.ReviewNum //当前单还剩的可以复核数量
+				if reviewNumDiff > surplus {             //修改的复核数差值 比 当前单还剩的复核数量 大 复核数可以加满
+					pickGoods[i].ReviewNum = good.NeedNum
+					//pickGoods[i].NeedNum = 0 需拣数不会变，拣货和复核时都不修改需拣数
+					reviewNumDiff -= surplus
+					orderGoodsIdConsumeNum += surplus //这里复核数加了
+					numberConsumeNum += surplus
+				} else { //修改的复核数差值 比 当前单还剩的复核数量 小 当前单可以消耗完差值
+					pickGoods[i].ReviewNum += reviewNumDiff //复核数可以消耗完，直接把复核数往上加
+					//pickGoods[i].NeedNum -= reviewNumDiff
+					reviewNumDiff = 0
+					orderGoodsIdConsumeNum += reviewNumDiff //这里增加的复核数被这个单消耗完了
+					numberConsumeNum += reviewNumDiff
+				}
+			} //没有 else 需拣小于等于复核数表明这单拣货完成，reviewNumDiff > 0 已拣加不上去了
+
+		} else { //修改后的复核数比原来小 已拣要扣，未拣要增
+
+			reviewDiffAbs := math.Abs(float64(reviewNumDiff))
+
+			if good.ReviewNum > int(reviewDiffAbs) { //复核数大于 复核数差值的绝对值 差值直接被消耗完了
+				pickGoods[i].ReviewNum = good.ReviewNum + reviewNumDiff //reviewNumDiff	小于0 这里的加的是负数
+				reviewNumDiff = 0
+				orderGoodsIdConsumeNum += reviewNumDiff //这里扣减的复核数被这个单消耗完了 这里的加的是负数
+				numberConsumeNum += reviewNumDiff
+			} else { //当复核数本来就是0时，其实相当于什么都没做
+				pickGoods[i].ReviewNum = 0               //复核数扣到0
+				reviewNumDiff += good.ReviewNum          //差值 被消耗掉 good.ReviewNum 复核数个
+				orderGoodsIdConsumeNum -= good.ReviewNum //这里把整单复核数扣光了
+				numberConsumeNum -= good.ReviewNum
+			}
+		}
+
+		//变更map中sku的差值
+		reviewNumDiffMp[good.Sku] = reviewNumDiff
+		//变更orderGoods相关消费复核差值map
+		orderGoodsIdConsumeMp[good.OrderGoodsId] = orderGoodsIdConsumeNum
+		//变更 order相关消费复核差值map
+		numberConsumeMp[good.Number] = numberConsumeNum
+
+		pickOrderGoodsIdSlice = append(pickOrderGoodsIdSlice, good.OrderGoodsId)
+	}
+
+	//pick_order_goods
+	result = db.Model(&model.PickOrderGoods{}).Where("id in (?)", pickOrderGoodsIdSlice).Find(&pickOrderGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//order_goods表 id 对应消费数
+	var orderGoodsConsumeMp = make(map[int]int, 0)
+
+	for i, good := range pickOrderGoods {
+		consumeNum, consumeOk := orderGoodsIdConsumeMp[good.Id]
+
+		if !consumeOk {
+			continue
+		}
+		pickOrderGoods[i].LackCount -= consumeNum
+		pickOrderGoods[i].OutCount += consumeNum
+
+		orderGoodsConsumeMp[good.OrderGoodsId] = consumeNum
+
+		orderGoodsIdSlice = append(orderGoodsIdSlice, good.OrderGoodsId)
+	}
+
+	result = db.Model(&model.OrderGoods{}).Where("id in (?)", orderGoodsIdSlice).Find(&orderGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	for i, og := range orderGoods {
+		consumeNum, consumeOk := orderGoodsConsumeMp[og.Id]
+
+		if !consumeOk {
+			continue
+		}
+
+		orderGoods[i].LackCount -= consumeNum
+		orderGoods[i].OutCount += consumeNum
+	}
+
+	result = db.Model(&model.Order{}).Where("number in (?)", numbers).Find(&order)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	for i, o := range order {
+		consumeNum, consumeOk := numberConsumeMp[o.Number]
+
+		if !consumeOk {
+			continue
+		}
+
+		order[i].Picked += consumeNum
+		order[i].UnPicked -= consumeNum
+	}
+
+	tx := db.Begin()
+
+	result = tx.Select("id", "update_time", "shop_code", "shop_name", "line", "review_num").
+		Save(&pick)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//todo reviewNumDiffMp 过滤掉没修改的
+
+	result = tx.Select("id", "update_time", "need_num", "complete_num", "review_num").
+		Save(&pickGoods)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = tx.Select("id", "update_time", "lack_count", "out_count").
+		Save(&pickOrderGoods)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = tx.Select("id", "update_time", "lack_count", "out_count").
+		Save(&orderGoods)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = tx.Select("id", "update_time", "shop_id", "shop_name", "shop_type", "shop_code", "house_code", "line", "picked", "un_picked").
+		Save(&order)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	tx.Commit()
 
 	xsq_net.Success(c)
 }

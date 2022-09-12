@@ -10,3 +10,8 @@ type LogListForm struct {
 type BatchSupplementForm struct {
 	Ids []int `json:"ids"`
 }
+
+type LogDetailForm struct {
+	BatchId int    `json:"batch_id"`
+	Number  string `json:"number"`
+}

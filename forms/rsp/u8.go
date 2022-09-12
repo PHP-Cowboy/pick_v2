@@ -16,3 +16,24 @@ type LogList struct {
 	Msg         string `json:"msg"`
 	ShopName    string `json:"shop_name"`
 }
+
+type LogDetailRsp struct {
+	Id               int    `json:"id"`
+	PickId           int    `json:"pick_id"`
+	BatchId          int    `json:"batch_id"`
+	PrePickGoodsId   int    `json:"pre_pick_goods_id"`
+	OrderGoodsId     int    `json:"order_goods_id"`
+	Number           string `json:"number"`
+	ShopId           int    `json:"shop_id"`
+	DistributionType int    `json:"distribution_type"`
+	Sku              string `json:"sku"`
+	GoodsName        string `json:"goods_name"`
+	GoodsType        string `json:"goods_type"`
+	GoodsSpe         string `json:"goods_spe"`
+	Shelves          string `json:"shelves"`
+	DiscountPrice    int    `json:"discount_price"`
+	NeedNum          int    `json:"need_num"`
+	CompleteNum      int    `json:"complete_num"`
+	ReviewNum        int    `json:"review_num"`
+	Unit             string `json:"unit"`
+}

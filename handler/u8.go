@@ -234,21 +234,20 @@ type CalculateModel struct {
 	SubTaxPrice     string `json:"sub_tax_price"`      //税额
 }
 
-func CalculatePrice(price int64, realCount int) CalculateModel {
-	rsp := CalculateModel{}
+func CalculatePrice(price int64, realCount int) (res CalculateModel) {
 	//含税单价
-	rsp.TaxPrice = AmountTransfer(price)
+	res.TaxPrice = AmountTransfer(price)
 	//无税单价
 	noTaxPriceInt64 := int64(math.Floor(float64(price)/float64(1.13) + 0.5))
 	//无税单价
-	rsp.NoTaxPrice = AmountTransfer(noTaxPriceInt64)
+	res.NoTaxPrice = AmountTransfer(noTaxPriceInt64)
 	//含税金额
-	rsp.TotalTaxPrice = AmountTransfer(price * int64(realCount))
+	res.TotalTaxPrice = AmountTransfer(price * int64(realCount))
 	//无税金额
-	rsp.TotalNoTaxPrice = AmountTransfer(int64(math.Floor(float64(price)*float64(realCount)/1.13 + 0.5)))
+	res.TotalNoTaxPrice = AmountTransfer(int64(math.Floor(float64(price)*float64(realCount)/1.13 + 0.5)))
 	//税额
-	rsp.SubTaxPrice = SubKeepNum(rsp.TotalTaxPrice, rsp.TotalNoTaxPrice, 2)
-	return rsp
+	res.SubTaxPrice = SubKeepNum(res.TotalTaxPrice, res.TotalNoTaxPrice, 2)
+	return
 }
 
 // 系统金额 由int64 单位分 转 字符串 单位元,且带小数2位
@@ -388,4 +387,53 @@ func PushYongYou(id int) {
 
 	//db.Omit("create_time", "number", "batch_id", "shop_name","delete_time").Save(stockLog)
 	db.Select("id", "update_time", "status", "request_xml", "response_xml", "msg").Save(stockLog)
+}
+
+//log detail
+func LogDetail(c *gin.Context) {
+	var form req.LogDetailForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var (
+		list      []rsp.LogDetailRsp
+		pickGoods []model.PickGoods
+	)
+
+	db := global.DB
+
+	result := db.Model(&model.PickGoods{}).Where(model.PickGoods{BatchId: form.BatchId, Number: form.Number}).Find(&pickGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	for _, pg := range pickGoods {
+		list = append(list, rsp.LogDetailRsp{
+			Id:               pg.Id,
+			PickId:           pg.PickId,
+			BatchId:          pg.BatchId,
+			PrePickGoodsId:   pg.PrePickGoodsId,
+			OrderGoodsId:     pg.OrderGoodsId,
+			Number:           pg.Number,
+			ShopId:           pg.ShopId,
+			DistributionType: pg.DistributionType,
+			Sku:              pg.Sku,
+			GoodsName:        pg.GoodsName,
+			GoodsType:        pg.GoodsType,
+			GoodsSpe:         pg.GoodsSpe,
+			Shelves:          pg.Shelves,
+			DiscountPrice:    pg.DiscountPrice,
+			NeedNum:          pg.NeedNum,
+			CompleteNum:      pg.CompleteNum,
+			ReviewNum:        pg.ReviewNum,
+			Unit:             pg.Unit,
+		})
+	}
+
+	xsq_net.SucJson(c, list)
 }
