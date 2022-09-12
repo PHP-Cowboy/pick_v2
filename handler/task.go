@@ -718,8 +718,6 @@ func ChangeReviewNum(c *gin.Context) {
 		return
 	}
 
-	//todo reviewNumDiffMp 过滤掉没修改的
-
 	result = tx.Select("id", "update_time", "need_num", "complete_num", "review_num").
 		Save(&pickGoods)
 
