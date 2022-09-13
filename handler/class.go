@@ -21,9 +21,9 @@ type ClassResponse struct {
 
 // 同步分类
 func SyncClassification(c *gin.Context) {
-	url := "api/v1/remote/pick/goods/typ/list"
+	url := "api/v1/remote/goods/typ/list"
 
-	body, err := request.Get(url)
+	body, err := request.Post(url, nil)
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return

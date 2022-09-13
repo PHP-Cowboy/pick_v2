@@ -80,7 +80,7 @@ func CreateUser(ctx *gin.Context) {
 		return
 	}
 
-	user.Account = warehouse.Abbreviation + strconv.Itoa(lastId) + character
+	user.Account = strings.ToLower(warehouse.Abbreviation + strconv.Itoa(lastId) + character)
 	user.Password = GenderPwd(form.Password)
 	user.Name = form.Name
 	user.RoleId = form.RoleId
@@ -170,6 +170,8 @@ func Login(ctx *gin.Context) {
 	var (
 		user model.User
 	)
+
+	form.Account = strings.ToLower(form.Account)
 
 	db := global.DB
 	result := db.Where("account = ? and status = 1 and delete_time is null", form.Account).First(&user)

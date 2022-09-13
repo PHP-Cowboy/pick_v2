@@ -14,5 +14,7 @@ func YongYouRoute(g *gin.RouterGroup) {
 		yongYouRouteGroup.GET("/list", handler.LogList)
 		//批量补单
 		yongYouRouteGroup.POST("/batchSupplement", handler.BatchSupplement)
+		//推送u8拣货详情
+		yongYouRouteGroup.GET("/logDetail", handler.LogDetail)
 	}
 }

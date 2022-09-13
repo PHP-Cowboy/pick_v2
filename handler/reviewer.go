@@ -226,6 +226,7 @@ func ReviewDetail(c *gin.Context) {
 		} else {
 			val.NeedNum += goods.NeedNum
 			val.CompleteNum += goods.CompleteNum
+			val.ReviewNum += goods.ReviewNum
 			val.ParamsId = append(val.ParamsId, paramsId)
 			pickGoodsSkuMp[goods.Sku] = val
 		}

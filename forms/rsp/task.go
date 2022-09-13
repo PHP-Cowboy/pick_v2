@@ -53,6 +53,7 @@ type GetPickDetailRsp struct {
 	BatchId        int                         `json:"batch_id"`
 	PickId         int                         `json:"pick_id"`
 	TaskName       string                      `json:"task_name"`
+	ShopCode       string                      `json:"shop_code"`
 	ShopNum        int                         `json:"shop_num"`
 	OrderNum       int                         `json:"order_num"`
 	GoodsNum       int                         `json:"goods_num"`

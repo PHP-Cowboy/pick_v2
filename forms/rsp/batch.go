@@ -9,6 +9,7 @@ type GetBatchListRsp struct {
 
 type Batch struct {
 	Id                int    `json:"id"`
+	CreateTime        string `json:"create_time"`
 	UpdateTime        string `json:"update_time"`
 	BatchName         string `json:"batch_name"`
 	DeliveryStartTime string `json:"delivery_start_time"`

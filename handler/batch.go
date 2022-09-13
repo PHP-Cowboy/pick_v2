@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/apache/rocketmq-client-go/v2"
 	"github.com/apache/rocketmq-client-go/v2/primitive"
 	"github.com/apache/rocketmq-client-go/v2/producer"
@@ -559,9 +560,9 @@ func EndBatch(c *gin.Context) {
 		return
 	}
 
-	result = db.Table("t_order_goods og").
+	result = db.Table("t_pick_order_goods og").
 		Select("og.*,o.shop_id,o.shop_name,o.shop_code,o.line,o.distribution_type,o.order_remark,o.pay_at,o.province,o.city,o.district,o.shop_type,o.latest_picking_time").
-		Joins("left join t_order o on og.number = o.number").
+		Joins("left join t_pick_order o on og.number = o.number").
 		Where("batch_id = ?", form.Id).
 		Find(&orderAndGoods)
 
@@ -850,56 +851,55 @@ func EditBatch(c *gin.Context) {
 
 // 推送u8 日志记录生成
 func YongYouLog(pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods, batchId int) error {
+	mpOrderAndGoods := make(map[string]rsp.OrderAndGoods, 0)
 
-	mpGoods := make(map[string]model.PickGoods, 0)
-
-	for _, good := range pickGoods {
-		//订单数据
-		//step1 map[number+sku]{...}
-		mpGoods[good.Number+good.Sku] = good
-		//step2 合并到 map[number][]PickGoods{...}
+	for _, order := range orderAndGoods {
+		_, ok := mpOrderAndGoods[order.Number]
+		if ok {
+			continue
+		}
+		mpOrderAndGoods[order.Number] = order
 	}
-
-	global.SugarLogger.Info(mpGoods)
 
 	mpPgv := make(map[string]PickGoodsView, 0)
 
-	for _, info := range orderAndGoods {
-		mp, goodsOk := mpGoods[info.Number+info.Sku]
-
-		if !goodsOk { //订单商品未拣货
+	for _, good := range pickGoods {
+		order, ogOk := mpOrderAndGoods[good.Number]
+		if !ogOk {
 			continue
 		}
 
-		pgv, ok := mpPgv[info.Number]
+		//以拣货id和订单编号的纬度来推u8
+		mpPgvKey := fmt.Sprintf("%v%v", good.PickId, good.Number)
+
+		pgv, ok := mpPgv[mpPgvKey]
 
 		if !ok {
 			pgv = PickGoodsView{}
 		}
 
-		pgv.SaleNumber = info.Number
-		pgv.ShopId = int64(info.ShopId)
-		pgv.ShopName = info.ShopName
-		pgv.Date = info.PayAt
-		pgv.Remark = info.OrderRemark
-		pgv.DeliveryType = info.DistributionType //配送方式
-		pgv.Line = info.Line
+		pgv.PickId = good.PickId
+		pgv.SaleNumber = order.Number
+		pgv.ShopId = int64(order.ShopId)
+		pgv.ShopName = order.ShopName
+		pgv.Date = order.PayAt
+		pgv.Remark = order.OrderRemark
+		pgv.DeliveryType = order.DistributionType //配送方式
+		pgv.Line = order.Line
 		pgv.List = append(pgv.List, PickGoods{
-			GoodsName:    mp.GoodsName,
-			Sku:          mp.Sku,
-			Price:        int64(info.DiscountPrice),
-			GoodsSpe:     mp.GoodsSpe,
-			Shelves:      mp.Shelves,
-			RealOutCount: mp.ReviewNum,
-			SlaveCode:    info.SaleCode,
-			GoodsUnit:    info.GoodsUnit,
-			SlaveUnit:    info.SaleUnit,
+			GoodsName:    good.GoodsName,
+			Sku:          good.Sku,
+			Price:        int64(order.DiscountPrice),
+			GoodsSpe:     good.GoodsSpe,
+			Shelves:      good.Shelves,
+			RealOutCount: good.ReviewNum,
+			SlaveCode:    order.SaleCode,
+			GoodsUnit:    order.GoodsUnit,
+			SlaveUnit:    order.SaleUnit,
 		})
 
-		mpPgv[info.Number] = pgv
+		mpPgv[mpPgvKey] = pgv
 	}
-
-	global.SugarLogger.Info(mpPgv)
 
 	var stockLogs = make([]model.StockLog, 0)
 
@@ -910,7 +910,8 @@ func YongYouLog(pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods, 
 		stockLogs = append(stockLogs, model.StockLog{
 			Number:      view.SaleNumber,
 			BatchId:     batchId,
-			Status:      2, //失败
+			PickId:      view.PickId,
+			Status:      0, //已创建
 			RequestXml:  xml,
 			ResponseXml: "",
 			ShopName:    view.ShopName,
@@ -1194,22 +1195,23 @@ func GetBatchList(c *gin.Context) {
 
 		deliveryStartTime := ""
 		if b.DeliveryStartTime != nil {
-			deliveryStartTime = b.DeliveryStartTime.Format(timeutil.TimeFormat)
+			deliveryStartTime = b.DeliveryStartTime.Format(timeutil.DateFormat)
 		}
 
 		list = append(list, &rsp.Batch{
 			Id:                b.Id,
-			UpdateTime:        b.UpdateTime.Format(timeutil.TimeFormat),
+			CreateTime:        b.CreateTime.Format(timeutil.MinuteFormat),
+			UpdateTime:        b.UpdateTime.Format(timeutil.MinuteFormat),
 			BatchName:         b.BatchName + helper.GetDeliveryMethod(b.DeliveryMethod),
 			DeliveryStartTime: deliveryStartTime,
-			DeliveryEndTime:   b.DeliveryEndTime.Format(timeutil.TimeFormat),
+			DeliveryEndTime:   b.DeliveryEndTime.Format(timeutil.DateFormat),
 			ShopNum:           b.ShopNum,
 			OrderNum:          b.OrderNum,
 			GoodsNum:          b.GoodsNum,
 			UserName:          b.UserName,
 			Line:              b.Line,
 			DeliveryMethod:    b.DeliveryMethod,
-			EndTime:           b.EndTime.Format(timeutil.TimeFormat),
+			EndTime:           b.EndTime.Format(timeutil.MinuteFormat),
 			Status:            b.Status,
 			PrePickNum:        b.PrePickNum,
 			PickNum:           b.PickNum,

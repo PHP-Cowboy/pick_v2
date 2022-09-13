@@ -7,6 +7,8 @@ type LogListRsp struct {
 
 type LogList struct {
 	Id          int    `json:"id"`
+	CreateTime  string `json:"create_time"`
+	UpdateTime  string `json:"update_time"`
 	Number      string `json:"number"`
 	BatchId     int    `json:"batch_id"`
 	Status      int    `json:"status"`
@@ -17,8 +19,9 @@ type LogList struct {
 	ShopName    string `json:"shop_name"`
 }
 
-type LogDetailRsp struct {
+type LogDetail struct {
 	Id               int    `json:"id"`
+	UpdateTime       string `json:"update_time"`
 	PickId           int    `json:"pick_id"`
 	BatchId          int    `json:"batch_id"`
 	PrePickGoodsId   int    `json:"pre_pick_goods_id"`
@@ -36,4 +39,10 @@ type LogDetailRsp struct {
 	CompleteNum      int    `json:"complete_num"`
 	ReviewNum        int    `json:"review_num"`
 	Unit             string `json:"unit"`
+}
+
+type LogDetailRsp struct {
+	CreateTime string      `json:"create_time"`
+	ShopName   string      `json:"shop_name"`
+	List       []LogDetail `json:"list"`
 }

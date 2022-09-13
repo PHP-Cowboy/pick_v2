@@ -97,6 +97,8 @@ func PickList(c *gin.Context) {
 		return
 	}
 
+	result = localDb.Order("sort desc").Scopes(model.Paginate(form.Page, form.Size)).Find(&pick)
+
 	//拣货ids
 	pickIds := make([]int, 0, len(pick))
 	for _, p := range pick {
@@ -192,6 +194,7 @@ func GetPickDetail(c *gin.Context) {
 	res.BatchId = pick.BatchId
 	res.PickId = pick.Id
 	res.TaskName = pick.TaskName
+	res.ShopCode = pick.ShopCode
 	res.ShopNum = pick.ShopNum
 	res.OrderNum = pick.OrderNum
 	res.GoodsNum = pick.NeedNum
@@ -239,6 +242,7 @@ func GetPickDetail(c *gin.Context) {
 		} else {
 			val.NeedNum += goods.NeedNum
 			val.CompleteNum += goods.CompleteNum
+			val.ReviewNum += goods.ReviewNum
 			val.ParamsId = append(val.ParamsId, paramsId)
 			pickGoodsSkuMp[goods.Sku] = val
 		}
@@ -494,21 +498,22 @@ func ChangeReviewNum(c *gin.Context) {
 	}
 
 	for _, review := range form.SkuReview {
-		mpForm[review.Sku] = *review.Num
-		skuSlice = append(skuSlice, review.Sku)
+		mpForm[review.Sku] = *review.Num        //sku 修改的复核数量 map
+		skuSlice = append(skuSlice, review.Sku) //被修改复核数量的sku切片
 	}
 
 	result = db.Model(&model.PickGoods{}).Where("pick_id = ? and sku in (?)", form.PickId, skuSlice).Find(&pickGoods)
 
 	var (
-		skuReviewTotalMp   = make(map[string]int)
-		skuNeedTotalMp     = make(map[string]int)
-		numbers            []string
-		numberSkuPickNumMp = make(map[string]int) //订单本次复核数map
+		skuReviewTotalMp = make(map[string]int) //当前拣货商品表中sku复核总数
+		skuNeedTotalMp   = make(map[string]int) //当前拣货商品表中sku需拣总数
+		numbers          []string               //订单编号切片
 	)
 
 	//计算 pick_goods sku 复核总数 需拣总数
 	for _, good := range pickGoods {
+
+		//计算 当前拣货商品表中sku复核总数 开始
 		reviewNum, reviewOk := skuReviewTotalMp[good.Sku]
 
 		if !reviewOk {
@@ -518,7 +523,9 @@ func ChangeReviewNum(c *gin.Context) {
 		reviewNum += good.ReviewNum
 
 		skuReviewTotalMp[good.Sku] = reviewNum
+		//计算 当前拣货商品表中sku复核总数 结束
 
+		//计算 当前拣货商品表中sku需拣总数 开始
 		needNum, needOk := skuNeedTotalMp[good.Sku]
 
 		if !needOk {
@@ -528,18 +535,18 @@ func ChangeReviewNum(c *gin.Context) {
 		needNum += good.NeedNum
 
 		skuNeedTotalMp[good.Sku] = needNum
+		//计算 当前拣货商品表中sku需拣总数 开始
 
-		numbers = append(numbers, good.Number) //不需要去重，一个拣货任务 订单号和sku本来就是唯一的
-
-		numberSkuPickNumMp[good.Number+good.Sku] = good.ReviewNum
+		numbers = append(numbers, good.Number) //订单编号切片
 	}
 
+	//订单编号去重
 	numbers = slice.UniqueStringSlice(numbers)
 
 	//复核数 差值 = 原来sku复核总数 - form.Num
 	var (
-		reviewNumDiffMp    = make(map[string]int, len(form.SkuReview))
-		reviewNumDiffTotal = 0 //复核数 总差值
+		reviewNumDiffMp    = make(map[string]int, len(form.SkuReview)) //每个sku的复核数差值map
+		reviewNumDiffTotal = 0                                         //复核数 总差值
 	)
 
 	for _, sr := range form.SkuReview {
@@ -555,20 +562,20 @@ func ChangeReviewNum(c *gin.Context) {
 			return
 		}
 
-		mpReviewNum, srtOK := skuReviewTotalMp[sr.Sku]
+		mpReviewNum, srtOK := skuReviewTotalMp[sr.Sku] //当前拣货商品表中sku复核总数
 
 		if !srtOK {
 			xsq_net.ErrorJSON(c, errors.New("sku:"+sr.Sku+"复核数未找到"))
 			return
 		}
 
-		reviewNumDiffMp[sr.Sku] = mpReviewNum - *sr.Num
+		reviewNumDiffMp[sr.Sku] = *sr.Num - mpReviewNum
 
 		reviewNumDiffTotal += reviewNumDiffMp[sr.Sku]
 	}
 
 	//拣货池 复核总数 = 复核总数 - 复核数 差值
-	pick.ReviewNum = pick.ReviewNum - reviewNumDiffTotal
+	pick.ReviewNum = pick.ReviewNum + reviewNumDiffTotal
 
 	var (
 		numberConsumeMp       = make(map[string]int, 0) //order相关消费复核差值map
@@ -612,10 +619,10 @@ func ChangeReviewNum(c *gin.Context) {
 					numberConsumeNum += surplus
 				} else { //修改的复核数差值 比 当前单还剩的复核数量 小 当前单可以消耗完差值
 					pickGoods[i].ReviewNum += reviewNumDiff //复核数可以消耗完，直接把复核数往上加
-					//pickGoods[i].NeedNum -= reviewNumDiff
-					reviewNumDiff = 0
 					orderGoodsIdConsumeNum += reviewNumDiff //这里增加的复核数被这个单消耗完了
 					numberConsumeNum += reviewNumDiff
+					//pickGoods[i].NeedNum -= reviewNumDiff
+					reviewNumDiff = 0
 				}
 			} //没有 else 需拣小于等于复核数表明这单拣货完成，reviewNumDiff > 0 已拣加不上去了
 
@@ -625,9 +632,9 @@ func ChangeReviewNum(c *gin.Context) {
 
 			if good.ReviewNum > int(reviewDiffAbs) { //复核数大于 复核数差值的绝对值 差值直接被消耗完了
 				pickGoods[i].ReviewNum = good.ReviewNum + reviewNumDiff //reviewNumDiff	小于0 这里的加的是负数
-				reviewNumDiff = 0
-				orderGoodsIdConsumeNum += reviewNumDiff //这里扣减的复核数被这个单消耗完了 这里的加的是负数
+				orderGoodsIdConsumeNum += reviewNumDiff                 //这里扣减的复核数被这个单消耗完了 这里的加的是负数
 				numberConsumeNum += reviewNumDiff
+				reviewNumDiff = 0
 			} else { //当复核数本来就是0时，其实相当于什么都没做
 				pickGoods[i].ReviewNum = 0               //复核数扣到0
 				reviewNumDiff += good.ReviewNum          //差值 被消耗掉 good.ReviewNum 复核数个

@@ -96,7 +96,7 @@ func PickOrderList(c *gin.Context) {
 		latestPickingTime := ""
 
 		if o.LatestPickingTime != nil {
-			latestPickingTime = o.LatestPickingTime.Format(timeutil.TimeFormat)
+			latestPickingTime = o.LatestPickingTime.Format(timeutil.MinuteFormat)
 		}
 
 		payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
@@ -108,9 +108,10 @@ func PickOrderList(c *gin.Context) {
 
 		list = append(list, rsp.PickOrder{
 			Id:                o.Id,
+			CreateTime:        o.CreateTime.Format(timeutil.MinuteFormat),
 			Number:            o.Number,
 			PickNumber:        o.PickNumber,
-			PayAt:             payAt.Format(timeutil.TimeFormat),
+			PayAt:             payAt.Format(timeutil.MinuteFormat),
 			ShopCode:          o.ShopCode,
 			ShopName:          o.ShopName,
 			ShopType:          o.ShopType,

@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+var BaseNum = 3
+
 // 打印 写入
 func AddPrintJobMap(warehouseCode string, printCh *global.PrintCh) {
 	_, ok := global.PrintMapCh[warehouseCode]
@@ -44,8 +46,8 @@ func YongYouConsumer() {
 		select {
 		case id := <-global.YongYouCh:
 			PushYongYou(id)
-			time.Sleep(3 * time.Second)
-		case <-time.After(30 * time.Second):
+			time.Sleep(time.Duration(BaseNum) * time.Second)
+		case <-time.After(time.Duration(BaseNum) * 10 * time.Second):
 		}
 	}
 }

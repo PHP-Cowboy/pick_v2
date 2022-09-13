@@ -1,16 +1,20 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"io"
 	"math"
 	"net/http"
+	"pick_v2/common/constant"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
 	"pick_v2/model"
+	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
+	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"strconv"
 	"strings"
@@ -22,6 +26,7 @@ import (
 )
 
 type PickGoodsView struct {
+	PickId       int         `json:"pick_id"`
 	SaleNumber   string      `json:"sale_number"` //销售单号
 	ShopId       int64       `json:"shop_id"`
 	ShopName     string      `json:"shop_name"`
@@ -312,6 +317,8 @@ func LogList(c *gin.Context) {
 	for _, log := range stockLog {
 		list = append(list, rsp.LogList{
 			Id:          log.Id,
+			CreateTime:  log.CreateTime.Format(timeutil.TimeFormat),
+			UpdateTime:  log.UpdateTime.Format(timeutil.TimeFormat),
 			Number:      log.Number,
 			BatchId:     log.BatchId,
 			Status:      log.Status,
@@ -334,6 +341,25 @@ func BatchSupplement(c *gin.Context) {
 
 	if err := c.ShouldBind(&form); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	second, err := cache.GetTtlKey(constant.BATCH_SUPPLEMENT)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	if second > 0 {
+		xsq_net.ErrorJSON(c, errors.New(fmt.Sprintf("推送u8处理中，请%v秒后再试", second.Seconds())))
+		return
+	}
+
+	expire := BaseNum * (len(form.Ids) + 10) //channel 没读取到数据时 等待了 BaseNum * 10 秒
+
+	_, err = cache.Set(constant.BATCH_SUPPLEMENT, "1", expire)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
@@ -389,7 +415,7 @@ func PushYongYou(id int) {
 	db.Select("id", "update_time", "status", "request_xml", "response_xml", "msg").Save(stockLog)
 }
 
-//log detail
+// 推送u8拣货详情
 func LogDetail(c *gin.Context) {
 	var form req.LogDetailForm
 
@@ -399,22 +425,36 @@ func LogDetail(c *gin.Context) {
 	}
 
 	var (
-		list      []rsp.LogDetailRsp
+		res       rsp.LogDetailRsp
 		pickGoods []model.PickGoods
+		pickOrder model.PickOrder
 	)
 
 	db := global.DB
 
-	result := db.Model(&model.PickGoods{}).Where(model.PickGoods{BatchId: form.BatchId, Number: form.Number}).Find(&pickGoods)
+	result := db.Model(&model.PickOrder{}).Where("number = ?", form.Number).First(&pickOrder)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
+	res.ShopName = pickOrder.ShopName
+	res.CreateTime = pickOrder.CreateTime.Format(timeutil.TimeFormat)
+
+	result = db.Model(&model.PickGoods{}).Where(model.PickGoods{BatchId: form.BatchId, Number: form.Number}).Find(&pickGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	list := make([]rsp.LogDetail, len(pickGoods))
+
 	for _, pg := range pickGoods {
-		list = append(list, rsp.LogDetailRsp{
+		list = append(list, rsp.LogDetail{
 			Id:               pg.Id,
+			UpdateTime:       pg.UpdateTime.Format(timeutil.TimeFormat),
 			PickId:           pg.PickId,
 			BatchId:          pg.BatchId,
 			PrePickGoodsId:   pg.PrePickGoodsId,
@@ -435,5 +475,7 @@ func LogDetail(c *gin.Context) {
 		})
 	}
 
-	xsq_net.SucJson(c, list)
+	res.List = list
+
+	xsq_net.SucJson(c, res)
 }

@@ -37,3 +37,16 @@ func GetIncrByKey(key string) (interface{}, error) {
 
 	return val, nil
 }
+
+func GetTtlKey(key string) (time.Duration, error) {
+
+	return global.Redis.TTL(context.Background(), key).Result()
+}
+
+func SetTtlKey(key string, second int) (bool, error) {
+	return global.Redis.Expire(context.Background(), key, time.Duration(second)*time.Second).Result()
+}
+
+func Set(key, val string, second int) (string, error) {
+	return global.Redis.Set(context.Background(), key, val, time.Duration(second)*time.Second).Result()
+}

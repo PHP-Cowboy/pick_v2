@@ -593,7 +593,7 @@ func PickingRecordDetail(c *gin.Context) {
 	}
 	res.ReviewTime = reviewTime
 
-	result = db.Where("pick_id = ?", form.PickId).Find(&pickGoods)
+	result = db.Where("pick_id = ?", form.PickId).Order("shelves asc").Find(&pickGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
