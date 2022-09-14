@@ -7,6 +7,7 @@ type ServerConfig struct {
 	RedisInfo  RedisConfig    `mapstructure:"redis" json:"redis"`
 	GoodsApi   GoodsApiConfig `mapstructure:"goods_api" json:"goods_api"`
 	YongSender string         `mapstructure:"yong_sender" json:"yong_sender"`
+	RocketMQ   string         `mapstructure:"rocket_mq" json:"rocket_mq"`
 }
 
 type MysqlConfig struct {

@@ -41,7 +41,7 @@ func main() {
 	}()
 
 	c, mqErr := rocketmq.NewPushConsumer(
-		consumer.WithNameServer([]string{"192.168.1.40:9876"}),
+		consumer.WithNameServer([]string{serverConfig.RocketMQ}),
 		consumer.WithGroupName("purchase"),
 	)
 
