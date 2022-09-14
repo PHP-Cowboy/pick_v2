@@ -11,7 +11,13 @@ type ReviewDetailReq struct {
 }
 
 type ConfirmDeliveryReq struct {
-	Id             int                  `json:"id"`
-	Num            int                  `json:"num" binding:"required"`
-	CompleteReview []CompletePickDetail `json:"complete_review"`
+	Id             int                    `json:"id"`
+	Num            int                    `json:"num" binding:"required"`
+	CompleteReview []CompleteReviewDetail `json:"complete_review"`
+}
+
+type CompleteReviewDetail struct {
+	Sku       string     `json:"sku"`
+	ParamsId  []ParamsId `json:"params_id"`
+	ReviewNum int        `json:"review_num"`
 }

@@ -46,6 +46,7 @@ type Pick struct {
 	Num            int    `json:"num"`         //件数
 	ReviewUser     string `json:"review_user"` //复核人
 	ReviewTime     string `json:"review_time"` //复核时间
+	PrintNum       int    `json:"print_num"`
 	//Shelves    string `json:"shelves"`     //货位号不要了
 }
 

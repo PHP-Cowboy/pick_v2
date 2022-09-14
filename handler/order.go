@@ -136,7 +136,7 @@ func PickOrderList(c *gin.Context) {
 // 拣货单明细
 func GetPickOrderDetail(c *gin.Context) {
 
-	var form req.GetOrderDetailForm
+	var form req.GetPickOrderDetailForm
 
 	if err := c.ShouldBind(&form); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
@@ -150,14 +150,14 @@ func GetPickOrderDetail(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Model(&model.PickOrder{}).Where("number = ?", form.Number).First(&orders)
+	result := db.Model(&model.PickOrder{}).Where("id = ?", form.Id).First(&orders)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	result = db.Model(&model.PickOrderGoods{}).Where("number = ?", form.Number).Find(&orderGoods)
+	result = db.Model(&model.PickOrderGoods{}).Where("pick_order_id = ?", form.Id).Find(&orderGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -204,6 +204,7 @@ func GetPickOrderDetail(c *gin.Context) {
 			PayCount:    og.PayCount,
 			CloseCount:  og.CloseCount,
 			LackCount:   og.LimitNum, //需拣数 以限发数为准
+			OutCount:    og.OutCount,
 			GoodsRemark: og.GoodsRemark,
 		})
 	}
@@ -304,7 +305,12 @@ func OrderGoodsList(c *gin.Context) {
 
 	var pickOrderGood []model.PickOrderGoods
 
-	result := global.DB.Model(&model.PickOrderGoods{}).Where("number = ?", form.Number).Find(&pickOrderGood)
+	//result := global.DB.Model(&model.PickOrderGoods{}).Where("pick_number = ?", form.PickNumber).Find(&pickOrderGood)
+	result := global.DB.Table("t_pick_order_goods og").
+		Select("og.*").
+		Where("pick_number = ?", form.PickNumber).
+		Joins("left join t_pick_order o on og.pick_order_id = o.id").
+		Find(&pickOrderGood)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -343,7 +349,7 @@ func RestrictedShipment(c *gin.Context) {
 		restrictedShipment = make([]model.RestrictedShipment, 0, len(form.Params))
 	)
 
-	result := db.Model(&model.PickOrder{}).Where("number = ?", form.Number).First(&pickOrder)
+	result := db.Model(&model.PickOrder{}).Where("pick_number = ?", form.PickNumber).First(&pickOrder)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -434,13 +440,14 @@ func BatchRestrictedShipment(c *gin.Context) {
 	var (
 		restrictedShipment = make([]model.RestrictedShipment, 0)
 		orderAndGoods      []rsp.OrderAndGoods
+		pickOrderGoods     = make([]model.PickOrderGoods, 0)
 	)
 
 	db := global.DB
 
 	result := db.Table("t_pick_order_goods og").
 		Select("og.*,o.pick_number").
-		Joins("left join t_pick_order o on og.number = o.number").
+		Joins("left join t_pick_order o on og.pick_order_id = o.id").
 		Where("og.sku = (?)", form.Sku).
 		Find(&orderAndGoods)
 
@@ -457,15 +464,34 @@ func BatchRestrictedShipment(c *gin.Context) {
 			GoodsSpe:         pg.GoodsSpe,
 			LimitNum:         form.LimitNum,
 		})
+
+		pickOrderGoods = append(pickOrderGoods, model.PickOrderGoods{
+			Base:     model.Base{Id: pg.Id},
+			LimitNum: form.LimitNum,
+		})
 	}
 
 	if len(restrictedShipment) > 0 {
-		result = db.Save(&restrictedShipment)
+		tx := db.Begin()
+
+		result = tx.Save(&restrictedShipment)
 
 		if result.Error != nil {
+			tx.Rollback()
 			xsq_net.ErrorJSON(c, result.Error)
 			return
 		}
+
+		result = tx.Select("id", "update_time", "limit_num").Save(&pickOrderGoods)
+
+		if result.Error != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+
+		tx.Commit()
+
 	} else {
 		xsq_net.ErrorJSON(c, errors.New("没有待拣货的sku"))
 		return
@@ -820,6 +846,6 @@ func PickOrderCount(c *gin.Context) {
 }
 
 func Test(c *gin.Context) {
-	salt, sign := middlewares.Generate()
-	xsq_net.SucJson(c, gin.H{"salt": salt, "sign": sign})
+	sign := middlewares.Generate()
+	xsq_net.SucJson(c, gin.H{"sign": sign})
 }

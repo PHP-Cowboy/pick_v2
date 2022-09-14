@@ -10,7 +10,7 @@ type PickOrder struct {
 	ShopName          string     `gorm:"type:varchar(64);not null;comment:店铺名称"`
 	ShopType          string     `gorm:"type:varchar(64);not null;comment:店铺类型"`
 	ShopCode          string     `gorm:"type:varchar(255);not null;comment:店铺编号"`
-	Number            string     `gorm:"type:varchar(64);unique;comment:订单编号"`
+	Number            string     `gorm:"type:varchar(64);index;comment:订单编号"`
 	PickNumber        string     `gorm:"type:varchar(64);unique;comment:拣货单编号"`
 	HouseCode         string     `gorm:"type:varchar(64);not null;comment:仓库编码"`
 	Line              string     `gorm:"type:varchar(255);not null;comment:线路"`

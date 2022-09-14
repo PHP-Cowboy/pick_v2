@@ -16,6 +16,7 @@ import (
 	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
+	"sort"
 	"strings"
 	"time"
 )
@@ -154,6 +155,7 @@ func PickList(c *gin.Context) {
 			PickNum:        p.PickNum,
 			ReviewNum:      p.ReviewNum,
 			Num:            p.Num,
+			PrintNum:       p.PrintNum,
 			ReviewUser:     p.ReviewUser,
 			ReviewTime:     reviewTime,
 		})
@@ -267,6 +269,16 @@ func GetPickDetail(c *gin.Context) {
 		})
 	}
 
+	//按货架号排序
+	for s, goods := range goodsMap {
+
+		ret := rsp.MyMergePickGoods(goods)
+
+		sort.Sort(ret)
+
+		goodsMap[s] = ret
+	}
+
 	res.Goods = goodsMap
 
 	result = db.Where("pick_id = ?", form.PickId).Find(&pickRemark)
@@ -352,8 +364,9 @@ func PushPrint(c *gin.Context) {
 
 	pickMp := make(map[int]string, 0)
 
-	for _, p := range pick {
+	for i, p := range pick {
 		pickMp[p.Id] = strings.Join(p.DeliveryOrderNo, ",")
+		pick[i].PrintNum += 1
 	}
 
 	result = db.Where("pick_id in (?)", form.Ids).Find(&pickGoods)
@@ -391,6 +404,8 @@ func PushPrint(c *gin.Context) {
 			ShopId:          ch.ShopId,
 		})
 	}
+
+	result = db.Select("id", "update_time", "shop_code", "shop_name", "line", "print_num").Save(&pick)
 
 	xsq_net.Success(c)
 }

@@ -19,6 +19,7 @@ type Pick struct {
 	PickNum         int        `gorm:"type:int;default:0;comment:拣货数量"`
 	ReviewNum       int        `gorm:"type:int;default:0;comment:复核数量"`
 	Num             int        `gorm:"type:int;default:0;comment:件数"`
+	PrintNum        int        `gorm:"type:int;default:0;comment:打印次数"`
 	PickUser        string     `gorm:"type:varchar(32);default:'';comment:拣货人"`
 	TakeOrdersTime  *time.Time `gorm:"type:datetime;default:null;comment:接单时间"`
 	ReviewUser      string     `gorm:"type:varchar(32);default:'';comment:复核人"`

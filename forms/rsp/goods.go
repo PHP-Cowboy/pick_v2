@@ -129,6 +129,7 @@ type GoodsDetail struct {
 	PayCount    int    `json:"pay_count"`
 	CloseCount  int    `json:"close_count"`
 	LackCount   int    `json:"need_count"` //欠货数量(需出数量)
+	OutCount    int    `json:"out_count"`
 	GoodsRemark string `json:"goods_remark"`
 }
 

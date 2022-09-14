@@ -159,6 +159,13 @@ func GetOrderDetail(c *gin.Context) {
 		return
 	}
 
+	payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, orders.PayAt, time.Local)
+
+	if payAtErr != nil {
+		xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+		return
+	}
+
 	result = db.Model(&model.OrderGoods{}).Where("number = ?", form.Number).Find(&orderGoods)
 
 	if result.Error != nil {
@@ -206,12 +213,13 @@ func GetOrderDetail(c *gin.Context) {
 			PayCount:    og.PayCount,
 			CloseCount:  og.CloseCount,
 			LackCount:   og.LackCount,
+			OutCount:    og.OutCount,
 			GoodsRemark: og.GoodsRemark,
 		})
 	}
 
 	res.Number = orders.Number
-	res.PayAt = orders.PayAt
+	res.PayAt = payAt.Format(timeutil.TimeFormat)
 	res.ShopCode = orders.ShopCode
 	res.ShopName = orders.ShopName
 	res.Line = orders.Line
@@ -308,7 +316,7 @@ func ShippingRecordDetail(c *gin.Context) {
 
 	var pickGoods []model.PickGoods
 
-	result := global.DB.Where("pick_id in (?)", form.Id).Find(&pickGoods)
+	result := global.DB.Where("pick_id in (?) and review_num > 0", form.Id).Find(&pickGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -641,13 +649,18 @@ func CreatePickOrder(c *gin.Context) {
 			Address:           o.Address,
 			ConsigneeName:     o.ConsigneeName,
 			ConsigneeTel:      o.ConsigneeTel,
-			OrderType:         o.OrderType,
+			OrderType:         1, //重新进入时，改为新订单
 			HasRemark:         o.HasRemark,
 			LatestPickingTime: o.LatestPickingTime,
 		})
 	}
 
 	for _, og := range orderGoods {
+
+		if og.LackCount <= 0 {
+			continue
+		}
+
 		pickOrderGoods = append(pickOrderGoods, model.PickOrderGoods{
 			OrderGoodsId:    og.Id,
 			Number:          og.Number,
@@ -679,6 +692,24 @@ func CreatePickOrder(c *gin.Context) {
 		tx.Rollback()
 		xsq_net.ErrorJSON(c, result.Error)
 		return
+	}
+
+	//取出pick_order 表中 number 对应的 id 存入 到 pick_order_goods 表中
+	var pickOrderNumberIdMp = make(map[string]int, len(pickOrder))
+
+	for _, po := range pickOrder {
+		pickOrderNumberIdMp[po.Number] = po.Id
+	}
+
+	for i, goods := range pickOrderGoods {
+		pickOrderId, ok := pickOrderNumberIdMp[goods.Number]
+
+		if !ok {
+			xsq_net.ErrorJSON(c, errors.New("number:"+goods.Number+"拣货单表id数据不存在，请联系管理员"))
+			return
+		}
+
+		pickOrderGoods[i].PickOrderId = pickOrderId
 	}
 
 	result = tx.Save(&pickOrderGoods)

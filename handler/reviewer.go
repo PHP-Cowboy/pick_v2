@@ -355,14 +355,14 @@ func ConfirmDelivery(c *gin.Context) {
 			orderPickGoodsIdMp[ids.OrderGoodsId] = ids.PickGoodsId
 		}
 		//sku完成数量
-		skuCompleteNumMp[cp.Sku] = cp.CompleteNum
-		totalNum += cp.CompleteNum //总复核数量
+		skuCompleteNumMp[cp.Sku] = cp.ReviewNum
+		totalNum += cp.ReviewNum //总复核数量
 	}
 
 	//step: 根据 订单表id切片 查出订单数据 根据支付时间升序
 	result = db.Table("t_pick_order_goods og").
 		Select("og.*").
-		Joins("left join t_pick_order o on og.number = o.number").
+		Joins("left join t_pick_order o on og.pick_order_id = o.id").
 		Where("og.id in (?)", orderGoodsIds).
 		Order("pay_at ASC").
 		Find(&orderAndGoods)
@@ -432,29 +432,11 @@ func ConfirmDelivery(c *gin.Context) {
 		//构造更新拣货单商品表数据
 		pickOrderGoods = append(pickOrderGoods, model.PickOrderGoods{
 			Base: model.Base{
-				Id:         info.Id,
-				CreateTime: info.CreateTime,
-				UpdateTime: info.UpdateTime,
-				DeleteTime: info.DeleteTime,
+				Id: info.Id,
 			},
-			OrderGoodsId:    info.OrderGoodsId,
-			Number:          info.Number,
-			GoodsName:       info.GoodsName,
-			Sku:             info.Sku,
-			GoodsType:       info.GoodsType,
-			GoodsSpe:        info.GoodsSpe,
-			Shelves:         info.Shelves,
-			DiscountPrice:   info.DiscountPrice,
-			GoodsUnit:       info.GoodsUnit,
-			SaleUnit:        info.SaleUnit,
-			SaleCode:        info.SaleCode,
-			PayCount:        info.PayCount,
-			CloseCount:      info.CloseCount,
 			LackCount:       info.LackCount - reviewCompleteNum,
 			OutCount:        reviewCompleteNum,
-			GoodsRemark:     info.GoodsRemark,
 			Status:          2,
-			BatchId:         info.BatchId,
 			DeliveryOrderNo: deliveryOrderNoArr,
 		})
 
@@ -546,7 +528,7 @@ func ConfirmDelivery(c *gin.Context) {
 
 	tx := db.Begin()
 
-	result = tx.Save(&pickOrderGoods)
+	result = tx.Select("id", "update_time", "lack_count", "out_count", "status", "delivery_order_no").Save(&pickOrderGoods)
 
 	if result.Error != nil {
 		tx.Rollback()

@@ -17,7 +17,7 @@ type StopPickForm struct {
 }
 
 type CreateByOrderReq struct {
-	Number string `json:"number" form:"number" binding:"required"`
+	PickNumber string `json:"pick_number" form:"pick_number" binding:"required"`
 }
 
 type EndBatchForm struct {

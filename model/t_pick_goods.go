@@ -18,7 +18,7 @@ type PickGoods struct {
 	Shelves          string `gorm:"type:varchar(64);comment:货架"`
 	DiscountPrice    int    `gorm:"comment:折扣价"`
 	NeedNum          int    `gorm:"type:int;not null;comment:需拣数量"`
-	CompleteNum      int    `gorm:"type:int;not null;default:0;comment:已拣数量"`
-	ReviewNum        int    `gorm:"type:int;not null;default:0;comment:复核数量"`
+	CompleteNum      int    `gorm:"type:int;default:0;comment:已拣数量"`
+	ReviewNum        int    `gorm:"type:int;default:0;comment:复核数量"`
 	Unit             string `gorm:"type:varchar(64);comment:单位"`
 }

@@ -12,6 +12,7 @@ import (
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
+	"sort"
 	"time"
 )
 
@@ -293,7 +294,7 @@ func CompletePick(c *gin.Context) {
 	//step: 根据 订单表id切片 查出订单数据 根据支付时间升序
 	result = db.Table("t_pick_order_goods og").
 		Select("og.*").
-		Joins("left join t_pick_order o on og.number = o.number").
+		Joins("left join t_pick_order o on og.pick_order_id = o.id").
 		Where("og.id in (?)", orderGoodsIds).
 		Order("pay_at ASC").
 		Find(&orderGoods)
@@ -593,7 +594,7 @@ func PickingRecordDetail(c *gin.Context) {
 	}
 	res.ReviewTime = reviewTime
 
-	result = db.Where("pick_id = ?", form.PickId).Order("shelves asc").Find(&pickGoods)
+	result = db.Where("pick_id = ?", form.PickId).Find(&pickGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -657,6 +658,16 @@ func PickingRecordDetail(c *gin.Context) {
 
 	res.OutTotal = completeTotal
 	res.UnselectedTotal = needTotal - completeTotal
+
+	//按货架号排序
+	for s, goods := range goodsMap {
+
+		ret := rsp.MyMergePickGoods(goods)
+
+		sort.Sort(ret)
+
+		goodsMap[s] = ret
+	}
 
 	res.Goods = goodsMap
 

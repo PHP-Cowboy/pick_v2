@@ -35,6 +35,20 @@ type MergePickGoods struct {
 	ParamsId    []ParamsId `json:"params_id"`
 }
 
+type MyMergePickGoods []MergePickGoods
+
+func (pg MyMergePickGoods) Len() int {
+	return len(pg)
+}
+
+func (pg MyMergePickGoods) Less(i, j int) bool {
+	return pg[i].Shelves < pg[j].Shelves
+}
+
+func (pg MyMergePickGoods) Swap(i, j int) {
+	pg[i].Shelves, pg[j].Shelves = pg[j].Shelves, pg[i].Shelves
+}
+
 type ParamsId struct {
 	PickGoodsId  int `json:"pick_goods_id"`
 	OrderGoodsId int `json:"order_goods_id"`

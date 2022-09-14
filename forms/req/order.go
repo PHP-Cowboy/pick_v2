@@ -26,12 +26,12 @@ type DeliveryMethodInfoForm struct {
 }
 
 type OrderGoodsListForm struct {
-	Number string `json:"number" form:"number"`
+	PickNumber string `json:"pick_number" form:"pick_number"`
 }
 
 type RestrictedShipmentForm struct {
-	Number string           `json:"number" form:"number"`
-	Params []ShipmentParams `json:"params" form:"params"`
+	PickNumber string           `json:"pick_number" form:"pick_number"`
+	Params     []ShipmentParams `json:"params" form:"params"`
 }
 
 type ShipmentParams struct {
@@ -63,4 +63,8 @@ type CloseOrderForm struct {
 type CloseOrderGoodsForm struct {
 	GoodsId  int `json:"goods_id"`
 	CloseNum int `json:"close_num"`
+}
+
+type GetPickOrderDetailForm struct {
+	Id int `json:"id" form:"id" binding:"required"`
 }

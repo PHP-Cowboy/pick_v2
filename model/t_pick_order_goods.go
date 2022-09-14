@@ -3,6 +3,7 @@ package model
 // 拣货单商品
 type PickOrderGoods struct {
 	Base
+	PickOrderId     int      `gorm:"type:int(11) unsigned;index;comment:拣货单表id"`
 	OrderGoodsId    int      `gorm:"type:int(11) unsigned;index;comment:订单商品表id"`
 	Number          string   `gorm:"type:varchar(64);index;comment:订单编号"`
 	GoodsName       string   `gorm:"type:varchar(64);comment:商品名称"`

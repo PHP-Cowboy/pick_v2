@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/xsq_net"
+	"strings"
 )
 
 var key = "9sWBFw96W1Vf7Bb4"
@@ -17,7 +18,6 @@ func GetOptions() *password.Options {
 func SignAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sign := c.Request.Header.Get("x-sign")
-		salt := c.Request.Header.Get("x-salt")
 		if sign == "" {
 			xsq_net.ErrorJSON(c, ecode.IllegalRequest)
 			c.Abort()
@@ -26,7 +26,15 @@ func SignAuth() gin.HandlerFunc {
 
 		options := GetOptions()
 
-		if !password.Verify(key, salt, sign, options) {
+		signSlice := strings.Split(sign, "$")
+
+		if len(signSlice) != 2 {
+			xsq_net.ErrorJSON(c, ecode.CommunalSignInvalid)
+			c.Abort()
+			return
+		}
+
+		if !password.Verify(key, signSlice[0], signSlice[1], options) {
 			xsq_net.ErrorJSON(c, ecode.CommunalSignInvalid)
 			c.Abort()
 			return
@@ -36,8 +44,10 @@ func SignAuth() gin.HandlerFunc {
 	}
 }
 
-func Generate() (salt string, sign string) {
+func Generate() string {
 	options := GetOptions()
 
-	return password.Encode(key, options)
+	salt, encode := password.Encode(key, options)
+
+	return salt + "$" + encode
 }

@@ -137,7 +137,7 @@ func CreateByOrder(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Where("number = ?", form.Number).First(&pickOrder)
+	result := db.Where("pick_number = ?", form.PickNumber).First(&pickOrder)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -175,7 +175,7 @@ func CreateByOrder(c *gin.Context) {
 		return
 	}
 
-	numbers, pickOrderGoodsId, orderGoodsIds, err := SavePrePickPool(tx, userInfo, batchId, form.Number, nil)
+	numbers, pickOrderGoodsId, orderGoodsIds, err := SavePrePickPool(tx, userInfo, batchId, form.PickNumber, nil)
 
 	if err != nil {
 		tx.Rollback()
@@ -293,7 +293,7 @@ func SaveBatch(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchName, line,
 	return batches.Id, nil
 }
 
-func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId int, number string, form *req.CreateBatchForm) ([]string, []int, []int, error) {
+func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId int, pickNumber string, form *req.CreateBatchForm) ([]string, []int, []int, error) {
 
 	//返回给调用方更新订单和订单商品状态
 	var (
@@ -321,10 +321,10 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 	localDb := global.DB.
 		Table("t_pick_order_goods og").
 		Select("og.*,o.shop_id,o.shop_name,o.shop_code,o.line,o.distribution_type,o.order_remark").
-		Joins("left join t_pick_order o on og.number = o.number")
+		Joins("left join t_pick_order o on og.pick_order_id = o.id")
 
-	if number != "" {
-		localDb = localDb.Where("og.number = ?", number)
+	if pickNumber != "" {
+		localDb = localDb.Where("o.pick_number = ?", pickNumber)
 	}
 
 	if form != nil {
@@ -562,7 +562,7 @@ func EndBatch(c *gin.Context) {
 
 	result = db.Table("t_pick_order_goods og").
 		Select("og.*,o.shop_id,o.shop_name,o.shop_code,o.line,o.distribution_type,o.order_remark,o.pay_at,o.province,o.city,o.district,o.shop_type,o.latest_picking_time").
-		Joins("left join t_pick_order o on og.number = o.number").
+		Joins("left join t_pick_order o on og.pick_order_id = o.id").
 		Where("batch_id = ?", form.Id).
 		Find(&orderAndGoods)
 
@@ -632,7 +632,7 @@ func UpdateCompleteOrder(batchId int) error {
 		order      []model.Order
 		orderGoods []model.OrderGoods
 	)
-
+	//根据批次拿order会导致完成订单有遗漏
 	result := db.Model(&model.OrderGoods{}).Where("batch_id = ?", batchId).Find(&orderGoods)
 
 	if result.Error != nil {
@@ -656,14 +656,13 @@ func UpdateCompleteOrder(batchId int) error {
 	var (
 		//完成订单map
 		//key => number
-		completeMp = make(map[string]interface{}, 0)
-		//待删除订单表id
-		deleteIds           []int
+		completeMp          = make(map[string]interface{}, 0)
+		completeNumbers     []string
+		deleteIds           []int    //待删除订单表id
 		deleteNumbers       []string //删除订单商品表
 		completeOrder       = make([]model.CompleteOrder, 0)
 		completeOrderDetail = make([]model.CompleteOrderDetail, 0)
-		//待更新为欠货订单表id
-		lackIds []int
+		lackIds             []int //待更新为欠货订单表id
 	)
 
 	for _, o := range order {
@@ -676,6 +675,9 @@ func UpdateCompleteOrder(batchId int) error {
 		deleteIds = append(deleteIds, o.Id)
 
 		completeMp[o.Number] = struct{}{}
+
+		//完成订单
+		completeNumbers = append(completeNumbers, o.Number)
 
 		deleteNumbers = append(deleteNumbers, o.Number)
 
@@ -705,27 +707,36 @@ func UpdateCompleteOrder(batchId int) error {
 		})
 	}
 
-	for _, og := range orderGoods {
-		//完成订单map中不存在订单的跳过
-		_, ok := completeMp[og.Number]
+	if len(completeNumbers) > 0 {
+		//如果有完成订单重新查询订单商品，因为商品可能是多个批次拣的，根据批次查的商品不全
+		result = db.Model(&model.OrderGoods{}).Where("number in (?)", completeNumbers).Find(&orderGoods)
 
-		if !ok {
-			continue
+		if result.Error != nil {
+			return result.Error
 		}
-		//完成订单详情
-		completeOrderDetail = append(completeOrderDetail, model.CompleteOrderDetail{
-			Number:          og.Number,
-			GoodsName:       og.GoodsName,
-			Sku:             og.Sku,
-			GoodsSpe:        og.GoodsSpe,
-			GoodsType:       og.GoodsType,
-			Shelves:         og.Shelves,
-			PayCount:        og.PayCount,
-			CloseCount:      og.CloseCount,
-			ReviewCount:     og.OutCount,
-			GoodsRemark:     og.GoodsRemark,
-			DeliveryOrderNo: og.DeliveryOrderNo,
-		})
+
+		for _, og := range orderGoods {
+			//完成订单map中不存在订单的跳过
+			_, ok := completeMp[og.Number]
+
+			if !ok {
+				continue
+			}
+			//完成订单详情
+			completeOrderDetail = append(completeOrderDetail, model.CompleteOrderDetail{
+				Number:          og.Number,
+				GoodsName:       og.GoodsName,
+				Sku:             og.Sku,
+				GoodsSpe:        og.GoodsSpe,
+				GoodsType:       og.GoodsType,
+				Shelves:         og.Shelves,
+				PayCount:        og.PayCount,
+				CloseCount:      og.CloseCount,
+				ReviewCount:     og.OutCount,
+				GoodsRemark:     og.GoodsRemark,
+				DeliveryOrderNo: og.DeliveryOrderNo,
+			})
+		}
 	}
 
 	tx := db.Begin()
@@ -748,6 +759,7 @@ func UpdateCompleteOrder(batchId int) error {
 	}
 
 	if len(lackIds) > 0 {
+		//更新为欠货
 		result = tx.Model(&model.Order{}).Where("id in (?)", lackIds).Updates(map[string]interface{}{
 			"order_type": 3,
 		})
@@ -2303,7 +2315,7 @@ func PrintCallGet(c *gin.Context) {
 
 	result = db.Table("t_pick_order_goods og").
 		Select("og.*,o.shop_id,o.shop_name,o.shop_code,o.line,o.distribution_type,o.order_remark,o.pay_at,o.province,o.city,o.district,o.shop_type,o.latest_picking_time,o.house_code,o.consignee_name,o.consignee_tel").
-		Joins("left join t_pick_order o on og.number = o.number").
+		Joins("left join t_pick_order o on og.pick_order_id = o.id").
 		Where("og.id in (?)", orderGoodsIds).
 		Scan(&orderAndGoods)
 
