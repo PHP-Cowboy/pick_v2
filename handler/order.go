@@ -209,8 +209,15 @@ func GetPickOrderDetail(c *gin.Context) {
 		})
 	}
 
+	payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, orders.PayAt, time.Local)
+
+	if payAtErr != nil {
+		xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+		return
+	}
+
 	res.Number = orders.Number
-	res.PayAt = orders.PayAt
+	res.PayAt = payAt.Format(timeutil.TimeFormat)
 	res.ShopCode = orders.ShopCode
 	res.ShopName = orders.ShopName
 	res.Line = orders.Line
@@ -460,7 +467,7 @@ func BatchRestrictedShipment(c *gin.Context) {
 		restrictedShipment = append(restrictedShipment, model.RestrictedShipment{
 			PickOrderGoodsId: pg.Id,
 			PickNumber:       pg.Number,
-			ShopName:         pg.GoodsName,
+			ShopName:         pg.ShopName,
 			GoodsSpe:         pg.GoodsSpe,
 			LimitNum:         form.LimitNum,
 		})

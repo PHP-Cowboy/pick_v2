@@ -13,6 +13,7 @@ import (
 	"pick_v2/model"
 	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
+	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"time"
@@ -513,21 +514,9 @@ func ConfirmDelivery(c *gin.Context) {
 
 	now := time.Now()
 
-	for i, o := range order {
-		picked, ogMpOk := orderPickMp[o.Number]
-
-		if !ogMpOk {
-			continue
-		}
-
-		order[i].Picked = picked
-		order[i].UnPicked = o.UnPicked - picked
-
-		order[i].LatestPickingTime = &now
-	}
-
 	tx := db.Begin()
 
+	//更新拣货单商品表数据
 	result = tx.Select("id", "update_time", "lack_count", "out_count", "status", "delivery_order_no").Save(&pickOrderGoods)
 
 	if result.Error != nil {
@@ -536,21 +525,8 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
-	result = tx.Save(&orderGoods)
-
-	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	result = tx.
-		Omit("number", "pay_at", "delivery_at", "has_remark", "address", "order_remark").
-		Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{"latest_picking_time", "picked", "un_picked"}),
-		}).
-		Save(&order)
+	//更新订单商品数据
+	result = tx.Select("id", "update_time", "lack_count", "out_count", "delivery_order_no").Save(&orderGoods)
 
 	if result.Error != nil {
 		tx.Rollback()
@@ -581,17 +557,125 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
-	//更新主表
+	//更新拣货池表
 	result = tx.Model(&model.Pick{}).
 		Where("id = ?", pick.Id).
 		Updates(map[string]interface{}{
-			"status":            2,
+			"status":            model.ReviewCompletedStatus,
 			"review_time":       &now,
 			"num":               form.Num,
 			"review_num":        totalNum,
 			"delivery_order_no": val,
 			"delivery_no":       deliveryOrderNo,
 		})
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	lackNumberMp := make(map[string]struct{}, 0) //要被更新为欠货的 number map
+
+	//批次已结束的
+	if batch.Status == model.BatchClosedStatus {
+		// 欠货逻辑 查出当前出库的所有商品 number ，这些number如果还有未复核完成的就不更新为欠货
+		var (
+			picks          []model.Pick
+			isSendMQ       = true
+			pickNumbers    []string //当前出库的所有商品 number
+			pickAndGoods   []model.PickAndGoods
+			pendingNumbers []string
+			diffSlice      []string
+		)
+		//查出当前批次拣货池数据，如果有未完成复核的，就不发送mq消息
+		result = db.Model(&model.Pick{}).Where("batch_id = ?", batch.Id).Find(&picks)
+		if result.Error != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+
+		for _, ps := range picks {
+			if ps.Status < model.ReviewCompletedStatus {
+				//批次有未复核完成的拣货单
+				isSendMQ = false
+			}
+		}
+
+		//获取当前出库的所有商品 number
+		for _, good := range pickGoods {
+			pickNumbers = append(pickNumbers, good.Number)
+		}
+
+		pickNumbers = slice.UniqueStringSlice(pickNumbers)
+
+		//获取欠货的订单number是否有在拣货池中未复核完成的数据，如果有，过滤掉欠货的订单number
+		db.Model("t_pick_goods pg").
+			Select("p.id as pick_id,p.status,pg.number").
+			Joins("left join t_pick_goods p on pg.pick_id = p.id").
+			Where("number in (?)", pickNumbers).
+			Find(&pickAndGoods)
+
+		//获取拣货id，根据拣货id查出 拣货单中 未复核完成的订单，不更新为欠货，
+		//且 有未复核完成的订单 不发送到mq中，完成后再发送到mq中
+		for _, p := range pickAndGoods {
+			if p.Status < model.ReviewCompletedStatus {
+				pendingNumbers = append(pendingNumbers, p.Number)
+				isSendMQ = false
+			}
+		}
+
+		pendingNumbers = slice.UniqueStringSlice(pendingNumbers)
+
+		diffSlice = slice.StrDiff(pickNumbers, pendingNumbers) // 在 pickNumbers 不在 pendingNumbers 中的
+
+		if len(diffSlice) > 0 {
+			//构造 更新为欠货 number map
+			for _, s := range diffSlice {
+				lackNumberMp[s] = struct{}{}
+			}
+		}
+
+		if isSendMQ {
+			//mq 存入 批次id
+			err = SyncBatch(batch.Id)
+			if err != nil {
+				tx.Rollback()
+				xsq_net.ErrorJSON(c, errors.New("写入mq失败"))
+				return
+			}
+		}
+	}
+
+	//如果是批次结束时 还在拣货池中的单的出库，且拣货池中没有未复核的商品，要更新 order_type
+	for i, o := range order {
+		picked, ogMpOk := orderPickMp[o.Number]
+
+		if !ogMpOk {
+			continue
+		}
+
+		order[i].Picked = picked
+		order[i].UnPicked = o.UnPicked - picked
+
+		order[i].LatestPickingTime = &now
+
+		_, ok := lackNumberMp[o.Number]
+
+		if ok {
+			order[i].OrderType = model.LackOrderType //更新为欠货
+		}
+	}
+
+	//更新订单数据
+	result = tx.
+		Omit("number", "pay_at", "delivery_at", "has_remark", "address", "order_remark").
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"latest_picking_time", "picked", "un_picked"}),
+		}).
+		Save(&order)
 
 	if result.Error != nil {
 		tx.Rollback()
@@ -623,21 +707,22 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
-	if batch.Status == 1 {
-		err = YongYouLog(pickGoods, orderAndGoods, pick.BatchId)
-		if err != nil {
-			tx.Commit() // u8推送失败不能影响仓库出货，只提示，业务继续
-			xsq_net.ErrorJSON(c, err)
-			return
-		}
-	}
-
 	err = UpdateBatchPickNums(tx, pick.BatchId)
 
 	if err != nil {
 		tx.Rollback()
 		xsq_net.ErrorJSON(c, result.Error)
 		return
+	}
+
+	//批次已结束,这个不能往前移，里面有commit，移到前面去如果进入commit，后面的又有失败的，事务无法保证一致性了
+	if batch.Status == model.BatchClosedStatus {
+		err = YongYouLog(tx, pickGoods, orderAndGoods, pick.BatchId)
+		if err != nil {
+			tx.Commit() // u8推送失败不能影响仓库出货，只提示，业务继续
+			xsq_net.ErrorJSON(c, err)
+			return
+		}
 	}
 
 	tx.Commit()

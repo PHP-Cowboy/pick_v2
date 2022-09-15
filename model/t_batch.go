@@ -24,3 +24,9 @@ type Batch struct {
 	PayEndTime        *time.Time `gorm:"type:datetime;comment:支付截止时间"`
 	Version           int        `gorm:"type:int;default:0;comment:版本"`
 }
+
+const (
+	BatchOngoingStatus = iota //进行中
+	BatchClosedStatus
+	BatchSuspendStatus
+)

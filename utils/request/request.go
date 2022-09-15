@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"pick_v2/global"
+	"pick_v2/middlewares"
 	"strings"
 )
 
@@ -64,7 +65,10 @@ func Post(path string, responseData interface{}) ([]byte, error) {
 		return nil, err
 	}
 
+	sign := middlewares.Generate()
+
 	rq.Header.Add("Content-Type", "application/json")
+	rq.Header.Add("x-sign", sign)
 
 	res, err := client.Do(rq)
 

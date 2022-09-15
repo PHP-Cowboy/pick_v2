@@ -13,3 +13,10 @@ type StockLog struct {
 	Msg         string `gorm:"type:text;comment:信息" json:"msg"`
 	ShopName    string `gorm:"type:varchar(64);default:'';not null;comment:店铺名称" json:"shop_name"`
 }
+
+const (
+	StockLogCreatedStatus             = iota //已创建
+	StockLogPushSucceededStatus              //推送成功
+	StockLogPushFailedStatus                 //推送失败
+	StockLogManualReplenishmentStatus        //手工补单
+)

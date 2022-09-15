@@ -11,6 +11,7 @@ type LogList struct {
 	UpdateTime  string `json:"update_time"`
 	Number      string `json:"number"`
 	BatchId     int    `json:"batch_id"`
+	PickId      int    `json:"pick_id"`
 	Status      int    `json:"status"`
 	RequestXml  string `json:"request_xml"`
 	ResponseXml string `json:"response_xml"`
@@ -42,7 +43,11 @@ type LogDetail struct {
 }
 
 type LogDetailRsp struct {
-	CreateTime string      `json:"create_time"`
-	ShopName   string      `json:"shop_name"`
-	List       []LogDetail `json:"list"`
+	ShopName       string      `json:"shop_name"`
+	PickUser       string      `json:"pick_user"`
+	TakeOrdersTime string      `json:"take_orders_time"`
+	ReviewUser     string      `json:"review_user"`
+	ReviewTime     string      `json:"review_time"`
+	PayAt          string      `json:"pay_at"`
+	List           []LogDetail `json:"list"`
 }

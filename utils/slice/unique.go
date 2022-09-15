@@ -17,3 +17,29 @@ func UniqueStringSlice(arr []string) []string {
 
 	return ret
 }
+
+// 在 a 不在 b 中的
+// a := []string{"5", "2", "3", "4"}
+// b := []string{"0", "1", "2", "3"}
+// c => [5 4]
+func StrDiff(a []string, b []string) []string {
+
+	var c []string
+
+	// map[string]struct{}{}创建了一个key类型为String值类型为空struct的map，Equal -> make(map[string]struct{})
+	temp := map[string]struct{}{}
+
+	for _, val := range b {
+		if _, ok := temp[val]; !ok {
+			temp[val] = struct{}{}
+		}
+	}
+
+	for _, val := range a {
+		if _, ok := temp[val]; !ok {
+			c = append(c, val)
+		}
+	}
+
+	return c
+}

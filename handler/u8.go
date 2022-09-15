@@ -321,6 +321,7 @@ func LogList(c *gin.Context) {
 			UpdateTime:  log.UpdateTime.Format(timeutil.TimeFormat),
 			Number:      log.Number,
 			BatchId:     log.BatchId,
+			PickId:      log.PickId,
 			Status:      log.Status,
 			RequestXml:  log.RequestXml,
 			ResponseXml: log.ResponseXml,
@@ -428,6 +429,7 @@ func LogDetail(c *gin.Context) {
 		res       rsp.LogDetailRsp
 		pickGoods []model.PickGoods
 		pickOrder model.PickOrder
+		pick      model.Pick
 	)
 
 	db := global.DB
@@ -435,14 +437,34 @@ func LogDetail(c *gin.Context) {
 	result := db.Model(&model.PickOrder{}).Where("number = ?", form.Number).First(&pickOrder)
 
 	if result.Error != nil {
+
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	res.ShopName = pickOrder.ShopName
-	res.CreateTime = pickOrder.CreateTime.Format(timeutil.TimeFormat)
+	result = db.First(&pick, form.PickId)
 
-	result = db.Model(&model.PickGoods{}).Where(model.PickGoods{BatchId: form.BatchId, Number: form.Number}).Find(&pickGoods)
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, pickOrder.PayAt, time.Local)
+
+	if payAtErr != nil {
+		xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+		return
+	}
+
+	res.ShopName = pickOrder.ShopName
+	res.PayAt = payAt.Format(timeutil.TimeFormat)
+
+	res.PickUser = pick.PickUser
+	res.TakeOrdersTime = pick.TakeOrdersTime.Format(timeutil.TimeFormat)
+	res.ReviewUser = pick.ReviewUser
+	res.ReviewTime = pick.ReviewTime.Format(timeutil.TimeFormat)
+
+	result = db.Model(&model.PickGoods{}).Where(model.PickGoods{PickId: form.PickId, Number: form.Number}).Find(&pickGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

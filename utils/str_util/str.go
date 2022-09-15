@@ -49,3 +49,34 @@ func StrPad(Input string, PadLength int, PadString string, PadType int) string {
 	leftBuffer.WriteString(buffer.String())
 	return leftBuffer.String()
 }
+
+func SubStr(str string, start int, length int) (result string) {
+	s := []rune(str)
+	total := len(s)
+	if total == 0 {
+		return
+	}
+	// 允许从尾部开始计算
+	if start < 0 {
+		start = total + start
+		if start < 0 {
+			return
+		}
+	}
+	if start > total {
+		return
+	}
+	// 到末尾
+	if length < 0 {
+		length = total
+	}
+
+	end := start + length
+	if end > total {
+		result = string(s[start:])
+	} else {
+		result = string(s[start:end])
+	}
+
+	return
+}

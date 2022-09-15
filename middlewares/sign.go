@@ -44,6 +44,12 @@ func SignAuth() gin.HandlerFunc {
 	}
 }
 
+//func GetKey() string {
+//	unixStr := strconv.Itoa(int(time.Now().Unix()))
+//
+//	str_util.SubStr(unixStr, 0, -1)
+//}
+
 func Generate() string {
 	options := GetOptions()
 

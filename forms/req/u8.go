@@ -12,6 +12,6 @@ type BatchSupplementForm struct {
 }
 
 type LogDetailForm struct {
-	BatchId int    `json:"batch_id"`
-	Number  string `json:"number"`
+	Number string `json:"number" form:"number" binding:"required"`
+	PickId int    `json:"pick_id" form:"pick_id" binding:"required"`
 }

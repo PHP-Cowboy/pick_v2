@@ -31,3 +31,11 @@ type PickOrder struct {
 	HasRemark         int        `gorm:"type:tinyint;default:0;comment:是否备注:0:否,1:是"`
 	LatestPickingTime *time.Time `gorm:"type:datetime;default:null;comment:最近拣货时间"`
 }
+
+const (
+	_                          = iota
+	PickOrderNewOrderType      //新订单
+	PickOrderPickingOrderType  //拣货中
+	PickOrderCloseOrderType    //已关闭
+	PickOrderCompleteOrderType //已完成
+)

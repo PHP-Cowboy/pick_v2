@@ -7,7 +7,7 @@ type Pick struct {
 	Base
 	DeliveryOrderNo GormList   `gorm:"type:varchar(255);comment:出库单号"`
 	WarehouseId     int        `gorm:"type:int(11);comment:仓库"`
-	BatchId         int        `gorm:"type:int(11) unsigned;comment:批次表id"`
+	BatchId         int        `gorm:"type:int(11) unsigned;index;comment:批次表id"`
 	PrePickIds      string     `gorm:"type:varchar(255);comment:预拣货ids"`
 	TaskName        string     `gorm:"type:varchar(64);comment:任务名称"`
 	ShopCode        string     `gorm:"type:varchar(255);not null;comment:店铺编号"`
@@ -28,4 +28,18 @@ type Pick struct {
 	Version         int        `gorm:"type:int;default:0;comment:版本"`
 	Status          int        `gorm:"type:tinyint;comment:状态:0:待拣货,1:待复核,2:复核完成,3:停止拣货,4:终止拣货"`
 	DeliveryNo      string     `gorm:"type:varchar(255);index:delivery_no_idx;comment:出库单号"`
+}
+
+const (
+	ToBePickedStatus         = iota //待拣货
+	ToBeReviewedStatus              //待复核
+	ReviewCompletedStatus           //复核完成
+	StopPickingStatus               //停止拣货
+	TerminationPickingStatus        //终止拣货
+)
+
+type PickAndGoods struct {
+	PickId int    `json:"pick_id"`
+	Status int    `json:"status"`
+	Number string `json:"number"`
 }

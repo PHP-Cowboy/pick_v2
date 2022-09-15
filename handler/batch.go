@@ -601,38 +601,39 @@ func EndBatch(c *gin.Context) {
 		mpGoods[good.OrderGoodsId] = good
 	}
 
-	err := YongYouLog(pickGoods, orderAndGoods, form.Id)
+	tx := global.DB.Begin()
+
+	err := YongYouLog(tx, pickGoods, orderAndGoods, form.Id)
 
 	if err != nil {
+		tx.Rollback()
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
 	//这里会删数据，要放在推u8之后处理，失败重试要加上这里的逻辑
-	err = UpdateCompleteOrder(form.Id)
+	err = UpdateCompleteOrder(tx, form.Id)
 	if err != nil {
+		tx.Rollback()
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
-	//mq 存入 批次id
-	err = SyncBatch(form.Id)
-	if err != nil {
-		xsq_net.ErrorJSON(c, errors.New("写入mq失败"))
-		return
-	}
+	tx.Commit()
 
 	xsq_net.Success(c)
 }
 
-func UpdateCompleteOrder(batchId int) error {
+func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 	db := global.DB
 
 	var (
 		order      []model.Order
 		orderGoods []model.OrderGoods
+		isSendMQ   bool
 	)
 	//根据批次拿order会导致完成订单有遗漏
+	//OrderGoods 的批次id是否被更新了---不会，批次里的单在被更新为欠货之前一个商品只能被一个批次拿走，如果不是应该优化批次拿数据逻辑
 	result := db.Model(&model.OrderGoods{}).Where("batch_id = ?", batchId).Find(&orderGoods)
 
 	if result.Error != nil {
@@ -662,13 +663,13 @@ func UpdateCompleteOrder(batchId int) error {
 		deleteNumbers       []string //删除订单商品表
 		completeOrder       = make([]model.CompleteOrder, 0)
 		completeOrderDetail = make([]model.CompleteOrderDetail, 0)
-		lackIds             []int //待更新为欠货订单表id
+		lackNumbers         []string //待更新为欠货订单表number
 	)
 
 	for _, o := range order {
 		//还有欠货
 		if o.UnPicked > 0 {
-			lackIds = append(lackIds, o.Id)
+			lackNumbers = append(lackNumbers, o.Number)
 			continue
 		}
 
@@ -708,7 +709,7 @@ func UpdateCompleteOrder(batchId int) error {
 	}
 
 	if len(completeNumbers) > 0 {
-		//如果有完成订单重新查询订单商品，因为商品可能是多个批次拣的，根据批次查的商品不全
+		//如果有完成订单重新查询订单商品，因为这批商品可能是多个批次拣的，根据批次查的商品不全
 		result = db.Model(&model.OrderGoods{}).Where("number in (?)", completeNumbers).Find(&orderGoods)
 
 		if result.Error != nil {
@@ -739,8 +740,6 @@ func UpdateCompleteOrder(batchId int) error {
 		}
 	}
 
-	tx := db.Begin()
-
 	result = tx.Delete(&model.Order{}, "id in (?)", deleteIds)
 
 	if result.Error != nil {
@@ -758,16 +757,46 @@ func UpdateCompleteOrder(batchId int) error {
 		}
 	}
 
-	if len(lackIds) > 0 {
-		//更新为欠货
-		result = tx.Model(&model.Order{}).Where("id in (?)", lackIds).Updates(map[string]interface{}{
-			"order_type": 3,
-		})
+	// 欠货的单 拣货池还有未完成的，不更新为欠货
+	if len(lackNumbers) > 0 {
+		var (
+			pickAndGoods   []model.PickAndGoods
+			pendingNumbers []string
+			diffSlice      []string
+		)
 
-		if result.Error != nil {
-			tx.Rollback()
-			return result.Error
+		//获取欠货的订单number是否有在拣货池中未复核完成的数据，如果有，过滤掉欠货的订单number
+		db.Model("t_pick_goods pg").
+			Select("p.id as pick_id,p.status,pg.number").
+			Joins("left join t_pick_goods p on pg.pick_id = p.id").
+			Where("number in (?)", lackNumbers).
+			Find(&pickAndGoods)
+
+		//获取拣货id，根据拣货id查出 拣货单中 未复核完成的订单，不更新为欠货，
+		//且 有未复核完成的订单 不发送到mq中，完成后再发送到mq中
+		for _, p := range pickAndGoods {
+			if p.Status < model.ReviewCompletedStatus {
+				pendingNumbers = append(pendingNumbers, p.Number)
+				isSendMQ = false
+			}
 		}
+
+		pendingNumbers = slice.UniqueStringSlice(pendingNumbers)
+
+		diffSlice = slice.StrDiff(lackNumbers, pendingNumbers) // 在 lackNumbers 不在 pendingNumbers 中的
+
+		if len(diffSlice) > 0 {
+			//更新为欠货
+			result = tx.Model(&model.Order{}).Where("number in (?)", diffSlice).Updates(map[string]interface{}{
+				"order_type": model.LackOrderType,
+			})
+
+			if result.Error != nil {
+				tx.Rollback()
+				return result.Error
+			}
+		}
+
 	}
 
 	//保存完成订单
@@ -790,7 +819,7 @@ func UpdateCompleteOrder(batchId int) error {
 
 	//更新pickOrder为已完成
 	result = tx.Model(&model.PickOrder{}).Where("number in (?)", numbers).Updates(map[string]interface{}{
-		"order_type": 4,
+		"order_type": model.PickOrderCompleteOrderType,
 	})
 
 	if result.Error != nil {
@@ -798,14 +827,21 @@ func UpdateCompleteOrder(batchId int) error {
 		return result.Error
 	}
 
-	tx.Commit()
+	if isSendMQ {
+		//mq 存入 批次id
+		err := SyncBatch(batchId)
+		if err != nil {
+			tx.Rollback()
+			return errors.New("写入mq失败")
+		}
+	}
 
 	return nil
 }
 
 func SyncBatch(batchId int) error {
 	p, _ := rocketmq.NewProducer(
-		producer.WithNsResolver(primitive.NewPassthroughResolver([]string{"192.168.1.40:9876"})),
+		producer.WithNsResolver(primitive.NewPassthroughResolver([]string{global.ServerConfig.RocketMQ})),
 		producer.WithRetry(2),
 	)
 
@@ -862,7 +898,7 @@ func EditBatch(c *gin.Context) {
 }
 
 // 推送u8 日志记录生成
-func YongYouLog(pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods, batchId int) error {
+func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods, batchId int) error {
 	mpOrderAndGoods := make(map[string]rsp.OrderAndGoods, 0)
 
 	for _, order := range orderAndGoods {
@@ -923,7 +959,7 @@ func YongYouLog(pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods, 
 			Number:      view.SaleNumber,
 			BatchId:     batchId,
 			PickId:      view.PickId,
-			Status:      0, //已创建
+			Status:      model.StockLogCreatedStatus, //已创建
 			RequestXml:  xml,
 			ResponseXml: "",
 			ShopName:    view.ShopName,
@@ -931,7 +967,7 @@ func YongYouLog(pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods, 
 	}
 
 	if len(stockLogs) > 0 {
-		result := global.DB.Save(&stockLogs)
+		result := tx.Save(&stockLogs)
 		if result.Error != nil {
 			return result.Error
 		}

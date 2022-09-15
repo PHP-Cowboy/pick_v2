@@ -8,7 +8,7 @@ import (
 
 func YongYouRoute(g *gin.RouterGroup) {
 
-	yongYouRouteGroup := g.Group("/yongYou", middlewares.JWTAuth(), middlewares.IsSuperAdminAuth())
+	yongYouRouteGroup := g.Group("/yongYou", middlewares.JWTAuth(), middlewares.IsSuperOrWarehouseAdminAuth())
 	{
 		//u8推送日志列表
 		yongYouRouteGroup.GET("/list", handler.LogList)
