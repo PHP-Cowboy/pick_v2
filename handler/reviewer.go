@@ -639,12 +639,12 @@ func ConfirmDelivery(c *gin.Context) {
 
 		if isSendMQ {
 			//mq 存入 批次id
-			err = SyncBatch(batch.Id)
-			if err != nil {
-				tx.Rollback()
-				xsq_net.ErrorJSON(c, errors.New("写入mq失败"))
-				return
-			}
+			//err = SyncBatch(batch.Id)
+			//if err != nil {
+			//	tx.Rollback()
+			//	xsq_net.ErrorJSON(c, errors.New("写入mq失败"))
+			//	return
+			//}
 		}
 	}
 

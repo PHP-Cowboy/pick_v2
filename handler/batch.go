@@ -619,7 +619,9 @@ func EndBatch(c *gin.Context) {
 		return
 	}
 
-	tx.Commit()
+	//tx.Commit()
+
+	tx.Rollback()
 
 	xsq_net.Success(c)
 }
@@ -740,11 +742,13 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 		}
 	}
 
-	result = tx.Delete(&model.Order{}, "id in (?)", deleteIds)
+	if len(deleteIds) > 0 {
+		result = tx.Delete(&model.Order{}, "id in (?)", deleteIds)
 
-	if result.Error != nil {
-		tx.Rollback()
-		return result.Error
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
 	}
 
 	if len(deleteNumbers) > 0 {
@@ -829,11 +833,11 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 
 	if isSendMQ {
 		//mq 存入 批次id
-		err := SyncBatch(batchId)
-		if err != nil {
-			tx.Rollback()
-			return errors.New("写入mq失败")
-		}
+		//err := SyncBatch(batchId)
+		//if err != nil {
+		//	tx.Rollback()
+		//	return errors.New("写入mq失败")
+		//}
 	}
 
 	return nil
