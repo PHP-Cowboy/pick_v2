@@ -27,7 +27,7 @@ func InitMysql() {
 		info.Name,
 	)
 
-	fileName := fmt.Sprintf("logs/mysql/%s.log", time.Now().Format(timeutil.DateNumberFormat))
+	fileName := fmt.Sprintf("logs/%s.sql", time.Now().Format(timeutil.DateNumberFormat))
 
 	file, err := os.Create(fileName)
 	if err != nil {
