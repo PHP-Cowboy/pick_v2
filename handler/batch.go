@@ -630,7 +630,7 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 	var (
 		order      []model.Order
 		orderGoods []model.OrderGoods
-		isSendMQ   bool
+		isSendMQ   = true
 	)
 	//根据批次拿order会导致完成订单有遗漏
 	//OrderGoods 的批次id是否被更新了---不会，批次里的单在被更新为欠货之前一个商品只能被一个批次拿走，如果不是应该优化批次拿数据逻辑
@@ -768,7 +768,7 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 		//获取欠货的订单number是否有在拣货池中未复核完成的数据，如果有，过滤掉欠货的订单number
 		db.Model("t_pick_goods pg").
 			Select("p.id as pick_id,p.status,pg.number").
-			Joins("left join t_pick_goods p on pg.pick_id = p.id").
+			Joins("left join t_pick p on pg.pick_id = p.id").
 			Where("number in (?)", lackNumbers).
 			Find(&pickAndGoods)
 

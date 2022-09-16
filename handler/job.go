@@ -35,7 +35,7 @@ func GetPrintJobMap(warehouseCode string) *global.PrintCh {
 	}
 }
 
-// u8 生成者
+// u8 生产者
 func YongYouProducer(id int) {
 	global.YongYouCh <- id
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/apache/rocketmq-client-go/v2"
 	"github.com/apache/rocketmq-client-go/v2/consumer"
+	"github.com/apache/rocketmq-client-go/v2/rlog"
 	"os"
 	"os/signal"
 	"pick_v2/handler"
@@ -39,6 +40,8 @@ func main() {
 			panic("启动失败:" + err.Error())
 		}
 	}()
+
+	rlog.SetLogLevel("error")
 
 	c, mqErr := rocketmq.NewPushConsumer(
 		consumer.WithNameServer([]string{serverConfig.RocketMQ}),
