@@ -619,9 +619,7 @@ func EndBatch(c *gin.Context) {
 		return
 	}
 
-	//tx.Commit()
-
-	tx.Rollback()
+	tx.Commit()
 
 	xsq_net.Success(c)
 }
@@ -770,11 +768,16 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 		)
 
 		//获取欠货的订单number是否有在拣货池中未复核完成的数据，如果有，过滤掉欠货的订单number
-		db.Model("t_pick_goods pg").
+		result = db.Table("t_pick_goods pg").
 			Select("p.id as pick_id,p.status,pg.number").
 			Joins("left join t_pick p on pg.pick_id = p.id").
 			Where("number in (?)", lackNumbers).
 			Find(&pickAndGoods)
+
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
 
 		//获取拣货id，根据拣货id查出 拣货单中 未复核完成的订单，不更新为欠货，
 		//且 有未复核完成的订单 不发送到mq中，完成后再发送到mq中

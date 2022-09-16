@@ -22,7 +22,6 @@ import (
 	"pick_v2/global"
 	"pick_v2/middlewares"
 	"pick_v2/model"
-	"pick_v2/utils"
 	"pick_v2/utils/xsq_net"
 )
 
@@ -40,26 +39,10 @@ func CreateUser(ctx *gin.Context) {
 	var (
 		user      model.User
 		warehouse model.Warehouse
-		lastId    int
 		role      model.Role
 	)
 
-	character := utils.ChineseCharacterInitials(form.Name)
-
-	result := db.Raw("SELECT id FROM t_user ORDER BY id DESC LIMIT 1")
-
-	if result.Error != nil {
-		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			xsq_net.ErrorJSON(ctx, result.Error)
-			return
-		}
-	} else {
-		result.Scan(&lastId)
-	}
-
-	lastId += 1
-
-	result = db.First(&warehouse, form.WarehouseId)
+	result := db.First(&warehouse, form.WarehouseId)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -80,7 +63,6 @@ func CreateUser(ctx *gin.Context) {
 		return
 	}
 
-	user.Account = strings.ToLower(warehouse.Abbreviation + strconv.Itoa(lastId) + character)
 	user.Password = GenderPwd(form.Password)
 	user.Name = form.Name
 	user.RoleId = form.RoleId
@@ -95,7 +77,7 @@ func CreateUser(ctx *gin.Context) {
 
 	userRsp := rsp.AddUserRsp{
 		Id:          user.Id,
-		Account:     user.Account,
+		Account:     strconv.Itoa(user.Id),
 		Name:        user.Name,
 		Role:        user.Role,
 		WarehouseId: user.WarehouseId,
@@ -140,7 +122,7 @@ func GetUserList(ctx *gin.Context) {
 		}
 		res.List = append(res.List, &rsp.User{
 			Id:          user.Id,
-			Account:     user.Account,
+			Account:     strconv.Itoa(user.Id),
 			Name:        user.Name,
 			Role:        user.Role,
 			WarehouseId: user.WarehouseId,
@@ -165,16 +147,12 @@ func Login(ctx *gin.Context) {
 
 	global.SugarLogger.Infof("%+v", form)
 
-	form.Account = strings.Trim(form.Account, " ")
-
 	var (
 		user model.User
 	)
 
-	form.Account = strings.ToLower(form.Account)
-
 	db := global.DB
-	result := db.Where("account = ? and status = 1 and delete_time is null", form.Account).First(&user)
+	result := db.Where("id = ? and status = 1 and delete_time is null", form.Id).First(&user)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(ctx, result.Error)
@@ -200,9 +178,11 @@ func Login(ctx *gin.Context) {
 		return
 	}
 
+	account := strconv.Itoa(user.Id)
+
 	claims := middlewares.CustomClaims{
 		ID:             user.Id,
-		Account:        user.Account,
+		Account:        account,
 		Name:           user.Name,
 		WarehouseId:    user.WarehouseId,
 		AuthorityId:    user.RoleId,
@@ -217,7 +197,7 @@ func Login(ctx *gin.Context) {
 	}
 
 	//token存入redis
-	redisKey := constant.LOGIN_PREFIX + form.Account
+	redisKey := constant.LOGIN_PREFIX + account
 	err = global.Redis.Set(context.Background(), redisKey, token, 12*60*60*time.Second).Err()
 	if err != nil {
 		xsq_net.ErrorJSON(ctx, ecode.RedisFailedToSetData)
@@ -228,7 +208,7 @@ func Login(ctx *gin.Context) {
 		"token":       token,
 		"roleId":      user.RoleId,
 		"userId":      user.Id,
-		"account":     user.Account,
+		"account":     account,
 		"name":        user.Name,
 		"warehouseId": user.WarehouseId,
 	})
