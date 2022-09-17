@@ -145,8 +145,6 @@ func Login(ctx *gin.Context) {
 		return
 	}
 
-	global.SugarLogger.Infof("%+v", form)
-
 	var (
 		user model.User
 	)

@@ -13,5 +13,7 @@ func ExportRoute(g *gin.RouterGroup) {
 		exportGroup.GET("/first_material", handler.FirstMaterial)
 		//批次出库导出
 		exportGroup.GET("/outbound_batch", handler.OutboundBatch)
+		//欠货信息导出
+		exportGroup.GET("/lack", handler.Lack)
 	}
 }

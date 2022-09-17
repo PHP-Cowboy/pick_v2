@@ -72,7 +72,7 @@ func main() {
 
 	_ = db.Set(model.TableOptions, model.GetOptions("字典表")).AutoMigrate(&model.Dict{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("用户表")).AutoMigrate(&model.User{})
+	_ = db.Set(model.TableOptions, model.GetUserOptions("用户表")).AutoMigrate(&model.User{})
 
 	_ = db.Set(model.TableOptions, model.GetOptions("角色表")).AutoMigrate(&model.Role{})
 

@@ -477,8 +477,8 @@ func ConfirmDelivery(c *gin.Context) {
 
 	}
 
-	//order_goods
-	result = db.Where("id in (?)", orderGoodsId).Find(&orderGoods)
+	//order_goods 这里会被mysql排序
+	result = db.Model(&model.OrderGoods{}).Where("id in (?)", orderGoodsId).Find(&orderGoods)
 
 	orderPickMp := make(map[string]int)
 
@@ -611,11 +611,17 @@ func ConfirmDelivery(c *gin.Context) {
 		pickNumbers = slice.UniqueStringSlice(pickNumbers)
 
 		//获取欠货的订单number是否有在拣货池中未复核完成的数据，如果有，过滤掉欠货的订单number
-		db.Model("t_pick_goods pg").
+		result = db.Table("t_pick_goods pg").
 			Select("p.id as pick_id,p.status,pg.number").
-			Joins("left join t_pick_goods p on pg.pick_id = p.id").
+			Joins("left join t_pick p on pg.pick_id = p.id").
 			Where("number in (?)", pickNumbers).
 			Find(&pickAndGoods)
+
+		if result.Error != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
 
 		//获取拣货id，根据拣货id查出 拣货单中 未复核完成的订单，不更新为欠货，
 		//且 有未复核完成的订单 不发送到mq中，完成后再发送到mq中
@@ -648,6 +654,12 @@ func ConfirmDelivery(c *gin.Context) {
 		}
 	}
 
+	//更新完成订单
+	var (
+		completeOrder  []model.CompleteOrder
+		completeNumber []string // 查询&&删除 完成订单详情使用
+	)
+
 	//如果是批次结束时 还在拣货池中的单的出库，且拣货池中没有未复核的商品，要更新 order_type
 	for i, o := range order {
 		picked, ogMpOk := orderPickMp[o.Number]
@@ -656,7 +668,7 @@ func ConfirmDelivery(c *gin.Context) {
 			continue
 		}
 
-		order[i].Picked = picked
+		order[i].Picked = picked + o.Picked //订单被拆分成多个出，已拣累加
 		order[i].UnPicked = o.UnPicked - picked
 
 		order[i].LatestPickingTime = &now
@@ -665,6 +677,39 @@ func ConfirmDelivery(c *gin.Context) {
 
 		if ok {
 			order[i].OrderType = model.LackOrderType //更新为欠货
+		}
+
+		//之前的欠货数，减去本次订单拣货数 为0的 完成订单
+		if o.UnPicked-picked == 0 {
+
+			completeNumber = append(completeNumber, o.Number)
+
+			payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
+
+			if payAtErr != nil {
+				xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+				return
+			}
+
+			//完成订单
+			completeOrder = append(completeOrder, model.CompleteOrder{
+				Number:         o.Number,
+				OrderRemark:    o.OrderRemark,
+				ShopId:         o.ShopId,
+				ShopName:       o.ShopName,
+				ShopType:       o.ShopType,
+				ShopCode:       o.ShopCode,
+				Line:           o.Line,
+				DeliveryMethod: o.DistributionType,
+				PayCount:       o.PayTotal,
+				CloseCount:     o.CloseNum,
+				OutCount:       o.Picked,
+				Province:       o.Province,
+				City:           o.City,
+				District:       o.District,
+				PickTime:       o.LatestPickingTime,
+				PayAt:          payAt.Format(timeutil.TimeFormat),
+			})
 		}
 	}
 
@@ -681,6 +726,71 @@ func ConfirmDelivery(c *gin.Context) {
 		tx.Rollback()
 		xsq_net.ErrorJSON(c, result.Error)
 		return
+	}
+
+	if len(completeNumber) > 0 {
+		//保存完成订单
+		result = tx.Save(&completeOrder)
+
+		if result.Error != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+
+		//根据条件重新查询完成订单详情
+		result = db.Model(&model.OrderGoods{}).Where("number in (?)", completeNumber).Find(&orderGoods)
+
+		if result.Error != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+
+		var completeOrderDetail []model.CompleteOrderDetail
+
+		//保存完成订单详情
+		for _, good := range orderGoods {
+			completeOrderDetail = append(completeOrderDetail, model.CompleteOrderDetail{
+				Number:          good.Number,
+				GoodsName:       good.GoodsName,
+				Sku:             good.Sku,
+				GoodsSpe:        good.GoodsSpe,
+				GoodsType:       good.GoodsType,
+				Shelves:         good.Shelves,
+				PayCount:        good.PayCount,
+				CloseCount:      good.CloseCount,
+				ReviewCount:     good.OutCount,
+				GoodsRemark:     good.GoodsRemark,
+				DeliveryOrderNo: good.DeliveryOrderNo,
+			})
+		}
+
+		result = tx.Save(&completeOrderDetail)
+
+		if result.Error != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+
+		//删除完成订单
+		result = tx.Delete(&model.Order{}, "number in (?)", completeNumber)
+
+		if result.Error != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+
+		//删除完成订单详情
+		result = tx.Delete(&model.OrderGoods{}, "number in (?)", completeNumber)
+
+		if result.Error != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
 	}
 
 	//更新拣货商品数据

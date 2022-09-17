@@ -412,11 +412,13 @@ func RemainingQuantity(c *gin.Context) {
 		batchIds = append(batchIds, b.Id)
 	}
 
-	result = db.Model(&model.Pick{}).Where("batch_id in (?) and status = 0 and pick_user = ''", batchIds).Count(&count)
+	if len(batchIds) > 0 {
+		result = db.Model(&model.Pick{}).Where("batch_id in (?) and status = ? ", batchIds, model.ToBePickedStatus).Count(&count)
 
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
+		if result.Error != nil {
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
 	}
 
 	xsq_net.SucJson(c, gin.H{"count": count})

@@ -12,6 +12,10 @@ func GetOptions(tableName string) string {
 	return "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci comment '" + tableName + "'"
 }
 
+func GetUserOptions(tableName string) string {
+	return "ENGINE=InnoDB AUTO_INCREMENT=10000 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci comment '" + tableName + "'"
+}
+
 type Base struct {
 	Id         int       `gorm:"primaryKey;type:int(11) unsigned AUTO_INCREMENT;comment:id"`
 	CreateTime time.Time `gorm:"autoCreateTime;type:datetime;not null;comment:创建时间"`

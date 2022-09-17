@@ -87,7 +87,7 @@ func FirstMaterial(c *gin.Context) {
 		item = append(item, "")
 		item = append(item, "")
 		item = append(item, "")
-		//xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d",startCount+idx), &[]interface{}{1, "11111", "草莓果泥",1,999,9999,0,0,0})
+
 		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+idx), &item)
 		tOutCount += val.NeedNum
 	}
@@ -106,7 +106,7 @@ func FirstMaterial(c *gin.Context) {
 	date := time.Now().Format("20060102")
 	c.Writer.Header().Add("Content-Type", "application/octet-stream")
 	c.Writer.Header().Add("Access-Control-Expose-Headers", "Content-Disposition")
-	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s-picking-list.xlsx", date)+"\"")
+	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s-firstMaterial.xlsx", date)+"\"")
 	c.Writer.Write(data)
 }
 
@@ -119,6 +119,7 @@ func AmountToFloatKeepTwo(amount int) float32 {
 	return float32(value)
 }
 
+// 批次出库导出
 func OutboundBatch(c *gin.Context) {
 	var (
 		form      req.OutboundBatchFormReq
@@ -210,10 +211,6 @@ func OutboundBatch(c *gin.Context) {
 
 	column = append(column, shopCodes...)
 
-	//xsq_net.SucJson(c, gin.H{
-	//	"mp":     mp,
-	//})
-
 	xFile := excelize.NewFile()
 	sheet := xFile.NewSheet("sheet1")
 	// 设置单元格的值
@@ -244,7 +241,6 @@ func OutboundBatch(c *gin.Context) {
 			item = append(item, val[code])
 		}
 
-		//xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d",startCount+idx), &[]interface{}{1, "11111", "草莓果泥",1,999,9999,0,0,0})
 		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+i), &item)
 	}
 
@@ -257,7 +253,7 @@ func OutboundBatch(c *gin.Context) {
 	date := time.Now().Format("20060102")
 	c.Writer.Header().Add("Content-Type", "application/octet-stream")
 	c.Writer.Header().Add("Access-Control-Expose-Headers", "Content-Disposition")
-	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s-picking-list.xlsx", date)+"\"")
+	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s-outboundBatch.xlsx", date)+"\"")
 	c.Writer.Write(data)
 }
 
@@ -270,4 +266,119 @@ func GetKey(index int) string {
 		colCode += GetKey(loop - 1)
 	}
 	return colCode + string(key+int32(index)%26)
+}
+
+func Lack(c *gin.Context) {
+	var form req.LackForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var (
+		order      []model.Order
+		orderGoods []model.OrderGoods
+	)
+
+	db := global.DB
+
+	result := db.Model(&model.Order{}).Where("order_type = ?", model.LackOrderType).Find(&order)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	if result.RowsAffected == 0 {
+		xsq_net.ErrorJSON(c, ecode.DataNotExist)
+		return
+	}
+
+	type orderInfo struct {
+		Number   string
+		ShopId   int
+		PayAt    string
+		ShopName string
+	}
+
+	var (
+		numbers []string
+		orderMp = make(map[string]orderInfo, len(order))
+	)
+
+	for _, o := range order {
+		numbers = append(numbers, o.Number)
+
+		orderMp[o.Number] = orderInfo{
+			Number:   o.Number,
+			ShopId:   o.ShopId,
+			PayAt:    o.PayAt,
+			ShopName: o.ShopName,
+		}
+	}
+
+	result = db.Model(&model.OrderGoods{}).Where("number in (?)", numbers).Find(&orderGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	xFile := excelize.NewFile()
+	sheet := xFile.NewSheet("sheet1")
+	// 设置单元格的值
+	xFile.SetCellValue("Sheet1", "A1", "订单号")
+	xFile.SetCellValue("Sheet1", "B1", "客户编码")
+	xFile.SetCellValue("Sheet1", "C1", "订单日期 (日)")
+	xFile.SetCellValue("Sheet1", "D1", "客户名称")
+	xFile.SetCellValue("Sheet1", "E1", "存货编码")
+	xFile.SetCellValue("Sheet1", "F1", "存货名称")
+	xFile.SetCellValue("Sheet1", "G1", "规格型号")
+	xFile.SetCellValue("Sheet1", "H1", "单位")
+	xFile.SetCellValue("Sheet1", "I1", "数量")
+	xFile.SetCellValue("Sheet1", "J1", "发货数量")
+	xFile.SetCellValue("Sheet1", "K1", "欠货数量")
+	xFile.SetActiveSheet(sheet)
+	//设置指定行高 指定列宽
+	xFile.SetRowHeight("Sheet1", 1, 30)
+	xFile.SetColWidth("Sheet1", "C", "C", 30)
+
+	startCount := 2
+	for idx, val := range orderGoods {
+		if val.LackCount <= 0 {
+			continue
+		}
+
+		o, ok := orderMp[val.Number]
+
+		if !ok {
+			continue
+		}
+
+		item := make([]interface{}, 0)
+		item = append(item, o.Number)
+		item = append(item, o.ShopId)
+		item = append(item, o.PayAt)
+		item = append(item, o.ShopName)
+		item = append(item, val.Sku)
+		item = append(item, val.GoodsName)
+		item = append(item, val.GoodsSpe)
+		item = append(item, val.GoodsUnit) //单位
+		item = append(item, val.PayCount)
+		item = append(item, val.OutCount)
+		item = append(item, val.LackCount)
+
+		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+idx), &item)
+	}
+
+	var buffer bytes.Buffer
+	_ = xFile.Write(&buffer)
+	content := bytes.NewReader(buffer.Bytes())
+	data, _ := io.ReadAll(content)
+	date := time.Now().Format("20060102")
+	c.Writer.Header().Add("Content-Type", "application/octet-stream")
+	c.Writer.Header().Add("Access-Control-Expose-Headers", "Content-Disposition")
+	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s-lackInfo.xlsx", date)+"\"")
+	c.Writer.Write(data)
 }

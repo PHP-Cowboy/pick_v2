@@ -594,13 +594,6 @@ func EndBatch(c *gin.Context) {
 		mpPick[p.Id] = p
 	}
 
-	//拣货商品map
-	mpGoods := make(map[int]model.PickGoods, 0)
-
-	for _, good := range pickGoods {
-		mpGoods[good.OrderGoodsId] = good
-	}
-
 	tx := global.DB.Begin()
 
 	err := YongYouLog(tx, pickGoods, orderAndGoods, form.Id)

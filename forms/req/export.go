@@ -7,3 +7,6 @@ type FirstMaterialExportReq struct {
 type OutboundBatchFormReq struct {
 	Id int `json:"id" form:"id" form:"id"`
 }
+
+type LackForm struct {
+}
