@@ -829,11 +829,11 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 
 	if isSendMQ {
 		//mq 存入 批次id
-		//err := SyncBatch(batchId)
-		//if err != nil {
-		//	tx.Rollback()
-		//	return errors.New("写入mq失败")
-		//}
+		err := SyncBatch(batchId)
+		if err != nil {
+			tx.Rollback()
+			return errors.New("写入mq失败")
+		}
 	}
 
 	return nil

@@ -453,7 +453,7 @@ func BatchRestrictedShipment(c *gin.Context) {
 	db := global.DB
 
 	result := db.Table("t_pick_order_goods og").
-		Select("og.*,o.pick_number").
+		Select("og.*,o.pick_number,o.shop_name").
 		Joins("left join t_pick_order o on og.pick_order_id = o.id").
 		Where("og.sku = (?)", form.Sku).
 		Find(&orderAndGoods)
@@ -468,6 +468,7 @@ func BatchRestrictedShipment(c *gin.Context) {
 			PickOrderGoodsId: pg.Id,
 			PickNumber:       pg.Number,
 			ShopName:         pg.ShopName,
+			GoodsName:        pg.GoodsName,
 			GoodsSpe:         pg.GoodsSpe,
 			LimitNum:         form.LimitNum,
 		})

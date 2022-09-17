@@ -45,8 +45,8 @@ func YongYouConsumer() {
 	for {
 		select {
 		case id := <-global.YongYouCh:
-			PushYongYou(id)
 			time.Sleep(time.Duration(BaseNum) * time.Second)
+			PushYongYou(id)
 		case <-time.After(time.Duration(BaseNum) * 10 * time.Second):
 		}
 	}
