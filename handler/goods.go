@@ -705,6 +705,7 @@ func CreatePickOrder(c *gin.Context) {
 		pickOrderId, ok := pickOrderNumberIdMp[goods.Number]
 
 		if !ok {
+			tx.Rollback()
 			xsq_net.ErrorJSON(c, errors.New("number:"+goods.Number+"拣货单表id数据不存在，请联系管理员"))
 			return
 		}

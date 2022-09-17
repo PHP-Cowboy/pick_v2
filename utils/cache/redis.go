@@ -2,7 +2,6 @@ package cache
 
 import (
 	"context"
-	"errors"
 	"pick_v2/global"
 	"pick_v2/utils/str_util"
 	"pick_v2/utils/timeutil"
@@ -21,15 +20,15 @@ func GetIncrNumberByKey(key string, padLength int) (string, error) {
 		return "", err
 	}
 
-	ok, err := global.Redis.Expire(context.Background(), "key", 24*time.Hour).Result()
-
-	if err != nil {
-		return "", errors.New("设置过期返回false")
-	}
-
-	if !ok {
-		return "", nil
-	}
+	//ok, err := global.Redis.Expire(context.Background(), "key", 24*time.Hour).Result()
+	//
+	//if err != nil {
+	//	return "", errors.New("设置过期返回false")
+	//}
+	//
+	//if !ok {
+	//	return "", nil
+	//}
 
 	number := strconv.Itoa(int(val.(int64)))
 
