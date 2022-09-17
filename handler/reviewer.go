@@ -567,6 +567,7 @@ func ConfirmDelivery(c *gin.Context) {
 			"review_num":        totalNum,
 			"delivery_order_no": val,
 			"delivery_no":       deliveryOrderNo,
+			"print_num":         gorm.Expr("print_num + ?", 1),
 		})
 
 	if result.Error != nil {

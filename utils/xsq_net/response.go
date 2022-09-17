@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"net/http"
+	"pick_v2/global"
 	"pick_v2/utils/ecode"
 )
 
@@ -18,7 +19,7 @@ func CodeWithJSON(c *gin.Context, data interface{}, code ecode.Codes) {
 	})
 }
 
-//未知错误 错误码为ecode.ServerErr，msg：为具体的错误信息
+// 未知错误 错误码为ecode.ServerErr，msg：为具体的错误信息
 func WithOutECodeErrorJSON(c *gin.Context, data interface{}, err error) {
 	c.JSON(http.StatusOK, gin.H{
 		"code": ecode.ServerErr,
@@ -56,6 +57,7 @@ func ErrorJSON(c *gin.Context, err error) {
 			zap.S().Errorf("paramsInvalid, url:%s,params:%s", c.Request.URL.Path, string(body))
 		}
 	}
+	global.SugarLogger.Error(err.Error())
 	JSON(c, Empty, err)
 }
 

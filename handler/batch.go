@@ -2313,7 +2313,7 @@ func PrintCallGet(c *gin.Context) {
 		return
 	}
 
-	global.SugarLogger.Infof("%+v", printCh)
+	global.SugarLogger.Infof("house_code:%+v", printCh)
 
 	var (
 		pick          model.Pick
