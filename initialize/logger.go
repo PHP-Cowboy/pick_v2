@@ -1,6 +1,7 @@
 package initialize
 
 import (
+	"fmt"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -8,13 +9,30 @@ import (
 	"time"
 )
 
+var logSlice = []string{"sql", "debug"}
+
 func InitLogger() {
-	writeSyncer := getLogWriter("./logs/")
 	encoder := getEncoder()
+	writeSyncer := getLogWriter("./logs/")
 	core := zapcore.NewCore(encoder, writeSyncer, zapcore.DebugLevel)
 
 	logger := zap.New(core, zap.AddCaller())
 	global.SugarLogger = logger.Sugar()
+}
+
+func InitNewLogger() {
+	encoder := getEncoder()
+
+	for _, s := range logSlice {
+		fileName := fmt.Sprintf("./logs/%s/", s)
+
+		writeSyncer := getLogWriter(fileName)
+		core := zapcore.NewCore(encoder, writeSyncer, zapcore.DebugLevel)
+
+		logger := zap.New(core, zap.AddCaller())
+		global.Logger[s] = logger.Sugar()
+	}
+
 }
 
 func getEncoder() zapcore.Encoder {

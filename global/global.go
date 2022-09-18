@@ -18,6 +18,7 @@ var (
 	Redis        *redis.Client
 	ServerConfig = &config.ServerConfig{}
 	SugarLogger  *zap.SugaredLogger
+	Logger       = make(map[string]*zap.SugaredLogger, 0)
 	PrintMapCh   = make(map[string]chan *PrintCh, 0)
 	YongYouCh    = make(chan int, 1000)
 )

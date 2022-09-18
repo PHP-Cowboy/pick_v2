@@ -2,10 +2,7 @@ package initialize
 
 import (
 	"fmt"
-	"io"
-	"log"
-	"os"
-	"pick_v2/utils/timeutil"
+	"go.uber.org/zap"
 	"time"
 
 	"gorm.io/driver/mysql"
@@ -15,6 +12,27 @@ import (
 
 	"pick_v2/global"
 )
+
+//定义自己的Writer
+type SqlWriter struct {
+	sqlLog *zap.SugaredLogger
+}
+
+//实现gorm/logger.Writer接口
+func (m *SqlWriter) Printf(format string, v ...interface{}) {
+	//记录日志
+	m.sqlLog.Info(fmt.Sprintf(format, v...))
+}
+
+func NewMyWriter() *SqlWriter {
+	l, ok := global.Logger["sql"]
+
+	if !ok {
+		panic("sql日志加载失败")
+	}
+
+	return &SqlWriter{sqlLog: l}
+}
 
 func InitMysql() {
 	info := global.ServerConfig.MysqlInfo
@@ -27,21 +45,8 @@ func InitMysql() {
 		info.Name,
 	)
 
-	fileName := fmt.Sprintf("logs/%s.sql", time.Now().Format(timeutil.DateNumberFormat))
-
-	file, err := os.Create(fileName)
-	if err != nil {
-		// Handle error
-		panic(err)
-	}
-	// Make sure file is closed before your app shuts down.
-
-	multiOutput := io.MultiWriter(os.Stdout, file)
-
-	multiLogger := log.New(multiOutput, "", log.LstdFlags)
-
 	logger := logger2.New(
-		multiLogger,
+		NewMyWriter(),
 		logger2.Config{
 			SlowThreshold: time.Second, // 慢 SQL 阈值
 			Colorful:      true,        //禁用彩色打印
@@ -49,7 +54,7 @@ func InitMysql() {
 		},
 	)
 
-	//var err error
+	var err error
 	global.DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
 			TablePrefix:   "t_", // 表名前缀，`User` 的表名应该是 `t_users`

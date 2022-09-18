@@ -18,6 +18,8 @@ func main() {
 
 	initialize.InitLogger()
 
+	initialize.InitNewLogger()
+
 	initialize.InitConfig()
 
 	initialize.InitMysql()
