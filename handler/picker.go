@@ -408,12 +408,19 @@ func RemainingQuantity(c *gin.Context) {
 		return
 	}
 
+	userInfo := GetUserInfo(c)
+
+	if userInfo == nil {
+		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
+		return
+	}
+
 	for _, b := range batches {
 		batchIds = append(batchIds, b.Id)
 	}
 
 	if len(batchIds) > 0 {
-		result = db.Model(&model.Pick{}).Where("batch_id in (?) and status = ? ", batchIds, model.ToBePickedStatus).Count(&count)
+		result = db.Model(&model.Pick{}).Where("batch_id in (?) and status = ? and (pick_user = '' or pick_user = ?)", batchIds, model.ToBePickedStatus, userInfo.Name).Count(&count)
 
 		if result.Error != nil {
 			xsq_net.ErrorJSON(c, result.Error)
