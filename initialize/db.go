@@ -24,7 +24,7 @@ func (m *SqlWriter) Printf(format string, v ...interface{}) {
 	m.sqlLog.Info(fmt.Sprintf(format, v...))
 }
 
-func NewMyWriter() *SqlWriter {
+func NewSqlWriter() *SqlWriter {
 	l, ok := global.Logger["sql"]
 
 	if !ok {
@@ -46,7 +46,7 @@ func InitMysql() {
 	)
 
 	logger := logger2.New(
-		NewMyWriter(),
+		NewSqlWriter(),
 		logger2.Config{
 			SlowThreshold: time.Second, // 慢 SQL 阈值
 			Colorful:      true,        //禁用彩色打印
