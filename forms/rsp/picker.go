@@ -46,7 +46,7 @@ func (pg MyMergePickGoods) Less(i, j int) bool {
 }
 
 func (pg MyMergePickGoods) Swap(i, j int) {
-	pg[i].Shelves, pg[j].Shelves = pg[j].Shelves, pg[i].Shelves
+	pg[i], pg[j] = pg[j], pg[i]
 }
 
 type ParamsId struct {
