@@ -460,9 +460,23 @@ func LogDetail(c *gin.Context) {
 	res.PayAt = payAt.Format(timeutil.TimeFormat)
 
 	res.PickUser = pick.PickUser
-	res.TakeOrdersTime = pick.TakeOrdersTime.Format(timeutil.TimeFormat)
+
+	takeOrdersTime := ""
+
+	if pick.TakeOrdersTime != nil {
+		takeOrdersTime = pick.TakeOrdersTime.Format(timeutil.TimeFormat)
+	}
+
+	res.TakeOrdersTime = takeOrdersTime
 	res.ReviewUser = pick.ReviewUser
-	res.ReviewTime = pick.ReviewTime.Format(timeutil.TimeFormat)
+
+	reviewTime := ""
+
+	if pick.ReviewTime != nil {
+		reviewTime = pick.ReviewTime.Format(timeutil.TimeFormat)
+	}
+
+	res.ReviewTime = reviewTime
 
 	result = db.Model(&model.PickGoods{}).Where(model.PickGoods{PickId: form.PickId, Number: form.Number}).Find(&pickGoods)
 
@@ -471,7 +485,7 @@ func LogDetail(c *gin.Context) {
 		return
 	}
 
-	list := make([]rsp.LogDetail, len(pickGoods))
+	list := make([]rsp.LogDetail, 0, len(pickGoods))
 
 	for _, pg := range pickGoods {
 		list = append(list, rsp.LogDetail{

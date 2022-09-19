@@ -570,7 +570,7 @@ func BatchTask(c *gin.Context) {
 	var (
 		form      req.BatchTaskForm
 		shopCodes []string
-		batch     model.Batch
+		pick      model.Pick
 	)
 
 	if err := c.ShouldBind(&form); err != nil {
@@ -590,7 +590,7 @@ func BatchTask(c *gin.Context) {
 		ReviewNum int    `json:"review_num"`
 	}
 
-	result := db.First(&batch, form.BatchId)
+	result := db.First(&pick, form.Id)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -698,7 +698,7 @@ func BatchTask(c *gin.Context) {
 		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+i), &item)
 	}
 
-	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{batch.BatchName + "拣货单导出"})
+	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{pick.TaskName + "拣货单导出"})
 
 	var buffer bytes.Buffer
 	_ = xFile.Write(&buffer)

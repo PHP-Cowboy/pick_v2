@@ -1023,11 +1023,15 @@ func GetBatchOrderAndGoods(c *gin.Context) {
 
 	result = db.Model(&model.PickOrderGoods{}).Where("batch_id = ?", form.Id).Find(&pickOrderGoods)
 
+	totalGoodsNum := 0
+
 	for _, good := range pickOrderGoods {
 		//出库为0的不推送
 		if good.OutCount == 0 {
 			continue
 		}
+
+		totalGoodsNum++
 
 		//编号 ，查询订单
 		numbers = append(numbers, good.Number)
@@ -1075,15 +1079,22 @@ func GetBatchOrderAndGoods(c *gin.Context) {
 			return
 		}
 
+		payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, order.PayAt, time.Local)
+
+		if payAtErr != nil {
+			xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+			return
+		}
+
 		list = append(list, rsp.OutOrder{
 			DistributionType: order.DistributionType,
-			PayAt:            order.PayAt,
+			PayAt:            payAt.Format(timeutil.TimeFormat),
 			OrderId:          order.OrderId,
 			GoodsInfo:        goodsInfo,
 		})
 	}
 
-	data.Count = len(pickOrderGoods)
+	data.Count = totalGoodsNum
 
 	data.List = list
 
