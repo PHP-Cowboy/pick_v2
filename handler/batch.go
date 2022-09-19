@@ -571,7 +571,7 @@ func EndBatch(c *gin.Context) {
 	result = db.Table("t_pick_order_goods og").
 		Select("og.*,o.shop_id,o.shop_name,o.shop_code,o.line,o.distribution_type,o.order_remark,o.pay_at,o.province,o.city,o.district,o.shop_type,o.latest_picking_time").
 		Joins("left join t_pick_order o on og.pick_order_id = o.id").
-		Where("batch_id = ?", form.Id).
+		Where("batch_id = ? ", form.Id).
 		Find(&orderAndGoods)
 
 	if result.Error != nil {
@@ -580,7 +580,7 @@ func EndBatch(c *gin.Context) {
 	}
 
 	//查询批次下全部订单
-	result = db.Model(&model.PickGoods{}).Where("batch_id = ?", form.Id).Find(&pickGoods)
+	result = db.Model(&model.PickGoods{}).Where("batch_id = ? ", form.Id).Find(&pickGoods)
 	if result.Error != nil {
 		global.SugarLogger.Error("批次结束成功，但推送u8拣货数据查询失败:" + result.Error.Error())
 		xsq_net.ErrorJSON(c, errors.New("批次结束成功，但推送u8拣货数据查询失败"))
@@ -907,20 +907,20 @@ func EditBatch(c *gin.Context) {
 
 // 推送u8 日志记录生成
 func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods, batchId int) error {
-	mpOrderAndGoods := make(map[string]rsp.OrderAndGoods, 0)
+	mpOrderAndGoods := make(map[int]rsp.OrderAndGoods, 0)
 
 	for _, order := range orderAndGoods {
-		_, ok := mpOrderAndGoods[order.Number]
+		_, ok := mpOrderAndGoods[order.Id]
 		if ok {
 			continue
 		}
-		mpOrderAndGoods[order.Number] = order
+		mpOrderAndGoods[order.Id] = order
 	}
 
 	mpPgv := make(map[string]PickGoodsView, 0)
 
 	for _, good := range pickGoods {
-		order, ogOk := mpOrderAndGoods[good.Number]
+		order, ogOk := mpOrderAndGoods[good.OrderGoodsId]
 		if !ogOk {
 			continue
 		}

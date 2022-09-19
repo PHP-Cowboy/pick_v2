@@ -188,6 +188,11 @@ func GetOrderDetail(c *gin.Context) {
 
 	for _, og := range orderGoods {
 
+		if form.IsLack > 0 && og.LackCount == 0 {
+			//是欠货单时只显示欠货的
+			continue
+		}
+
 		deliveryOrderNoArr = append(deliveryOrderNoArr, og.DeliveryOrderNo...)
 
 		goodsType, ok := mp[og.GoodsType]
