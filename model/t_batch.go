@@ -1,6 +1,8 @@
 package model
 
-import "time"
+import (
+	"time"
+)
 
 // 批次
 type Batch struct {
@@ -30,3 +32,15 @@ const (
 	BatchClosedStatus
 	BatchSuspendStatus
 )
+
+func GetDeliveryMethod(method int) string {
+	var methodMp = map[int]string{1: "公司配送", 2: "用户自提", 3: "三方物流", 4: "快递配送", 5: "首批物料|设备单"}
+
+	s, ok := methodMp[method]
+
+	if !ok {
+		return ""
+	}
+
+	return s
+}

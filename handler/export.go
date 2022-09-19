@@ -433,9 +433,9 @@ func BatchShop(c *gin.Context) {
 	xFile.SetActiveSheet(sheet)
 	//设置指定行高 指定列宽
 	xFile.SetRowHeight("Sheet1", 1, 20)
-	xFile.SetColWidth("Sheet1", "C", "C", 20)
+	xFile.SetColWidth("Sheet1", "C", "C", 40)
 
-	startCount := 2
+	startCount := 3
 	for idx, val := range prePicks {
 		item := make([]interface{}, 0)
 		item = append(item, idx+1)
@@ -526,7 +526,7 @@ func BatchShopMaterial(c *gin.Context) {
 	xFile.SetActiveSheet(sheet)
 	//设置指定行高 指定列宽
 	xFile.SetRowHeight("Sheet1", 1, 20)
-	xFile.SetColWidth("Sheet1", "C", "C", 20)
+	xFile.SetColWidth("Sheet1", "C", "C", 40)
 
 	startCount := 3
 	for idx, val := range prePickAndGoods {
@@ -552,7 +552,7 @@ func BatchShopMaterial(c *gin.Context) {
 		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+idx), &item)
 	}
 
-	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{fmt.Sprintf("批次-%s门店物料信息", batch.BatchName)})
+	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{fmt.Sprintf("%s-%s-门店物料信息", batch.BatchName, model.GetDeliveryMethod(batch.DeliveryMethod))})
 
 	var buffer bytes.Buffer
 	_ = xFile.Write(&buffer)
