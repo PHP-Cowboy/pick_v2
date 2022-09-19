@@ -17,8 +17,9 @@ import (
 )
 
 type ShopResponse struct {
-	Code int          `json:"code"`
-	Data []model.Shop `json:"data"`
+	Code    int          `json:"code"`
+	Message string       `json:"message"`
+	Data    []model.Shop `json:"data"`
 }
 
 // 同步门店
@@ -128,6 +129,11 @@ func SyncShop(c *gin.Context) {
 		return
 	}
 
+	if result.Code != 200 {
+		xsq_net.ErrorJSON(c, errors.New(result.Message))
+		return
+	}
+
 	var shops []*model.Shop
 
 	db := global.DB
@@ -161,11 +167,11 @@ func SyncShop(c *gin.Context) {
 			Province:  shop.Province,
 			City:      shop.City,
 			District:  shop.District,
-			//Line:      shop.Line,
-			ShopCode: shop.ShopCode,
-			Status:   shop.Status,
-			CreateAt: time.Now(),
-			UpdateAt: time.Now(),
+			Line:      shop.Line,
+			ShopCode:  shop.ShopCode,
+			Status:    shop.Status,
+			CreateAt:  time.Now(),
+			UpdateAt:  time.Now(),
 		})
 	}
 

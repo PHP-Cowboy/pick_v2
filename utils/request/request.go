@@ -12,6 +12,11 @@ import (
 	"strings"
 )
 
+type Rsp struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
 func PostTest() {
 	url := "http://121.196.60.92:19090/api/v1/remote/get/goods/by/id"
 	method := "POST"

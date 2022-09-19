@@ -16,6 +16,7 @@ import (
 	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
+	"sort"
 	"time"
 )
 
@@ -164,7 +165,6 @@ func ReviewDetail(c *gin.Context) {
 			Where("id = ? and version = ?", pick.Id, pick.Version).
 			Updates(map[string]interface{}{"review_user": userInfo.Name, "version": pick.Version + 1})
 
-		// todo 需要模拟测试
 		if result.Error != nil {
 			xsq_net.ErrorJSON(c, result.Error)
 			return
@@ -259,6 +259,16 @@ func ReviewDetail(c *gin.Context) {
 	res.OutTotal = completeTotal
 	res.UnselectedTotal = needTotal - completeTotal
 	res.ReviewTotal = reviewTotal
+
+	//按货架号排序
+	for s, goods := range goodsMap {
+
+		ret := rsp.MyMergePickGoods(goods)
+
+		sort.Sort(ret)
+
+		goodsMap[s] = ret
+	}
 
 	res.Goods = goodsMap
 

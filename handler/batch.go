@@ -66,7 +66,11 @@ func CreateBatch(c *gin.Context) {
 
 	batchName := form.BatchName
 
-	lines := strings.Join(form.Lines, ",")
+	lines := "全部线路"
+
+	if len(form.Lines) > 0 {
+		lines = strings.Join(form.Lines, ",")
+	}
 
 	if form.BatchName == "" {
 		batchName = lines
@@ -328,7 +332,7 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 	}
 
 	if form != nil {
-		localDb = localDb.Where("o.line in (?) and o.distribution_type = ? and o.pay_at <= ? and o.delivery_at <= ? ", form.Lines, form.DistributionType, form.PayTime, form.DeliveryEndTime)
+		localDb = localDb.Where("o.distribution_type = ? and o.pay_at <= ? and o.delivery_at <= ? ", form.DistributionType, form.PayTime, form.DeliveryEndTime)
 
 		if form.DeliveryStartTime != "" {
 			localDb = localDb.Where("o.delivery_at >= ?", form.DeliveryStartTime)
@@ -336,6 +340,10 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 
 		if len(form.Sku) > 0 {
 			localDb = localDb.Where("og.sku in (?)", form.Sku)
+		}
+
+		if len(form.Lines) > 0 {
+			localDb = localDb.Where("o.line in (?) ", form.Lines)
 		}
 	}
 
@@ -1016,6 +1024,11 @@ func GetBatchOrderAndGoods(c *gin.Context) {
 	result = db.Model(&model.PickOrderGoods{}).Where("batch_id = ?", form.Id).Find(&pickOrderGoods)
 
 	for _, good := range pickOrderGoods {
+		//出库为0的不推送
+		if good.OutCount == 0 {
+			continue
+		}
+
 		//编号 ，查询订单
 		numbers = append(numbers, good.Number)
 

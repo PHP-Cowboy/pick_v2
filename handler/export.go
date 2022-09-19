@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 	"io"
 	"pick_v2/forms/req"
+	"pick_v2/forms/rsp"
 	"pick_v2/global"
 	"pick_v2/model"
 	"pick_v2/utils/ecode"
@@ -104,9 +105,9 @@ func FirstMaterial(c *gin.Context) {
 	content := bytes.NewReader(buffer.Bytes())
 	data, _ := io.ReadAll(content)
 	date := time.Now().Format("20060102")
-	c.Writer.Header().Add("Content-Type", "application/octet-stream")
+	c.Writer.Header().Add("Content-Type", "application/octet-stream;charset=utf-8")
 	c.Writer.Header().Add("Access-Control-Expose-Headers", "Content-Disposition")
-	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s-firstMaterial.xlsx", date)+"\"")
+	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s-.xlsx", date)+"\"")
 	c.Writer.Write(data)
 }
 
@@ -124,7 +125,7 @@ func OutboundBatch(c *gin.Context) {
 	var (
 		form      req.OutboundBatchFormReq
 		shopCodes []string
-		batches   model.Batch
+		batch     model.Batch
 	)
 
 	if err := c.ShouldBind(&form); err != nil {
@@ -134,7 +135,7 @@ func OutboundBatch(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.First(&batches, form.Id)
+	result := db.First(&batch, form.Id)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -185,7 +186,11 @@ func OutboundBatch(c *gin.Context) {
 		}
 
 		for _, code := range shopCodes {
-			subMp[code] = "0"
+			_, has := subMp[code]
+			if !has {
+				subMp[code] = "0"
+			}
+
 			if code == pg.ShopCode {
 				subMp[code] = strconv.Itoa(pg.ReviewNum)
 			}
@@ -244,16 +249,16 @@ func OutboundBatch(c *gin.Context) {
 		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+i), &item)
 	}
 
-	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{batches.BatchName})
+	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{batch.BatchName})
 
 	var buffer bytes.Buffer
 	_ = xFile.Write(&buffer)
 	content := bytes.NewReader(buffer.Bytes())
 	data, _ := io.ReadAll(content)
 	date := time.Now().Format("20060102")
-	c.Writer.Header().Add("Content-Type", "application/octet-stream")
+	c.Writer.Header().Add("Content-Type", "application/octet-stream;charset=utf-8")
 	c.Writer.Header().Add("Access-Control-Expose-Headers", "Content-Disposition")
-	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s-outboundBatch.xlsx", date)+"\"")
+	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s-.xlsx", date)+"\"")
 	c.Writer.Write(data)
 }
 
@@ -268,6 +273,7 @@ func GetKey(index int) string {
 	return colCode + string(key+int32(index)%26)
 }
 
+// 欠货信息导出
 func Lack(c *gin.Context) {
 	var form req.LackForm
 
@@ -328,23 +334,25 @@ func Lack(c *gin.Context) {
 	xFile := excelize.NewFile()
 	sheet := xFile.NewSheet("sheet1")
 	// 设置单元格的值
-	xFile.SetCellValue("Sheet1", "A1", "订单号")
-	xFile.SetCellValue("Sheet1", "B1", "客户编码")
-	xFile.SetCellValue("Sheet1", "C1", "订单日期 (日)")
-	xFile.SetCellValue("Sheet1", "D1", "客户名称")
-	xFile.SetCellValue("Sheet1", "E1", "存货编码")
-	xFile.SetCellValue("Sheet1", "F1", "存货名称")
-	xFile.SetCellValue("Sheet1", "G1", "规格型号")
-	xFile.SetCellValue("Sheet1", "H1", "单位")
-	xFile.SetCellValue("Sheet1", "I1", "数量")
-	xFile.SetCellValue("Sheet1", "J1", "发货数量")
-	xFile.SetCellValue("Sheet1", "K1", "欠货数量")
+	xFile.MergeCell("Sheet1", "A1", "K1")
+
+	xFile.SetCellValue("Sheet1", "A2", "订单号")
+	xFile.SetCellValue("Sheet1", "B2", "客户编码")
+	xFile.SetCellValue("Sheet1", "C2", "订单日期 (日)")
+	xFile.SetCellValue("Sheet1", "D2", "客户名称")
+	xFile.SetCellValue("Sheet1", "E2", "存货编码")
+	xFile.SetCellValue("Sheet1", "F2", "存货名称")
+	xFile.SetCellValue("Sheet1", "G2", "规格型号")
+	xFile.SetCellValue("Sheet1", "H2", "单位")
+	xFile.SetCellValue("Sheet1", "I2", "数量")
+	xFile.SetCellValue("Sheet1", "J2", "发货数量")
+	xFile.SetCellValue("Sheet1", "K2", "欠货数量")
 	xFile.SetActiveSheet(sheet)
 	//设置指定行高 指定列宽
 	xFile.SetRowHeight("Sheet1", 1, 30)
 	xFile.SetColWidth("Sheet1", "C", "C", 30)
 
-	startCount := 2
+	startCount := 3
 	for idx, val := range orderGoods {
 		if val.LackCount <= 0 {
 			continue
@@ -372,13 +380,333 @@ func Lack(c *gin.Context) {
 		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+idx), &item)
 	}
 
+	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{fmt.Sprintf("欠货信息")})
+
 	var buffer bytes.Buffer
 	_ = xFile.Write(&buffer)
 	content := bytes.NewReader(buffer.Bytes())
 	data, _ := io.ReadAll(content)
 	date := time.Now().Format("20060102")
-	c.Writer.Header().Add("Content-Type", "application/octet-stream")
+	c.Writer.Header().Add("Content-Type", "application/octet-stream;charset=utf-8")
 	c.Writer.Header().Add("Access-Control-Expose-Headers", "Content-Disposition")
-	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s-lackInfo.xlsx", date)+"\"")
+	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s-.xlsx", date)+"\"")
+	c.Writer.Write(data)
+}
+
+// 批次门店信息
+func BatchShop(c *gin.Context) {
+	var form req.BatchShopForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var (
+		prePicks []model.PrePick
+		batch    model.Batch
+	)
+
+	db := global.DB
+
+	result := db.Model(&model.PrePick{}).Where("batch_id = ?", form.Id).Find(&prePicks)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = db.Model(&model.Batch{}).First(&batch, form.Id)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	xFile := excelize.NewFile()
+	sheet := xFile.NewSheet("sheet1")
+	// 设置单元格的值
+	xFile.MergeCell("Sheet1", "A1", "C1")
+	xFile.SetCellValue("Sheet1", "A2", "序号")
+	xFile.SetCellValue("Sheet1", "B2", "门店编码")
+	xFile.SetCellValue("Sheet1", "C2", "门店名称")
+	xFile.SetActiveSheet(sheet)
+	//设置指定行高 指定列宽
+	xFile.SetRowHeight("Sheet1", 1, 20)
+	xFile.SetColWidth("Sheet1", "C", "C", 20)
+
+	startCount := 2
+	for idx, val := range prePicks {
+		item := make([]interface{}, 0)
+		item = append(item, idx+1)
+		item = append(item, val.ShopCode)
+		item = append(item, val.ShopName)
+
+		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+idx), &item)
+	}
+
+	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{fmt.Sprintf("批次-%s门店信息", batch.BatchName)})
+
+	var buffer bytes.Buffer
+	_ = xFile.Write(&buffer)
+	content := bytes.NewReader(buffer.Bytes())
+	data, _ := io.ReadAll(content)
+	date := time.Now().Format("20060102")
+	c.Writer.Header().Add("Content-Type", "application/octet-stream;charset=utf-8")
+	c.Writer.Header().Add("Access-Control-Expose-Headers", "Content-Disposition")
+	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s-.xlsx", date)+"\"")
+	c.Writer.Write(data)
+}
+
+// 批次门店物料表
+func BatchShopMaterial(c *gin.Context) {
+	var form req.BatchShopMaterialForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var (
+		batch     model.Batch
+		pickGoods []model.PickGoods
+	)
+
+	db := global.DB
+
+	result := db.Model(&model.Batch{}).First(&batch, form.Id)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	var prePickAndGoods []rsp.PrePickAndGoods
+
+	//获取批次预拣池数据
+	result = db.Table("t_pre_pick_goods pg").
+		Select("shop_code,shop_name,pg.id as pre_pick_goods_id,goods_name,goods_type,goods_spe,unit,need_num").
+		Joins("left join t_pre_pick pp on pg.pre_pick_id = pp.id").
+		Where("pp.batch_id = ?", form.Id). //t_pre_pick.batch_id 有索引，t_pre_pick_goods batch_id 没有
+		Find(&prePickAndGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//获取批次全部拣货池数据
+	result = db.Model(&model.PickGoods{}).Where("batch_id = ?", form.Id).Find(&pickGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//拣货商品明细表 复核数map
+	var pickGoodsMp = make(map[int]int, len(pickGoods))
+
+	for _, good := range pickGoods {
+		pickGoodsMp[good.PrePickGoodsId] = good.ReviewNum
+	}
+
+	xFile := excelize.NewFile()
+	sheet := xFile.NewSheet("sheet1")
+	// 设置单元格的值
+	xFile.MergeCell("Sheet1", "A1", "I1")
+	xFile.SetCellValue("Sheet1", "A2", "序号")
+	xFile.SetCellValue("Sheet1", "B2", "门店编码")
+	xFile.SetCellValue("Sheet1", "C2", "门店名称")
+	xFile.SetCellValue("Sheet1", "D2", "仓库商品分类")
+	xFile.SetCellValue("Sheet1", "E2", "商品名称")
+	xFile.SetCellValue("Sheet1", "F2", "商品规格")
+	xFile.SetCellValue("Sheet1", "G2", "商品单位")
+	xFile.SetCellValue("Sheet1", "H2", "需拣数量")
+	xFile.SetCellValue("Sheet1", "I2", "已拣数量")
+	xFile.SetActiveSheet(sheet)
+	//设置指定行高 指定列宽
+	xFile.SetRowHeight("Sheet1", 1, 20)
+	xFile.SetColWidth("Sheet1", "C", "C", 20)
+
+	startCount := 3
+	for idx, val := range prePickAndGoods {
+
+		reviewNum, pgOk := pickGoodsMp[val.PrePickGoodsId]
+
+		//不存在时赋值为0，这种是没有进入拣货池，还在待拣池中
+		if !pgOk {
+			reviewNum = 0
+		}
+
+		item := make([]interface{}, 0)
+		item = append(item, idx+1)
+		item = append(item, val.ShopCode)
+		item = append(item, val.ShopName)
+		item = append(item, val.GoodsType)
+		item = append(item, val.GoodsName)
+		item = append(item, val.GoodsSpe)
+		item = append(item, val.Unit)
+		item = append(item, val.NeedNum)
+		item = append(item, reviewNum)
+
+		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+idx), &item)
+	}
+
+	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{fmt.Sprintf("批次-%s门店物料信息", batch.BatchName)})
+
+	var buffer bytes.Buffer
+	_ = xFile.Write(&buffer)
+	content := bytes.NewReader(buffer.Bytes())
+	data, _ := io.ReadAll(content)
+	date := time.Now().Format("20060102")
+	c.Writer.Header().Add("Content-Type", "application/octet-stream;charset=utf-8")
+	c.Writer.Header().Add("Access-Control-Expose-Headers", "Content-Disposition")
+	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s-.xlsx", date)+"\"")
+	c.Writer.Write(data)
+}
+
+// 拣货任务导出
+func BatchTask(c *gin.Context) {
+	var (
+		form      req.BatchTaskForm
+		shopCodes []string
+		batch     model.Batch
+	)
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	db := global.DB
+
+	type PickGoods struct {
+		ShopCode  string `json:"shop_code"`
+		GoodsName string `json:"goods_name"`
+		GoodsSpe  string `json:"goods_spe"`
+		Unit      string `json:"unit"`
+		Sku       string `json:"sku"`
+		NeedNum   int    `json:"need_num"`
+		ReviewNum int    `json:"review_num"`
+	}
+
+	result := db.First(&batch, form.BatchId)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			xsq_net.ErrorJSON(c, ecode.DataNotExist)
+			return
+		}
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	var pickGoods []PickGoods
+
+	result = db.Table("t_pick_goods pg").
+		Select("shop_code,goods_name,goods_spe,unit,sku,pg.need_num,pg.review_num").
+		Where("pg.pick_id = ?", form.Id).
+		Joins("left join t_pick_order po on po.number = pg.number").
+		Scan(&pickGoods)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	mp := make(map[string]map[string]string, 0)
+
+	mpSum := make(map[string]int, 0)
+
+	for _, good := range pickGoods {
+		shopCodes = append(shopCodes, good.ShopCode)
+	}
+
+	shopCodes = slice.UniqueStringSlice(shopCodes)
+
+	for _, pg := range pickGoods {
+
+		subMp, ok := mp[pg.Sku]
+
+		if !ok {
+			subMp = make(map[string]string, 0)
+			mp[pg.Sku] = subMp
+		}
+
+		for _, code := range shopCodes {
+			_, has := subMp[code]
+			if !has {
+				subMp[code] = "0"
+			}
+
+			if code == pg.ShopCode {
+				subMp[code] = strconv.Itoa(pg.NeedNum)
+			}
+		}
+
+		subMp["商品名称"] = pg.GoodsName
+		subMp["规格"] = pg.GoodsSpe
+		subMp["单位"] = pg.Unit
+
+		_, msOk := mpSum[pg.Sku]
+		if !msOk {
+			mpSum[pg.Sku] = pg.NeedNum
+		} else {
+			mpSum[pg.Sku] += pg.NeedNum
+		}
+
+		subMp["总计"] = strconv.Itoa(mpSum[pg.Sku])
+
+		mp[pg.Sku] = subMp
+	}
+
+	column := []string{"商品名称", "规格", "单位", "总计"}
+
+	shopCodes = slice.UniqueStringSlice(shopCodes)
+
+	column = append(column, shopCodes...)
+
+	xFile := excelize.NewFile()
+	sheet := xFile.NewSheet("sheet1")
+
+	xFile.MergeCell("Sheet1", "A1", GetKey(len(column))+"1")
+	for i, cn := range column {
+		xFile.SetCellValue("Sheet1", GetKey(i)+"2", cn)
+	}
+
+	xFile.SetActiveSheet(sheet)
+	//设置指定行高 指定列宽
+	xFile.SetRowHeight("Sheet1", 1, 30)
+	xFile.SetColWidth("Sheet1", "C", "C", 30)
+
+	startCount := 2
+
+	i := 0
+
+	for _, val := range mp {
+		i++
+		item := make([]interface{}, 0)
+		item = append(item, val["商品名称"])
+		item = append(item, val["规格"])
+		item = append(item, val["单位"])
+		item = append(item, val["总计"])
+
+		for _, code := range shopCodes {
+			item = append(item, val[code])
+		}
+
+		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+i), &item)
+	}
+
+	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{batch.BatchName + "拣货单导出"})
+
+	var buffer bytes.Buffer
+	_ = xFile.Write(&buffer)
+	content := bytes.NewReader(buffer.Bytes())
+	data, _ := io.ReadAll(content)
+	date := time.Now().Format("20060102")
+	c.Writer.Header().Add("Content-Type", "application/octet-stream;charset=utf-8")
+	c.Writer.Header().Add("Access-Control-Expose-Headers", "Content-Disposition")
+	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s.xlsx", date)+"\"")
 	c.Writer.Write(data)
 }
