@@ -60,7 +60,7 @@ func Post(path string, responseData interface{}) ([]byte, error) {
 		return nil, err
 	}
 
-	defer global.SugarLogger.Infof("params:%s, error:%s", string(jData), err.Error())
+	global.SugarLogger.Infof("params:%s", string(jData))
 
 	rq, err := http.NewRequest("POST", url, bytes.NewReader(jData))
 
