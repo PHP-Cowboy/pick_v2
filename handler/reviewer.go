@@ -256,6 +256,7 @@ func ReviewDetail(c *gin.Context) {
 		})
 	}
 
+	res.ShopCode = pick.ShopCode
 	res.OutTotal = completeTotal
 	res.UnselectedTotal = needTotal - completeTotal
 	res.ReviewTotal = reviewTotal

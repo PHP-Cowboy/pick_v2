@@ -11,6 +11,7 @@ type ReceivingOrdersRsp struct {
 
 type PickingRecordDetailRsp struct {
 	TaskName        string                      `json:"task_name"`
+	ShopCode        string                      `json:"shop_code"`
 	OutTotal        int                         `json:"out_total"`
 	UnselectedTotal int                         `json:"unselected_total"`
 	PickUser        string                      `json:"pick_user"`
