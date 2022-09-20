@@ -29,8 +29,8 @@ type Batch struct {
 
 const (
 	BatchOngoingStatus = iota //进行中
-	BatchClosedStatus
-	BatchSuspendStatus
+	BatchClosedStatus         //已结束
+	BatchSuspendStatus        //暂停
 )
 
 func GetDeliveryMethod(method int) string {

@@ -221,7 +221,7 @@ func GetUserInfo(c *gin.Context) *middlewares.CustomClaims {
 
 func UpdateOrder(tx *gorm.DB, numbers []string, pickOrderGoodsId []int, orderGoodsIds []int, batchId int) error {
 
-	result := tx.Model(&model.PickOrder{}).Where("number in (?)", numbers).Update("order_type", 2)
+	result := tx.Model(&model.PickOrder{}).Where("number in (?)", numbers).Update("order_type", model.PickOrderPickingOrderType)
 
 	if result.Error != nil {
 		return result.Error

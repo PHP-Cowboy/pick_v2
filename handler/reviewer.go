@@ -690,8 +690,8 @@ func ConfirmDelivery(c *gin.Context) {
 			order[i].OrderType = model.LackOrderType //更新为欠货
 		}
 
-		//之前的欠货数，减去本次订单拣货数 为0的 完成订单
-		if o.UnPicked-picked == 0 {
+		//之前的欠货数，减去本次订单拣货数 为0的 且 批次结束 改成 完成订单
+		if o.UnPicked-picked == 0 && batch.Status == model.BatchClosedStatus {
 
 			completeNumber = append(completeNumber, o.Number)
 
