@@ -415,6 +415,7 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 			GoodsType:        goodsType,
 			GoodsSpe:         og.GoodsSpe,
 			Shelves:          og.Shelves,
+			DiscountPrice:    og.DiscountPrice,
 			Unit:             og.GoodsUnit,
 			NeedNum:          needNum,
 			CloseNum:         og.CloseCount,

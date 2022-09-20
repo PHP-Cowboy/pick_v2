@@ -178,13 +178,15 @@ func Login(ctx *gin.Context) {
 
 	account := strconv.Itoa(user.Id)
 
+	hour := time.Duration(24)
+
 	claims := middlewares.CustomClaims{
 		ID:             user.Id,
 		Account:        account,
 		Name:           user.Name,
 		WarehouseId:    user.WarehouseId,
 		AuthorityId:    user.RoleId,
-		StandardClaims: jwt.StandardClaims{ExpiresAt: time.Now().Add(12 * time.Hour).Unix()},
+		StandardClaims: jwt.StandardClaims{ExpiresAt: time.Now().Add(hour * time.Hour).Unix()},
 	}
 
 	j := middlewares.NewJwt()
@@ -196,7 +198,7 @@ func Login(ctx *gin.Context) {
 
 	//token存入redis
 	redisKey := constant.LOGIN_PREFIX + account
-	err = global.Redis.Set(context.Background(), redisKey, token, 12*60*60*time.Second).Err()
+	err = global.Redis.Set(context.Background(), redisKey, token, hour*60*60*time.Second).Err()
 	if err != nil {
 		xsq_net.ErrorJSON(ctx, ecode.RedisFailedToSetData)
 		return

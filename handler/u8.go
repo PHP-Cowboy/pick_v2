@@ -503,7 +503,7 @@ func LogDetail(c *gin.Context) {
 			GoodsType:        pg.GoodsType,
 			GoodsSpe:         pg.GoodsSpe,
 			Shelves:          pg.Shelves,
-			DiscountPrice:    pg.DiscountPrice,
+			DiscountPrice:    float64(pg.DiscountPrice) / 100,
 			NeedNum:          pg.NeedNum,
 			CompleteNum:      pg.CompleteNum,
 			ReviewNum:        pg.ReviewNum,
