@@ -13,7 +13,14 @@ type GoodsListForm struct {
 	City             string `json:"city" form:"city"`
 	District         string `json:"district" form:"district"`
 	HasRemark        int    `json:"has_remark" form:"has_remark"` ////是否存在备注  0-默认全部 1-有备注 2-无备注
-	PayEndTime       string `json:"pay_end_time"  form:"pay_end_time"`
+	PayEndTime       string `json:"pay_end_time" form:"pay_end_time"`
+	PayAtSort        string `json:"pay_at_sort" form:"pay_at_sort" binding:"required"`
+	ShopCodeSort     string `json:"shop_code_sort" form:"shop_code_sort"`
+}
+
+type GoodsSort struct {
+	Field string `json:"field" form:"field"`
+	Rule  string `json:"rule" form:"rule"`
 }
 
 type GetOrderDetailForm struct {

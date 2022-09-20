@@ -79,16 +79,17 @@ func GetOrderInfo(responseData interface{}) (rsp.OrderRsp, error) {
 func Shipping(form Form, info rsp.OrderInfo) (consumer.ConsumeResult, error) {
 	//是否备注
 	var (
-		hasRemark  int
-		order      []model.Order
-		orderGoods []model.OrderGoods
+		hasRemark     int
+		order         []model.Order
+		orderGoods    []model.OrderGoods
+		completeOrder []model.CompleteOrder
 	)
 
 	payTotal := 0
 
-	// 查询是否已存在 存在的过滤掉？
 	db := global.DB
 
+	// 查询是否已存在 存在的过滤掉
 	result := db.Where("id in (?)", form.OrderId).Find(&order)
 
 	if result.Error != nil {
@@ -97,6 +98,17 @@ func Shipping(form Form, info rsp.OrderInfo) (consumer.ConsumeResult, error) {
 
 	if len(order) > 0 {
 		return consumer.ConsumeSuccess, errors.New("订单已存在")
+	}
+
+	//查看完成订单里有没有
+	result = db.Where("number = ?", info.Number).Find(&completeOrder)
+
+	if result.Error != nil {
+		return consumer.ConsumeRetryLater, result.Error
+	}
+
+	if len(completeOrder) > 0 {
+		return consumer.ConsumeSuccess, errors.New("订单在完成订单中已存在")
 	}
 
 	for _, goods := range info.GoodsInfo {

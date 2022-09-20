@@ -87,7 +87,13 @@ func GetGoodsList(c *gin.Context) {
 		return
 	}
 
-	result = localDb.Order("pay_at").Scopes(model.Paginate(form.Page, form.Size)).Find(&orders)
+	localDb.Order(fmt.Sprintf("pay_at %s", form.PayAtSort))
+
+	if form.ShopCodeSort != "" {
+		localDb.Order(fmt.Sprintf("shop_code  %s", form.ShopCodeSort))
+	}
+
+	result = localDb.Scopes(model.Paginate(form.Page, form.Size)).Find(&orders)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

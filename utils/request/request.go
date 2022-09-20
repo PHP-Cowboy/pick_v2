@@ -49,8 +49,6 @@ func PostTest() {
 
 func Post(path string, responseData interface{}) ([]byte, error) {
 
-	global.SugarLogger.Infof("params:%+v", responseData)
-
 	cfg := global.ServerConfig
 
 	url := fmt.Sprintf("%s:%d/%s", cfg.GoodsApi.Url, cfg.GoodsApi.Port, path)
@@ -62,7 +60,7 @@ func Post(path string, responseData interface{}) ([]byte, error) {
 		return nil, err
 	}
 
-	global.SugarLogger.Infof("params:%s", string(jData))
+	defer global.SugarLogger.Infof("params:%s, error:%s", string(jData), err.Error())
 
 	rq, err := http.NewRequest("POST", url, bytes.NewReader(jData))
 
