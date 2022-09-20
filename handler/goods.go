@@ -25,7 +25,7 @@ func GetGoodsList(c *gin.Context) {
 	var form req.GoodsListForm
 
 	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, err)
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
 
