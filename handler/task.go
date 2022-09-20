@@ -386,7 +386,7 @@ func PushPrint(c *gin.Context) {
 			continue
 		}
 
-		mpKey := fmt.Sprintf("%d%d", good.PickId, good.ShopId)
+		mpKey := fmt.Sprintf("%d%d", good.PickId, good.Number)
 		_, ok := shopAndPickGoodsIdMp[mpKey]
 		if ok {
 			continue
