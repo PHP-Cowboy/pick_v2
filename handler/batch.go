@@ -2355,7 +2355,7 @@ func PrintCallGet(c *gin.Context) {
 		return
 	}
 
-	result = db.Model(&model.PickGoods{}).Where("pick_id = ? and shop_id = ? and review_num > 0", pick.Id, printCh.ShopId).Find(&pickGoods)
+	result = db.Model(&model.PickGoods{}).Where("pick_id = ? and number = ? and review_num > 0", pick.Id, printCh.Number).Find(&pickGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

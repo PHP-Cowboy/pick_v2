@@ -464,15 +464,15 @@ func ConfirmDelivery(c *gin.Context) {
 	}
 
 	//构造打印 chan 结构体数据
-	printChMp := make(map[int]struct{}, 0)
+	printChMp := make(map[string]struct{}, 0)
 
 	//构造更新 订单表 订单商品 表完成出库数据
 	orderNumbers := []string{}
 	for k, pg := range pickGoods {
-		_, printChOk := printChMp[pg.ShopId]
+		_, printChOk := printChMp[pg.Number]
 
 		if !printChOk {
-			printChMp[pg.ShopId] = struct{}{}
+			printChMp[pg.Number] = struct{}{}
 		}
 
 		completeNum, mpOk := mp[pg.Id]
@@ -815,10 +815,10 @@ func ConfirmDelivery(c *gin.Context) {
 	}
 
 	//拆单 -打印
-	for shopId, _ := range printChMp {
+	for number, _ := range printChMp {
 		AddPrintJobMap(constant.JH_HUOSE_CODE, &global.PrintCh{
 			DeliveryOrderNo: deliveryOrderNo,
-			ShopId:          shopId,
+			Number:          number,
 		})
 	}
 

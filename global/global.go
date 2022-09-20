@@ -9,7 +9,7 @@ import (
 
 type PrintCh struct {
 	DeliveryOrderNo string
-	ShopId          int
+	Number          string
 }
 
 var (
