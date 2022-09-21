@@ -2355,7 +2355,7 @@ func PrintCallGet(c *gin.Context) {
 		return
 	}
 
-	result = db.Model(&model.PickGoods{}).Where("pick_id = ? and number = ? and review_num > 0", pick.Id, printCh.Number).Find(&pickGoods)
+	result = db.Model(&model.PickGoods{}).Where("pick_id = ? and shop_id = ? and review_num > 0", pick.Id, printCh.ShopId).Find(&pickGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -2410,11 +2410,7 @@ func PrintCallGet(c *gin.Context) {
 		item.ShopName = orderAndGoods[0].ShopCode + "--" + orderAndGoods[0].ShopName
 	}
 
-	item2 := rsp.CallGetGoodsView{
-		SaleNumber:  orderAndGoods[0].Number,
-		Date:        orderAndGoods[0].PayAt,
-		OrderRemark: orderAndGoods[0].OrderRemark,
-	}
+	item2Mp := make(map[string]rsp.CallGetGoodsView, 0)
 
 	for _, info := range orderAndGoods {
 
@@ -2422,6 +2418,16 @@ func PrintCallGet(c *gin.Context) {
 
 		if !ok {
 			continue
+		}
+
+		item2val, item2ok := item2Mp[info.Number]
+
+		if !item2ok {
+			item2val = rsp.CallGetGoodsView{
+				SaleNumber:  info.Number,
+				Date:        info.PayAt,
+				OrderRemark: info.OrderRemark,
+			}
 		}
 
 		item3 := rsp.CallGetGoods{
@@ -2433,10 +2439,14 @@ func PrintCallGet(c *gin.Context) {
 			Price:        int64(info.DiscountPrice) * int64(pgs.ReviewNum),
 			LackCount:    info.PayCount - pgs.ReviewNum,
 		}
-		item2.List = append(item2.List, item3)
+		item2val.List = append(item2val.List, item3)
+
+		item2Mp[info.Number] = item2val
 	}
 
-	item.GoodsList = append(item.GoodsList, item2)
+	for _, item2 := range item2Mp {
+		item.GoodsList = append(item.GoodsList, item2)
+	}
 
 	ret := make([]rsp.PrintCallGetRsp, 0, 1)
 

@@ -386,7 +386,7 @@ func PushPrint(c *gin.Context) {
 			continue
 		}
 
-		mpKey := fmt.Sprintf("%d%d", good.PickId, good.Number)
+		mpKey := fmt.Sprintf("%d%d", good.PickId, good.ShopId)
 		_, ok := shopAndPickGoodsIdMp[mpKey]
 		if ok {
 			continue
@@ -394,14 +394,14 @@ func PushPrint(c *gin.Context) {
 		shopAndPickGoodsIdMp[mpKey] = struct{}{}
 		printChSlice = append(printChSlice, global.PrintCh{
 			DeliveryOrderNo: deliveryOrderNo,
-			Number:          good.Number,
+			ShopId:          good.ShopId,
 		})
 	}
 
 	for _, ch := range printChSlice {
 		AddPrintJobMap(constant.JH_HUOSE_CODE, &global.PrintCh{
 			DeliveryOrderNo: ch.DeliveryOrderNo,
-			Number:          ch.Number,
+			ShopId:          ch.ShopId,
 		})
 	}
 
