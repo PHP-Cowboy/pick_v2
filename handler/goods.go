@@ -76,8 +76,9 @@ func GetGoodsList(c *gin.Context) {
 	localDb.Where("order_type != 2") //不要拣货中的
 
 	var (
-		total int64
 		res   rsp.GoodsListRsp
+		dbRes []OrderNum
+		total int64
 	)
 
 	result := localDb.Count(&total)
@@ -109,16 +110,22 @@ func GetGoodsList(c *gin.Context) {
 			latestPickingTime = o.LatestPickingTime.Format(timeutil.TimeFormat)
 		}
 
-		payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
+		payAt := ""
 
-		if payAtErr != nil {
-			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
-			return
+		if o.PayAt != "" {
+
+			at, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
+
+			if payAtErr != nil {
+				xsq_net.ErrorJSON(c, ecode.DataTransformationError)
+				return
+			}
+			payAt = at.Format(timeutil.TimeFormat)
 		}
 
 		list = append(list, rsp.Order{
 			Number:            o.Number,
-			PayAt:             payAt.Format(timeutil.TimeFormat),
+			PayAt:             payAt,
 			ShopCode:          o.ShopCode,
 			ShopName:          o.ShopName,
 			ShopType:          o.ShopType,
@@ -135,7 +142,13 @@ func GetGoodsList(c *gin.Context) {
 		})
 	}
 
-	res.Total = total
+	result = localDb.Model(&model.Order{}).Select("count(id) as count, order_type").Group("order_type").Find(&dbRes)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
 	res.List = list
 
 	xsq_net.SucJson(c, res)
@@ -535,6 +548,11 @@ func CompleteOrderDetail(c *gin.Context) {
 	res.DeliveryOrderNo = deliveryOrderNoArr
 
 	xsq_net.SucJson(c, res)
+}
+
+type OrderNum struct {
+	Count     int `json:"count"`
+	OrderType int `json:"order_type"`
 }
 
 func Count(c *gin.Context) {

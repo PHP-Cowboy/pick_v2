@@ -642,6 +642,7 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 		return result.Error
 	}
 
+	//当前批次所有订单号
 	var numbers []string
 
 	for _, good := range orderGoods {
@@ -650,6 +651,7 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 
 	numbers = slice.UniqueStringSlice(numbers)
 
+	//根据当前批次的所有订单号，查询订单
 	result = db.Model(&model.Order{}).Where("number in (?)", numbers).Find(&order)
 
 	if result.Error != nil {
@@ -771,7 +773,7 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 
 		//获取欠货的订单number是否有在拣货池中未复核完成的数据，如果有，过滤掉欠货的订单number
 		result = db.Table("t_pick_goods pg").
-			Select("p.id as pick_id,p.status,pg.number").
+			Select("p.id as pick_id,p.status,pg.number,p.pick_user").
 			Joins("left join t_pick p on pg.pick_id = p.id").
 			Where("number in (?)", lackNumbers).
 			Find(&pickAndGoods)
@@ -784,7 +786,8 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 		//获取拣货id，根据拣货id查出 拣货单中 未复核完成的订单，不更新为欠货，
 		//且 有未复核完成的订单 不发送到mq中，完成后再发送到mq中
 		for _, p := range pickAndGoods {
-			if p.Status < model.ReviewCompletedStatus {
+			//已经被接单，且未完成复核
+			if p.Status < model.ReviewCompletedStatus && p.PickUser != "" {
 				pendingNumbers = append(pendingNumbers, p.Number)
 				isSendMQ = false
 			}

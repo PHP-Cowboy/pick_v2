@@ -331,6 +331,13 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
+	result = db.First(&batch, pick.BatchId)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
 	userInfo := GetUserInfo(c)
 
 	if userInfo == nil {
@@ -581,6 +588,10 @@ func ConfirmDelivery(c *gin.Context) {
 			"print_num":         gorm.Expr("print_num + ?", 1),
 		})
 
+	//前边更新的 pick.Id的 status 后面查询还未生效
+	pickStatusMp := make(map[int]int, 1)
+	pickStatusMp[pick.Id] = model.ReviewCompletedStatus
+
 	if result.Error != nil {
 		tx.Rollback()
 		xsq_net.ErrorJSON(c, result.Error)
@@ -591,11 +602,11 @@ func ConfirmDelivery(c *gin.Context) {
 
 	//批次已结束的
 	if batch.Status == model.BatchClosedStatus {
-		// 欠货逻辑 查出当前出库的所有商品 number ，这些number如果还有未复核完成的就不更新为欠货
+		// 欠货逻辑 查出当前出库的所有商品 number ，这些number如果还有未复核完成状态的就不更新为欠货
 		var (
 			picks          []model.Pick
 			isSendMQ       = true
-			pickNumbers    []string //当前出库的所有商品 number
+			pickNumbers    = make([]string, 0) //当前出库的所有商品 number
 			pickAndGoods   []model.PickAndGoods
 			pendingNumbers []string
 			diffSlice      []string
@@ -609,9 +620,17 @@ func ConfirmDelivery(c *gin.Context) {
 		}
 
 		for _, ps := range picks {
+
+			status, ok := pickStatusMp[ps.Id]
+
+			if ok {
+				ps.Status = status //刚更新的状态立即查询，mysql数据可能还在缓存中差不到，更新成map中保存的状态
+			}
+
 			if ps.Status < model.ReviewCompletedStatus {
 				//批次有未复核完成的拣货单
 				isSendMQ = false
+				continue
 			}
 		}
 
@@ -635,9 +654,15 @@ func ConfirmDelivery(c *gin.Context) {
 			return
 		}
 
-		//获取拣货id，根据拣货id查出 拣货单中 未复核完成的订单，不更新为欠货，
+		//获取拣货id，根据拣货id查出 拣货单中 未复核完成状态的订单，不更新为欠货，
 		//且 有未复核完成的订单 不发送到mq中，完成后再发送到mq中
 		for _, p := range pickAndGoods {
+			status, ok := pickStatusMp[p.PickId]
+
+			if ok {
+				p.Status = status //刚更新的状态立即查询，mysql数据可能还在缓存中差不到，更新成map中保存的状态
+			}
+
 			if p.Status < model.ReviewCompletedStatus {
 				pendingNumbers = append(pendingNumbers, p.Number)
 				isSendMQ = false
@@ -730,7 +755,7 @@ func ConfirmDelivery(c *gin.Context) {
 		Omit("number", "pay_at", "delivery_at", "has_remark", "address", "order_remark").
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{"latest_picking_time", "picked", "un_picked"}),
+			DoUpdates: clause.AssignmentColumns([]string{"latest_picking_time", "picked", "un_picked", "order_type"}),
 		}).
 		Save(&order)
 

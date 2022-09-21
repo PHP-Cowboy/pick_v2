@@ -39,7 +39,8 @@ const (
 )
 
 type PickAndGoods struct {
-	PickId int    `json:"pick_id"`
-	Status int    `json:"status"`
-	Number string `json:"number"`
+	PickId   int    `json:"pick_id"`
+	Status   int    `json:"status"`
+	Number   string `json:"number"`
+	PickUser string `json:"pick_user"`
 }
