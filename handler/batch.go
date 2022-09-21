@@ -2390,6 +2390,13 @@ func PrintCallGet(c *gin.Context) {
 		return
 	}
 
+	packages := pick.Num
+
+	//合并单不打印，ShopCode为空说明是合并单，合并单不会有店编
+	if pick.ShopCode == "" {
+		packages = 0
+	}
+
 	item := rsp.PrintCallGetRsp{
 		ShopName:    pick.ShopName,
 		JHNumber:    strconv.Itoa(pick.Id),
@@ -2401,7 +2408,7 @@ func PrintCallGet(c *gin.Context) {
 		OrderRemark: orderAndGoods[0].OrderRemark,
 		Consignee:   orderAndGoods[0].ConsigneeName, //info.ConsigneeName
 		Shop_code:   pick.ShopCode,
-		Packages:    pick.Num,
+		Packages:    packages,
 		Phone:       orderAndGoods[0].ConsigneeTel, //info.ConsigneeTel,
 		PriType:     1,
 	}
