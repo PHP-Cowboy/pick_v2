@@ -6,17 +6,40 @@ import (
 	"github.com/apache/rocketmq-client-go/v2"
 	"github.com/apache/rocketmq-client-go/v2/primitive"
 	"github.com/apache/rocketmq-client-go/v2/producer"
+	"github.com/spf13/viper"
 	"os"
 	"strconv"
 )
 
 func main() {
+	v := viper.New()
+
+	v.SetConfigFile("mq.json")
+
+	err := v.ReadInConfig()
+	if err != nil {
+		panic("读取配置文件失败:" + err.Error())
+	}
+
+	type OrderIds struct {
+		Ids []int `json:"ids"`
+	}
+
+	var orderIds OrderIds
+
+	//fmt.Println(content) //字符串 - yaml
+	//想要将一个json字符串转换成struct，需要去设置这个struct的tag
+	err = v.Unmarshal(&orderIds)
+	if err != nil {
+		panic("解析配置失败:" + err.Error())
+	}
+
 	p, _ := rocketmq.NewProducer(
 		producer.WithNsResolver(primitive.NewPassthroughResolver([]string{"127.0.0.1:10007"})), // 127.0.0.1:10007 192.168.1.40:9876
 		producer.WithRetry(2),
 	)
 
-	err := p.Start()
+	err = p.Start()
 
 	if err != nil {
 		fmt.Printf("start producer error: %s", err.Error())
@@ -25,16 +48,10 @@ func main() {
 
 	topic := "purchase_order"
 
-	toBeShipped := []int{
-		18418, 22123, 23261, 25493, 26584, 27579, 27595, 28074, 28146, 28239, 28268, 28270,
-		28300, 28309, 28314, 28725, 28843, 28857, 28860, 28862, 28895, 28902, 28905, 28906,
-		28918, 28925, 28926, 28959, 28966, 28973, 28975, 28983, 29000, 29011, 29021, 29036,
-		29041, 29054, 29060, 29065,
-	}
-	for _, v := range toBeShipped {
+	for _, id := range orderIds.Ids {
 		msg := &primitive.Message{
 			Topic: topic,
-			Body:  []byte(strconv.Itoa(v)),
+			Body:  []byte(strconv.Itoa(id)),
 		}
 
 		res, err := p.SendSync(context.Background(), msg)

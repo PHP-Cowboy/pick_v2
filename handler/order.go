@@ -625,7 +625,7 @@ func CloseOrder(c *gin.Context) {
 
 	db := global.DB
 
-	//根据ID倒叙，查最新的记录，避免欠货单更新错误
+	//根据ID倒序，查最新的记录，避免欠货单更新错误
 	result := db.Model(&model.PickOrder{}).Where("order_id = ?", form.OrderId).Find(&pickOrder)
 
 	if result.Error != nil {
