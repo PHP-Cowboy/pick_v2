@@ -477,7 +477,7 @@ func PickingRecord(c *gin.Context) {
 
 	res.Total = result.RowsAffected
 
-	result = local.Scopes(model.Paginate(form.Page, form.Size)).Find(&pick)
+	result = local.Scopes(model.Paginate(form.Page, form.Size)).Order("take_orders_time desc").Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -650,6 +650,7 @@ func PickingRecordDetail(c *gin.Context) {
 	for _, goods := range pickGoodsSkuMp {
 		completeTotal += goods.CompleteNum
 		needTotal += goods.NeedNum
+
 		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.MergePickGoods{
 			Id:          goods.Id,
 			Sku:         goods.Sku,

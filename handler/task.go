@@ -402,7 +402,7 @@ func PushPrint(c *gin.Context) {
 		AddPrintJobMap(constant.JH_HUOSE_CODE, &global.PrintCh{
 			DeliveryOrderNo: ch.DeliveryOrderNo,
 			ShopId:          ch.ShopId,
-			Type:            *form.Type, //打印类型
+			Type:            form.Type, //打印类型
 		})
 	}
 

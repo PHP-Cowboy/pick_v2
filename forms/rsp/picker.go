@@ -50,6 +50,20 @@ func (pg MyMergePickGoods) Swap(i, j int) {
 	pg[i], pg[j] = pg[j], pg[i]
 }
 
+type ClassSort []MergePickGoods
+
+func (cs ClassSort) Len() int {
+	return len(cs)
+}
+
+func (cs ClassSort) Less(i, j int) bool {
+	return cs[i].Shelves < cs[j].Shelves
+}
+
+func (cs ClassSort) Swap(i, j int) {
+	cs[i], cs[j] = cs[j], cs[i]
+}
+
 type ParamsId struct {
 	PickGoodsId  int `json:"pick_goods_id"`
 	OrderGoodsId int `json:"order_goods_id"`

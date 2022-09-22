@@ -54,7 +54,7 @@ func ReviewList(c *gin.Context) {
 	if form.Status == 1 {
 		localDb.Where("review_user = ? or review_user = ''", userInfo.Name)
 	} else {
-		localDb.Where("review_user = ? ", userInfo.Name)
+		localDb.Where("review_user = ? ", userInfo.Name).Order("review_time desc")
 	}
 
 	result := localDb.Where(model.Pick{PickUser: form.Name}).Find(&pick)
@@ -241,6 +241,7 @@ func ReviewDetail(c *gin.Context) {
 		completeTotal += goods.CompleteNum
 		needTotal += goods.NeedNum
 		reviewTotal += goods.ReviewNum
+
 		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.MergePickGoods{
 			Id:          goods.Id,
 			Sku:         goods.Sku,
@@ -844,7 +845,7 @@ func ConfirmDelivery(c *gin.Context) {
 		AddPrintJobMap(constant.JH_HUOSE_CODE, &global.PrintCh{
 			DeliveryOrderNo: deliveryOrderNo,
 			ShopId:          shopId,
-			Type:            0, //打印箱单和出库单
+			Type:            1, // 1-全部打印 2-打印箱单 3-打印出库单 第一次全打，后边的前段选
 		})
 	}
 

@@ -24,7 +24,7 @@ type ChangeNumReq struct {
 
 type PrintReq struct {
 	Ids  []int `json:"ids" binding:"required"`
-	Type *int  `json:"type" binding:"required"` //类型:0:打印全部;1:打印箱单;2:打印出库单;
+	Type int   `json:"type" binding:"required"` // 1-全部打印 2-打印箱单 3-打印出库单 第一次全打，后边的前段选
 }
 
 type AssignReq struct {
