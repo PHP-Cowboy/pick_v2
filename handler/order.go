@@ -814,6 +814,56 @@ func CloseOrderGoods(c *gin.Context) {
 // 拣货单统计
 func PickOrderCount(c *gin.Context) {
 
+	var form req.PickOrderCountForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	var (
+		pickOrderGoods []model.PickOrderGoods
+		numbers        []string
+	)
+
+	db := global.DB
+
+	if form.Sku != "" {
+		result := db.Where("sku = ?", form.Sku).Find(&pickOrderGoods)
+
+		if result.Error != nil {
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+
+		for _, good := range pickOrderGoods {
+			numbers = append(numbers, good.Number)
+		}
+	}
+
+	localDb := db.Model(&model.PickOrder{})
+
+	if len(numbers) > 0 {
+		numbers = slice.UniqueStringSlice(numbers)
+		localDb = localDb.Where("number in (?)", numbers)
+	}
+
+	localDb.Where(&model.PickOrder{
+		ShopId:           form.ShopId,
+		Number:           form.Number,
+		Line:             form.Lines,
+		DistributionType: form.DistributionType,
+		ShopType:         form.ShopType,
+		Province:         form.Province,
+		City:             form.City,
+		District:         form.District,
+		HasRemark:        form.HasRemark,
+	})
+
+	if form.PayEndTime != "" {
+		localDb = localDb.Where("pay_at >= ?", form.PayEndTime)
+	}
+
 	type OrderNum struct {
 		Count     int `json:"count"`
 		OrderType int `json:"order_type"`
@@ -824,7 +874,7 @@ func PickOrderCount(c *gin.Context) {
 		res   rsp.PickOrderCount
 	)
 
-	result := global.DB.Model(&model.PickOrder{}).Select("count(id) as count, order_type").Group("order_type").Find(&dbRes)
+	result := localDb.Model(&model.PickOrder{}).Select("count(id) as count, order_type").Group("order_type").Find(&dbRes)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

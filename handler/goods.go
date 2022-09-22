@@ -557,6 +557,57 @@ type OrderNum struct {
 
 func Count(c *gin.Context) {
 
+	var form req.CountFrom
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	var (
+		orderGoods []model.OrderGoods
+		numbers    []string
+	)
+
+	db := global.DB
+
+	if form.Sku != "" {
+		result := db.Where("sku = ?", form.Sku).Find(&orderGoods)
+
+		if result.Error != nil {
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+
+		for _, good := range orderGoods {
+			numbers = append(numbers, good.Number)
+		}
+	}
+
+	localDb := db.Model(&model.Order{})
+
+	if len(numbers) > 0 {
+		localDb = localDb.Where("number in (?)", numbers)
+	}
+
+	localDb.Where(&model.Order{
+		ShopId:           form.ShopId,
+		Number:           form.Number,
+		Line:             form.Lines,
+		DistributionType: form.DistributionType,
+		ShopType:         form.ShopType,
+		Province:         form.Province,
+		City:             form.City,
+		District:         form.District,
+		HasRemark:        form.HasRemark,
+	})
+
+	if form.PayEndTime != "" {
+		localDb = localDb.Where("pay_at >= ?", form.PayEndTime)
+	}
+
+	localDb.Where("order_type != 2") //不要拣货中的
+
 	type OrderNum struct {
 		Count     int `json:"count"`
 		OrderType int `json:"order_type"`
@@ -567,7 +618,7 @@ func Count(c *gin.Context) {
 		res   rsp.CountRes
 	)
 
-	result := global.DB.Model(&model.Order{}).Select("count(id) as count, order_type").Group("order_type").Find(&dbRes)
+	result := localDb.Model(&model.Order{}).Select("count(id) as count, order_type").Group("order_type").Find(&dbRes)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

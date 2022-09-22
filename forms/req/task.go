@@ -23,7 +23,8 @@ type ChangeNumReq struct {
 }
 
 type PrintReq struct {
-	Ids []int `json:"ids" binding:"required"`
+	Ids  []int `json:"ids" binding:"required"`
+	Type *int  `json:"type" binding:"required"` //类型:0:打印全部;1:打印箱单;2:打印出库单;
 }
 
 type AssignReq struct {

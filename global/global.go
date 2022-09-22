@@ -10,6 +10,7 @@ import (
 type PrintCh struct {
 	DeliveryOrderNo string
 	ShopId          int
+	Type            int //类型:0:打印全部;1:打印箱单;2:打印出库单;
 }
 
 var (

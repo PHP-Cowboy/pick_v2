@@ -1435,16 +1435,18 @@ func GetPrePickList(c *gin.Context) {
 	typeMap := make(map[int]map[string]rsp.PickCount, 0)
 
 	for _, r := range retCount {
-		_, ok := typeMap[r.ShopId]
+		mp, ok := typeMap[r.ShopId]
+
 		if !ok {
-			countMap := make(map[string]rsp.PickCount, 0)
-			typeMap[r.ShopId] = countMap
-			countMap[r.GoodsType] = rsp.PickCount{
-				WaitingPick: r.NeedC,
-				PickedCount: r.OutC,
-			}
-			typeMap[r.ShopId][r.GoodsType] = countMap[r.GoodsType]
+			mp = make(map[string]rsp.PickCount, 0)
 		}
+
+		mp[r.GoodsType] = rsp.PickCount{
+			WaitingPick: r.NeedC,
+			PickedCount: r.OutC,
+		}
+
+		typeMap[r.ShopId] = mp
 	}
 
 	list := make([]*rsp.PrePick, 0, len(prePicks))
@@ -2413,7 +2415,7 @@ func PrintCallGet(c *gin.Context) {
 		Shop_code:   pick.ShopCode,
 		Packages:    packages,
 		Phone:       orderAndGoods[0].ConsigneeTel, //info.ConsigneeTel,
-		PriType:     1,
+		PriType:     printCh.Type,
 	}
 
 	if orderAndGoods[0].ShopCode != "" {

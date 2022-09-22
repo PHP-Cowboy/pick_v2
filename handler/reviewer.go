@@ -844,6 +844,7 @@ func ConfirmDelivery(c *gin.Context) {
 		AddPrintJobMap(constant.JH_HUOSE_CODE, &global.PrintCh{
 			DeliveryOrderNo: deliveryOrderNo,
 			ShopId:          shopId,
+			Type:            0, //打印箱单和出库单
 		})
 	}
 
