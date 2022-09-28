@@ -1,6 +1,8 @@
 package timeutil
 
 import (
+	"database/sql/driver"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -29,7 +31,7 @@ func (t *Time) UnmarshalJSON(data []byte) error {
 	return err
 }
 
-//MyTime 自定义时间
+// MyTime 自定义时间
 type MyTime time.Time
 
 func (t *MyTime) UnmarshalJSON(data []byte) error {
