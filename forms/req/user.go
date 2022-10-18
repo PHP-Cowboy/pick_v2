@@ -9,7 +9,9 @@ type AddUserForm struct {
 
 type GetUserListForm struct {
 	Paging
-	WarehouseId int `form:"warehouse_id" json:"warehouse_id"`
+	Name        string `json:"name" form:"name"`
+	WarehouseId int    `form:"warehouse_id" json:"warehouse_id"`
+	RoleId      int    `form:"role_id" json:"role_id"`
 }
 
 type LoginForm struct {

@@ -130,23 +130,6 @@ func ParamsGet(c *gin.Context) (params interface{}, err error) {
 
 func ParamsPost(c *gin.Context) (params interface{}, err error) {
 
-	//body := make([]byte, 1024)
-	//
-	//var n int
-	//
-	//n, err = c.Request.Body.Read(body)
-	//if err != nil {
-	//	panic(err.Error())
-	//}
-	//
-	//err = json.Unmarshal(body[0:n], &params)
-	//
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	//return
-
 	var body []byte
 	if cb, ok := c.Get(gin.BodyBytesKey); ok {
 		if cbb, ok := cb.([]byte); ok {

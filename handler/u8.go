@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"io"
 	"math"
 	"net/http"
@@ -340,7 +341,9 @@ func LogList(c *gin.Context) {
 func BatchSupplement(c *gin.Context) {
 	var form req.BatchSupplementForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}

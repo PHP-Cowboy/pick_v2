@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"gorm.io/gorm"
 	"math"
 	"pick_v2/common/constant"
@@ -25,8 +26,10 @@ import (
 func PickTopping(c *gin.Context) {
 	var form req.PickToppingForm
 
-	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, err)
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
 
@@ -37,9 +40,9 @@ func PickTopping(c *gin.Context) {
 		return
 	}
 
-	sort := int(val.(int64))
+	rdsSort := int(val.(int64))
 
-	result := global.DB.Model(model.Pick{}).Where("id = ?", form.Id).Update("sort", sort)
+	result := global.DB.Model(model.Pick{}).Where("id = ?", form.Id).Update("sort", rdsSort)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -289,7 +292,9 @@ func GetPickDetail(c *gin.Context) {
 func ChangeNum(c *gin.Context) {
 	var form req.ChangeNumReq
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -324,7 +329,9 @@ func ChangeNum(c *gin.Context) {
 func PushPrint(c *gin.Context) {
 	var form req.PrintReq
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -397,7 +404,9 @@ func PushPrint(c *gin.Context) {
 func Assign(c *gin.Context) {
 	var form req.AssignReq
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -451,7 +460,9 @@ func Assign(c *gin.Context) {
 func ChangeReviewNum(c *gin.Context) {
 	var form req.ChangeReviewNumForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}

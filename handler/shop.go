@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"gorm.io/gorm"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
@@ -261,7 +262,9 @@ func ShopList(c *gin.Context) {
 func BatchSetLine(c *gin.Context) {
 	var form req.BatchSetLineForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -305,7 +308,9 @@ func LineList(c *gin.Context) {
 func BatchSetDistributionType(c *gin.Context) {
 	var form req.BatchSetDistributionTypeForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/apache/rocketmq-client-go/v2/primitive"
 	"github.com/apache/rocketmq-client-go/v2/producer"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"gorm.io/gorm"
 	"pick_v2/common/constant"
 	"pick_v2/forms/req"
@@ -30,7 +31,9 @@ import (
 func CreateBatch(c *gin.Context) {
 	var form req.CreateBatchForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -123,7 +126,9 @@ func CreateBatch(c *gin.Context) {
 func CreateByOrder(c *gin.Context) {
 	var form req.CreateByOrderReq
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -520,7 +525,9 @@ func SavePrePickPool(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchId in
 func EndBatch(c *gin.Context) {
 	var form req.EndBatchForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -874,7 +881,9 @@ func SyncBatch(batchId int) error {
 func EditBatch(c *gin.Context) {
 	var form req.EditBatchForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -976,7 +985,9 @@ func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderAndGoods []rsp.Or
 func GetBatchOrderAndGoods(c *gin.Context) {
 	var form req.GetBatchOrderAndGoodsForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -1110,7 +1121,9 @@ func ChangeBatch(c *gin.Context) {
 	//todo 把状态为0的更新为停止拣货，其他的正常操作
 	var form req.StopPickForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -1558,8 +1571,10 @@ func GetPrePickDetail(c *gin.Context) {
 func Topping(c *gin.Context) {
 	var form req.ToppingForm
 
-	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, err)
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
 
@@ -1649,7 +1664,9 @@ func BatchPick(c *gin.Context) {
 		err  error
 	)
 
-	if err = c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -2028,7 +2045,9 @@ func UpdateBatchPickNums(tx *gorm.DB, batchId int) error {
 func MergePick(c *gin.Context) {
 	var form req.MergePickForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}

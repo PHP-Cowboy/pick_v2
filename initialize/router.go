@@ -45,6 +45,8 @@ func InitRouter() *gin.Engine {
 	router.OpenRoute(group)
 	//u8
 	router.YongYouRoute(group)
+	//盘点
+	router.InvTaskRoute(group)
 
 	return r
 }

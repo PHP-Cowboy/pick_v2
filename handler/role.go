@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
@@ -12,35 +13,35 @@ import (
 	"time"
 )
 
-//创建角色
-func CreateRole(ctx *gin.Context) {
+// 创建角色
+func CreateRole(c *gin.Context) {
 	var form req.CreateRoleForm
 
-	err := ctx.ShouldBind(&form)
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
 
-	if err != nil {
-		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
 
 	result := global.DB.Create(&model.Role{Name: form.Name})
 
 	if result.Error != nil || result.RowsAffected == 0 {
-		xsq_net.ErrorJSON(ctx, result.Error)
+		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	xsq_net.Success(ctx)
+	xsq_net.Success(c)
 }
 
-//修改角色
-func ChangeRole(ctx *gin.Context) {
+// 修改角色
+func ChangeRole(c *gin.Context) {
 	var form req.ChangeRoleForm
 
-	err := ctx.ShouldBind(&form)
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
 
-	if err != nil {
-		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
 
@@ -51,18 +52,18 @@ func ChangeRole(ctx *gin.Context) {
 	result := db.First(&role, form.Id)
 
 	if result.Error != nil {
-		xsq_net.ErrorJSON(ctx, result.Error)
+		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
 	if result.RowsAffected == 0 {
-		xsq_net.ErrorJSON(ctx, ecode.RoleNotFound)
+		xsq_net.ErrorJSON(c, ecode.RoleNotFound)
 		return
 	}
 
 	deleteTime, err := time.ParseInLocation(timeutil.TimeFormat, timeutil.GetDateTime(), time.Local)
 	if err != nil {
-		xsq_net.ErrorJSON(ctx, ecode.DataTransformationError)
+		xsq_net.ErrorJSON(c, ecode.DataTransformationError)
 		return
 	}
 
@@ -74,17 +75,17 @@ func ChangeRole(ctx *gin.Context) {
 		})
 	}
 
-	xsq_net.Success(ctx)
+	xsq_net.Success(c)
 }
 
-//角色列表
-func GetRoleList(ctx *gin.Context) {
+// 角色列表
+func GetRoleList(c *gin.Context) {
 	var form req.GetRoleListForm
 
-	err := ctx.ShouldBind(&form)
+	err := c.ShouldBind(&form)
 
 	if err != nil {
-		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
 
@@ -98,7 +99,7 @@ func GetRoleList(ctx *gin.Context) {
 	result := db.Where("delete_time is null").Find(&roles)
 
 	if result.Error != nil {
-		xsq_net.ErrorJSON(ctx, result.Error)
+		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
@@ -114,14 +115,16 @@ func GetRoleList(ctx *gin.Context) {
 		})
 	}
 
-	xsq_net.SucJson(ctx, res)
+	xsq_net.SucJson(c, res)
 }
 
-//批量删除角色
+// 批量删除角色
 func BatchDeleteRole(c *gin.Context) {
 	var form req.BatchDeleteRoleForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}

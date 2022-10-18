@@ -27,11 +27,11 @@ import (
 )
 
 // 新增用户
-func CreateUser(ctx *gin.Context) {
+func CreateUser(c *gin.Context) {
 	var form req.AddUserForm
-	err := ctx.ShouldBind(&form)
+	err := c.ShouldBind(&form)
 	if err != nil {
-		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
 
@@ -47,20 +47,20 @@ func CreateUser(ctx *gin.Context) {
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			xsq_net.ErrorJSON(ctx, ecode.WarehouseNotFound)
+			xsq_net.ErrorJSON(c, ecode.WarehouseNotFound)
 			return
 		}
-		xsq_net.ErrorJSON(ctx, result.Error)
+		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
 	result = db.First(&role, form.RoleId)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			xsq_net.ErrorJSON(ctx, ecode.RoleNotFound)
+			xsq_net.ErrorJSON(c, ecode.RoleNotFound)
 			return
 		}
-		xsq_net.ErrorJSON(ctx, result.Error)
+		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
@@ -72,7 +72,7 @@ func CreateUser(ctx *gin.Context) {
 
 	result = db.Save(&user)
 	if result.Error != nil {
-		xsq_net.ErrorJSON(ctx, result.Error)
+		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
@@ -84,16 +84,16 @@ func CreateUser(ctx *gin.Context) {
 		WarehouseId: user.WarehouseId,
 	}
 
-	xsq_net.SucJson(ctx, userRsp)
+	xsq_net.SucJson(c, userRsp)
 }
 
 // 获取用户列表
-func GetUserList(ctx *gin.Context) {
+func GetUserList(c *gin.Context) {
 	var form req.GetUserListForm
 
-	err := ctx.ShouldBind(&form)
+	err := c.ShouldBind(&form)
 	if err != nil {
-		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
 
@@ -107,7 +107,7 @@ func GetUserList(ctx *gin.Context) {
 	result := db.Where("delete_time is null").Find(&users)
 
 	if result.Error != nil {
-		xsq_net.ErrorJSON(ctx, result.Error)
+		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
@@ -132,26 +132,19 @@ func GetUserList(ctx *gin.Context) {
 		})
 	}
 
-	xsq_net.SucJson(ctx, res)
+	xsq_net.SucJson(c, res)
 }
 
 // 登录
-func Login(ctx *gin.Context) {
+func Login(c *gin.Context) {
 	var form req.LoginForm
 
-	bindingBody := binding.Default(ctx.Request.Method, ctx.ContentType()).(binding.BindingBody)
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
 
-	if err := ctx.ShouldBindBodyWith(&form, bindingBody); err != nil {
-		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
-
-	//err := ctx.ShouldBind(&form)
-	//
-	//if err != nil {
-	//	xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
-	//	return
-	//}
 
 	var (
 		user model.User
@@ -161,17 +154,17 @@ func Login(ctx *gin.Context) {
 	result := db.Where("id = ? and status = 1 and delete_time is null", form.Id).First(&user)
 
 	if result.Error != nil {
-		xsq_net.ErrorJSON(ctx, result.Error)
+		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
 	if result.RowsAffected == 0 {
-		xsq_net.ErrorJSON(ctx, ecode.UserNotFound)
+		xsq_net.ErrorJSON(c, ecode.UserNotFound)
 		return
 	}
 
 	if user.WarehouseId != form.WarehouseId {
-		xsq_net.ErrorJSON(ctx, ecode.WarehouseSelectError)
+		xsq_net.ErrorJSON(c, ecode.WarehouseSelectError)
 		return
 	}
 
@@ -180,7 +173,7 @@ func Login(ctx *gin.Context) {
 	pwdSlice := strings.Split(user.Password, "$")
 
 	if !password.Verify(form.Password, pwdSlice[1], pwdSlice[2], options) {
-		xsq_net.ErrorJSON(ctx, ecode.PasswordCheckFailed)
+		xsq_net.ErrorJSON(c, ecode.PasswordCheckFailed)
 		return
 	}
 
@@ -200,7 +193,7 @@ func Login(ctx *gin.Context) {
 	j := middlewares.NewJwt()
 	token, err := j.CreateToken(claims)
 	if err != nil {
-		xsq_net.ErrorJSON(ctx, err)
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
@@ -208,11 +201,11 @@ func Login(ctx *gin.Context) {
 	redisKey := constant.LOGIN_PREFIX + account
 	err = global.Redis.Set(context.Background(), redisKey, token, hour*60*60*time.Second).Err()
 	if err != nil {
-		xsq_net.ErrorJSON(ctx, ecode.RedisFailedToSetData)
+		xsq_net.ErrorJSON(c, ecode.RedisFailedToSetData)
 		return
 	}
 
-	xsq_net.SucJson(ctx, gin.H{
+	xsq_net.SucJson(c, gin.H{
 		"token":       token,
 		"roleId":      user.RoleId,
 		"userId":      user.Id,
@@ -223,13 +216,13 @@ func Login(ctx *gin.Context) {
 }
 
 // 修改 名称 密码 状态 组织
-func ChangeUser(ctx *gin.Context) {
+func ChangeUser(c *gin.Context) {
 	var form req.CheckPwdForm
 
-	err := ctx.ShouldBind(&form)
+	err := c.ShouldBind(&form)
 
 	if err != nil {
-		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
 	var (
@@ -242,12 +235,12 @@ func ChangeUser(ctx *gin.Context) {
 	result := db.First(&user, form.Id)
 
 	if result.Error != nil {
-		xsq_net.ErrorJSON(ctx, result.Error)
+		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
 	if result.RowsAffected == 0 {
-		xsq_net.ErrorJSON(ctx, ecode.UserNotFound)
+		xsq_net.ErrorJSON(c, ecode.UserNotFound)
 		return
 	}
 
@@ -274,11 +267,11 @@ func ChangeUser(ctx *gin.Context) {
 	result = db.Model(&user).Updates(update)
 
 	if result.Error != nil {
-		xsq_net.ErrorJSON(ctx, result.Error)
+		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	xsq_net.Success(ctx)
+	xsq_net.Success(c)
 }
 
 // 批量删除角色
@@ -301,29 +294,29 @@ func BatchDeleteUser(c *gin.Context) {
 }
 
 // 获取仓库用户数列表
-func GetWarehouseUserCountList(ctx *gin.Context) {
+func GetWarehouseUserCountList(c *gin.Context) {
 	var (
 		form req.WarehouseUserCountForm
 		res  []*rsp.GetWarehouseUserCountListRsp
 	)
 
-	err := ctx.ShouldBind(&form)
+	err := c.ShouldBind(&form)
 
 	if err != nil {
-		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
 
 	result := global.DB.Raw("SELECT COUNT(u.id) as count,w.id as warehouse_id, w.warehouse_name FROM t_warehouse as w left join `t_user` as u on u.warehouse_id = w.id GROUP BY w.id")
 
 	if result.Error != nil {
-		xsq_net.ErrorJSON(ctx, result.Error)
+		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
 	result.Scan(&res)
 
-	xsq_net.SucJson(ctx, res)
+	xsq_net.SucJson(c, res)
 }
 
 func GenderPwd(pwd string) string {

@@ -42,7 +42,8 @@ func (g *GormList) Scan(value interface{}) error {
 }
 
 const (
-	TimeFormat = "2006-01-02 15:04:05"
+	TimeFormat   = "2006-01-02 15:04:05"
+	MinuteFormat = "2006-01-02 15:04"
 )
 
 // MyTime 自定义时间
@@ -55,7 +56,7 @@ func (t *MyTime) UnmarshalJSON(data []byte) error {
 }
 
 func (t MyTime) MarshalJSON() ([]byte, error) {
-	var stamp = fmt.Sprintf("\"%s\"", time.Time(t).Format(TimeFormat))
+	var stamp = fmt.Sprintf("\"%s\"", time.Time(t).Format(MinuteFormat))
 	return []byte(stamp), nil
 }
 
@@ -77,5 +78,5 @@ func (t *MyTime) Scan(v interface{}) error {
 }
 
 func (t *MyTime) String() string {
-	return time.Time(*t).Format(TimeFormat)
+	return time.Time(*t).Format(MinuteFormat)
 }

@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"gorm.io/gorm"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
@@ -249,7 +250,9 @@ func DeliveryMethodInfo(c *gin.Context) {
 func ChangeDeliveryMethod(c *gin.Context) {
 	var form req.ChangeDeliveryMethodForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -322,7 +325,9 @@ func OrderGoodsList(c *gin.Context) {
 func RestrictedShipment(c *gin.Context) {
 	var form req.RestrictedShipmentForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -419,7 +424,9 @@ func RestrictedShipment(c *gin.Context) {
 func BatchRestrictedShipment(c *gin.Context) {
 	var form req.BatchRestrictedShipmentForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -545,7 +552,9 @@ func RestrictedShipmentList(c *gin.Context) {
 func RevokeRestrictedShipment(c *gin.Context) {
 	var form req.RevokeRestrictedShipmentForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -594,7 +603,9 @@ func RevokeRestrictedShipment(c *gin.Context) {
 func CloseOrder(c *gin.Context) {
 	var form req.CloseOrderForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -663,7 +674,9 @@ func CloseOrder(c *gin.Context) {
 func CloseOrderGoods(c *gin.Context) {
 	var form req.CloseOrderGoodsForm
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}

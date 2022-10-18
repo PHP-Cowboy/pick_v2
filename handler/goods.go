@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"pick_v2/common/constant"
 	"pick_v2/global"
 	"pick_v2/model"
@@ -268,7 +269,9 @@ func OrderShippingRecord(c *gin.Context) {
 		res  rsp.OrderShippingRecordRsp
 	)
 
-	if err := c.ShouldBind(&form); err != nil {
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -620,8 +623,10 @@ func Count(c *gin.Context) {
 func CreatePickOrder(c *gin.Context) {
 	var form req.CreatePickOrderForm
 
-	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, err)
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
 
