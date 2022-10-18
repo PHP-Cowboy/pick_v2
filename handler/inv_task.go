@@ -7,11 +7,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/xuri/excelize/v2"
+	"gorm.io/gorm/clause"
 	"io"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
 	"pick_v2/model"
+	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
@@ -219,6 +221,7 @@ func TaskRecordList(c *gin.Context) {
 			Sku:           record.Sku,
 			GoodsName:     record.GoodsName,
 			GoodsType:     record.GoodsType,
+			GoodsSpe:      record.GoodsSpe,
 			BookNum:       record.BookNum,
 			InventoryNum:  record.InventoryNum,
 			ProfitLossNum: record.ProfitLossNum,
@@ -290,6 +293,8 @@ func InventoryRecordList(c *gin.Context) {
 	for _, record := range records {
 		list = append(list, &rsp.InventoryRecord{
 			Id:           record.Id,
+			OrderNo:      record.OrderNo,
+			Sku:          record.Sku,
 			CreateTime:   record.CreateTime.Format(timeutil.TimeFormat),
 			InventoryNum: record.InventoryNum,
 			UserName:     record.UserName,
@@ -410,6 +415,9 @@ func UserInventoryRecordList(c *gin.Context) {
 	for _, record := range records {
 		list = append(list, &rsp.UserInventoryRecord{
 			Id:           record.Id,
+			OrderNo:      record.OrderNo,
+			Sku:          record.Sku,
+			UserName:     record.UserName,
 			GoodsName:    record.GoodsName,
 			GoodsSpe:     record.GoodsSpe,
 			InventoryNum: record.InventoryNum,
@@ -482,18 +490,41 @@ func BatchCreate(c *gin.Context) {
 		return
 	}
 
-	userName, ok := c.Get("user_name")
-
-	if !ok {
-		xsq_net.ErrorJSON(c, errors.New("用户名不存在"))
+	//rds 锁
+	err := cache.SetNx("batchCreate", "1")
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
-	var taskRecords []model.InvTaskRecord
+	userInfo := GetUserInfo(c)
+
+	if userInfo == nil {
+		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
+		return
+	}
+
+	var (
+		task        model.InvTask
+		taskRecords []model.InvTaskRecord
+	)
 
 	db := global.DB
 
-	result := db.Model(&model.InvTaskRecord{}).
+	result := db.Model(&model.InvTask{}).Where("order_no = ?", form.OrderNo).First(&task)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	// 验证是否已结束
+	if task.Status == 2 {
+		xsq_net.ErrorJSON(c, errors.New("盘点任务已结束"))
+		return
+	}
+
+	result = db.Model(&model.InvTaskRecord{}).
 		Where("order_no = ?", form.OrderNo).
 		Find(&taskRecords)
 
@@ -504,6 +535,8 @@ func BatchCreate(c *gin.Context) {
 
 	//sku map
 	mp := make(map[string]model.InvTaskRecord, 0)
+	taskRecordMp := make(map[string]int, len(form.Records))
+	var total int //本次提交盘点总数
 
 	for _, record := range taskRecords {
 		mp[record.Sku] = record
@@ -519,23 +552,90 @@ func BatchCreate(c *gin.Context) {
 			return
 		}
 
+		if fm.InventoryNum < 0 {
+			xsq_net.ErrorJSON(c, errors.New("盘点数量不能为负"))
+			return
+		}
+
+		total += fm.InventoryNum
+
 		records = append(records, &model.InventoryRecord{
 			OrderNo:      form.OrderNo,
 			Sku:          fm.Sku,
+			UserName:     userInfo.Name,
 			GoodsName:    mpSku.GoodsName,
 			GoodsSpe:     mpSku.GoodsSpe,
 			GoodsUnit:    mpSku.GoodsUnit,
 			InventoryNum: fm.InventoryNum,
-			UserName:     userName.(string),
+		})
+
+		taskRecordMp[fm.Sku] = fm.InventoryNum
+	}
+
+	trList := make([]model.InvTaskRecord, 0, len(form.Records))
+
+	for _, val := range taskRecords {
+		num, trOk := taskRecordMp[val.Sku]
+
+		if !trOk {
+			continue
+		}
+
+		invNum := val.InventoryNum + num
+
+		trList = append(trList, model.InvTaskRecord{
+			OrderNo:       val.OrderNo,
+			Sku:           val.Sku,
+			GoodsName:     val.GoodsName,
+			GoodsType:     val.GoodsType,
+			GoodsSpe:      val.GoodsSpe,
+			GoodsUnit:     val.GoodsUnit,
+			BookNum:       val.BookNum,
+			InventoryNum:  invNum,
+			ProfitLossNum: invNum - val.BookNum,
 		})
 	}
 
-	result = db.Save(&records)
+	tx := db.Begin()
+
+	result = tx.Save(&records)
 
 	if result.Error != nil {
+		tx.Rollback()
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
+
+	result = tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "order_no,sku"}},
+		DoUpdates: clause.AssignmentColumns([]string{"inventory_num", "profit_loss_num"}),
+	}).Save(&trList)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	task.InventoryNum += total
+	task.ProfitLossNum = task.InventoryNum - task.BookNum
+
+	result = tx.Save(&task)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	err = cache.Del("batchCreate")
+	if err != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	tx.Commit()
 
 	xsq_net.Success(c)
 

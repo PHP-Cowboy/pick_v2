@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"gorm.io/gorm"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
@@ -24,7 +26,18 @@ func CreateRole(c *gin.Context) {
 		return
 	}
 
-	result := global.DB.Create(&model.Role{Name: form.Name})
+	db := global.DB
+
+	var role model.Role
+
+	result := db.Where("name = ?", form.Name).First(&role)
+
+	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	result = global.DB.Create(&model.Role{Name: form.Name})
 
 	if result.Error != nil || result.RowsAffected == 0 {
 		xsq_net.ErrorJSON(c, result.Error)

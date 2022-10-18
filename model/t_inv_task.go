@@ -3,7 +3,7 @@ package model
 import "time"
 
 type InvTask struct {
-	OrderNo       string    `gorm:"primaryKey;type:varchar(32);comment:盘点单号"`
+	OrderNo       string    `gorm:"primaryKey;type:varchar(64);comment:盘点单号"`
 	CreateTime    time.Time `gorm:"autoCreateTime;type:datetime;not null;comment:创建时间"`
 	UpdateTime    time.Time `gorm:"autoUpdateTime;type:datetime;not null;comment:更新时间"`
 	DeleteTime    time.Time `gorm:"type:datetime;default:null;comment:删除时间"`

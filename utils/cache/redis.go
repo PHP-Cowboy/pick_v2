@@ -60,3 +60,15 @@ func SetTtlKey(key string, second int) (bool, error) {
 func Set(key, val string, second int) (string, error) {
 	return global.Redis.Set(context.Background(), key, val, time.Duration(second)*time.Second).Result()
 }
+
+func Get(key string) (string, error) {
+	return global.Redis.Get(context.Background(), key).Result()
+}
+
+func SetNx(key string, val string) error {
+	return global.Redis.SetNX(context.Background(), key, val, 0).Err()
+}
+
+func Del(key string) error {
+	return global.Redis.Del(context.Background(), key).Err()
+}

@@ -29,6 +29,7 @@ type RecordList struct {
 	Sku           string `json:"sku"`
 	GoodsName     string `json:"goods_name"`
 	GoodsType     string `json:"goods_type"`
+	GoodsSpe      string `json:"goods_spe"`
 	BookNum       int    `json:"book_num"`
 	InventoryNum  int    `json:"inventory_num"`
 	ProfitLossNum int    `json:"profit_loss_num"`
@@ -41,9 +42,11 @@ type InventoryRecordListRsp struct {
 
 type InventoryRecord struct {
 	Id           int    `json:"id"`
+	OrderNo      string `json:"order_no"`
+	Sku          string `json:"sku"`
+	UserName     string `json:"user_name"`
 	CreateTime   string `json:"create_time"`
 	InventoryNum int    `json:"inventory_num"`
-	UserName     string `json:"user_name"`
 	GoodsUnit    string `json:"goods_unit"`
 }
 
@@ -54,6 +57,9 @@ type UserInventoryRecordListRsp struct {
 
 type UserInventoryRecord struct {
 	Id           int    `json:"id"`
+	OrderNo      string `json:"order_no"`
+	Sku          string `json:"sku"`
+	UserName     string `json:"user_name"`
 	GoodsName    string `json:"goods_name"`
 	GoodsSpe     string `json:"goods_spe"`
 	InventoryNum int    `json:"inventory_num"`
