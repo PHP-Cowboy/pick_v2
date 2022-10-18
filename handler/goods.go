@@ -104,28 +104,10 @@ func GetGoodsList(c *gin.Context) {
 	list := make([]rsp.Order, 0, form.Size)
 
 	for _, o := range orders {
-		latestPickingTime := ""
-
-		if o.LatestPickingTime != nil {
-			latestPickingTime = o.LatestPickingTime.Format(timeutil.TimeFormat)
-		}
-
-		payAt := ""
-
-		if o.PayAt != "" {
-
-			at, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
-
-			if payAtErr != nil {
-				xsq_net.ErrorJSON(c, ecode.DataTransformationError)
-				return
-			}
-			payAt = at.Format(timeutil.TimeFormat)
-		}
 
 		list = append(list, rsp.Order{
 			Number:            o.Number,
-			PayAt:             payAt,
+			PayAt:             o.PayAt,
 			ShopCode:          o.ShopCode,
 			ShopName:          o.ShopName,
 			ShopType:          o.ShopType,
@@ -138,7 +120,7 @@ func GetGoodsList(c *gin.Context) {
 			Region:            o.Province + o.City + o.District,
 			OrderRemark:       o.OrderRemark,
 			OrderType:         o.OrderType,
-			LatestPickingTime: latestPickingTime,
+			LatestPickingTime: o.LatestPickingTime,
 		})
 	}
 
@@ -175,13 +157,6 @@ func GetOrderDetail(c *gin.Context) {
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, orders.PayAt, time.Local)
-
-	if payAtErr != nil {
-		xsq_net.ErrorJSON(c, ecode.DataTransformationError)
 		return
 	}
 
@@ -243,7 +218,7 @@ func GetOrderDetail(c *gin.Context) {
 	}
 
 	res.Number = orders.Number
-	res.PayAt = payAt.Format(timeutil.TimeFormat)
+	res.PayAt = orders.PayAt
 	res.ShopCode = orders.ShopCode
 	res.ShopName = orders.ShopName
 	res.Line = orders.Line
@@ -312,10 +287,10 @@ func OrderShippingRecord(c *gin.Context) {
 	for _, p := range pick {
 		list = append(list, rsp.OrderShippingRecord{
 			Id:              p.Id,
-			TakeOrdersTime:  p.TakeOrdersTime.Format(timeutil.TimeFormat),
+			TakeOrdersTime:  p.TakeOrdersTime,
 			PickUser:        p.PickUser,
 			ReviewUser:      p.ReviewUser,
-			ReviewTime:      p.ReviewTime.Format(timeutil.TimeFormat),
+			ReviewTime:      p.ReviewTime,
 			ReviewNum:       p.ReviewNum,
 			DeliveryOrderNo: p.DeliveryOrderNo,
 		})
@@ -455,12 +430,6 @@ func CompleteOrder(c *gin.Context) {
 
 	for _, o := range completeOrder {
 
-		pickTime := ""
-
-		if o.PickTime != nil {
-			pickTime = o.PickTime.Format(timeutil.TimeFormat)
-		}
-
 		list = append(list, rsp.CompleteOrder{
 			Number:         o.Number,
 			PayAt:          o.PayAt,
@@ -473,7 +442,7 @@ func CompleteOrder(c *gin.Context) {
 			Line:           o.Line,
 			DeliveryMethod: o.DeliveryMethod,
 			Region:         fmt.Sprintf("%s-%s-%s", o.Province, o.City, o.District),
-			PickTime:       pickTime,
+			PickTime:       o.PickTime,
 			OrderRemark:    o.OrderRemark,
 		})
 	}
@@ -683,19 +652,6 @@ func CreatePickOrder(c *gin.Context) {
 	)
 
 	for _, o := range order {
-		payAt, err := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
-
-		if err != nil {
-			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
-			return
-		}
-
-		deliveryAt, err := time.ParseInLocation(timeutil.TimeZoneFormat, o.DeliveryAt, time.Local)
-
-		if err != nil {
-			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
-			return
-		}
 
 		pickNumber, err := cache.GetIncrNumberByKey(constant.PICK_ORDER_NO, 4)
 
@@ -718,11 +674,11 @@ func CreatePickOrder(c *gin.Context) {
 			Line:              o.Line,
 			DistributionType:  o.DistributionType,
 			OrderRemark:       o.OrderRemark,
-			PayAt:             payAt.Format(timeutil.TimeFormat),
+			PayAt:             o.PayAt,
 			ShipmentsNum:      total,
 			LimitNum:          total, //限发总数 默认等于应发总数
 			CloseNum:          o.CloseNum,
-			DeliveryAt:        deliveryAt.Format(timeutil.TimeFormat),
+			DeliveryAt:        o.DeliveryAt,
 			Province:          o.Province,
 			City:              o.City,
 			District:          o.District,

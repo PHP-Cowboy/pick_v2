@@ -8,21 +8,21 @@ type GoodsListRsp struct {
 }
 
 type Order struct {
-	Number            string `json:"number"`
-	PayAt             string `json:"pay_time"`
-	ShopCode          string `json:"shop_code"`
-	ShopName          string `json:"shop_name"`
-	ShopType          string `json:"shop_type"`
-	DistributionType  int    `json:"distribution_type"` //配送方式
-	PayCount          int    `json:"pay_count"`         //下单数量
-	Picked            int    `json:"picked"`
-	UnPicked          int    `json:"un_picked"`
-	CloseNum          int    `json:"close_num"`
-	Line              string `json:"line"`
-	Region            string `json:"region"`
-	OrderRemark       string `json:"order_remark"` //订单备注
-	OrderType         int    `json:"order_type"`   //1:新订单,2:拣货中,3:欠货单
-	LatestPickingTime string `json:"latest_picking_time"`
+	Number            string        `json:"number"`
+	PayAt             model.MyTime  `json:"pay_time"`
+	ShopCode          string        `json:"shop_code"`
+	ShopName          string        `json:"shop_name"`
+	ShopType          string        `json:"shop_type"`
+	DistributionType  int           `json:"distribution_type"` //配送方式
+	PayCount          int           `json:"pay_count"`         //下单数量
+	Picked            int           `json:"picked"`
+	UnPicked          int           `json:"un_picked"`
+	CloseNum          int           `json:"close_num"`
+	Line              string        `json:"line"`
+	Region            string        `json:"region"`
+	OrderRemark       string        `json:"order_remark"` //订单备注
+	OrderType         int           `json:"order_type"`   //1:新订单,2:拣货中,3:欠货单
+	LatestPickingTime *model.MyTime `json:"latest_picking_time"`
 }
 
 type CommodityListRsp struct {
@@ -106,7 +106,7 @@ type OrderList struct {
 
 type OrderDetail struct {
 	Number          string             `json:"number"`
-	PayAt           string             `json:"pay_time"`
+	PayAt           model.MyTime       `json:"pay_time"`
 	ShopCode        string             `json:"shop_code"`
 	ShopName        string             `json:"shop_name"`
 	OrderRemark     string             `json:"order_remark"` //订单备注
@@ -139,10 +139,10 @@ type OrderShippingRecordRsp struct {
 
 type OrderShippingRecord struct {
 	Id              int            `json:"id"`
-	TakeOrdersTime  string         `json:"take_orders_time"`
+	TakeOrdersTime  *model.MyTime  `json:"take_orders_time"`
 	PickUser        string         `json:"pick_user"`
 	ReviewUser      string         `json:"review_user"`
-	ReviewTime      string         `json:"review_time"`
+	ReviewTime      *model.MyTime  `json:"review_time"`
 	ReviewNum       int            `json:"review_num"`
 	DeliveryOrderNo model.GormList `json:"delivery_order_no"`
 }
@@ -156,19 +156,19 @@ type CompleteOrderRsp struct {
 }
 
 type CompleteOrder struct {
-	Number         string `json:"number"`
-	PayAt          string `json:"pay_at"`
-	ShopCode       string `json:"shop_code"`
-	ShopName       string `json:"shop_name"`
-	ShopType       string `json:"shop_type"`
-	PayCount       int    `json:"pay_count"`
-	OutCount       int    `json:"out_count"`
-	CloseCount     int    `json:"close_count"`
-	Line           string `json:"line"`
-	DeliveryMethod int    `json:"delivery_method"`
-	Region         string `json:"region"`
-	PickTime       string `json:"pick_time"`
-	OrderRemark    string `json:"order_remark"`
+	Number         string        `json:"number"`
+	PayAt          model.MyTime  `json:"pay_at"`
+	ShopCode       string        `json:"shop_code"`
+	ShopName       string        `json:"shop_name"`
+	ShopType       string        `json:"shop_type"`
+	PayCount       int           `json:"pay_count"`
+	OutCount       int           `json:"out_count"`
+	CloseCount     int           `json:"close_count"`
+	Line           string        `json:"line"`
+	DeliveryMethod int           `json:"delivery_method"`
+	Region         string        `json:"region"`
+	PickTime       *model.MyTime `json:"pick_time"`
+	OrderRemark    string        `json:"order_remark"`
 }
 
 type CompleteOrderDetailRsp struct {

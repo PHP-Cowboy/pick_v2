@@ -1,12 +1,14 @@
 package rsp
 
-import "time"
+import (
+	"pick_v2/model"
+)
 
 type ReceivingOrdersRsp struct {
-	Id             int        `json:"id"`
-	BatchId        int        `json:"batch_id"`
-	Version        int        `json:"version"`
-	TakeOrdersTime *time.Time `json:"take_orders_time"`
+	Id             int           `json:"id"`
+	BatchId        int           `json:"batch_id"`
+	Version        int           `json:"version"`
+	TakeOrdersTime *model.MyTime `json:"take_orders_time"`
 }
 
 type PickingRecordDetailRsp struct {
@@ -15,9 +17,9 @@ type PickingRecordDetailRsp struct {
 	OutTotal        int                         `json:"out_total"`
 	UnselectedTotal int                         `json:"unselected_total"`
 	PickUser        string                      `json:"pick_user"`
-	TakeOrdersTime  string                      `json:"take_orders_time"`
+	TakeOrdersTime  *model.MyTime               `json:"take_orders_time"`
 	ReviewUser      string                      `json:"review_user"`
-	ReviewTime      string                      `json:"review_time"`
+	ReviewTime      *model.MyTime               `json:"review_time"`
 	Goods           map[string][]MergePickGoods `json:"goods"`
 	RemarkList      []PickRemark                `json:"remark_list"`
 }
@@ -75,16 +77,16 @@ type PickingRecordRsp struct {
 }
 
 type PickingRecord struct {
-	Id               int    `json:"id"`
-	TaskName         string `json:"task_name"`
-	ShopCode         string `json:"shop_code"`
-	ShopNum          int    `json:"shop_num"`
-	OrderNum         int    `json:"order_num"`
-	NeedNum          int    `json:"need_num"`
-	TakeOrdersTime   string `json:"take_orders_time"`
-	ReviewUser       string `json:"review_user"`
-	OutNum           int    `json:"out_num"`
-	ReviewStatus     string `json:"review_status"`
-	DistributionType int    `json:"distribution_type"`
-	IsRemark         bool   `json:"is_remark"`
+	Id               int           `json:"id"`
+	TaskName         string        `json:"task_name"`
+	ShopCode         string        `json:"shop_code"`
+	ShopNum          int           `json:"shop_num"`
+	OrderNum         int           `json:"order_num"`
+	NeedNum          int           `json:"need_num"`
+	TakeOrdersTime   *model.MyTime `json:"take_orders_time"`
+	ReviewUser       string        `json:"review_user"`
+	OutNum           int           `json:"out_num"`
+	ReviewStatus     string        `json:"review_status"`
+	DistributionType int           `json:"distribution_type"`
+	IsRemark         bool          `json:"is_remark"`
 }

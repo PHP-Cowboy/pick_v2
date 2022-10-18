@@ -1,5 +1,7 @@
 package rsp
 
+import "pick_v2/model"
+
 type ReviewListRsp struct {
 	Total int64  `json:"total"`
 	List  []Pick `json:"list"`
@@ -15,9 +17,9 @@ type ReviewDetailRsp struct {
 	UnselectedTotal int                         `json:"unselected_total"`
 	ReviewTotal     int                         `json:"review_total"`
 	PickUser        string                      `json:"pick_user"`
-	TakeOrdersTime  string                      `json:"take_orders_time"`
+	TakeOrdersTime  *model.MyTime               `json:"take_orders_time"`
 	ReviewUser      string                      `json:"review_user"`
-	ReviewTime      string                      `json:"review_time"`
+	ReviewTime      *model.MyTime               `json:"review_time"`
 	Goods           map[string][]MergePickGoods `json:"goods"`
 	RemarkList      []PickRemark                `json:"remark_list"`
 }

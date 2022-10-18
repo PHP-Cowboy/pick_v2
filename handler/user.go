@@ -5,6 +5,7 @@ import (
 	"crypto/sha512"
 	"errors"
 	"fmt"
+	"github.com/gin-gonic/gin/binding"
 	"pick_v2/common/constant"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
@@ -138,12 +139,19 @@ func GetUserList(ctx *gin.Context) {
 func Login(ctx *gin.Context) {
 	var form req.LoginForm
 
-	err := ctx.ShouldBind(&form)
+	bindingBody := binding.Default(ctx.Request.Method, ctx.ContentType()).(binding.BindingBody)
 
-	if err != nil {
+	if err := ctx.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
 		return
 	}
+
+	//err := ctx.ShouldBind(&form)
+	//
+	//if err != nil {
+	//	xsq_net.ErrorJSON(ctx, ecode.ParamInvalid)
+	//	return
+	//}
 
 	var (
 		user model.User

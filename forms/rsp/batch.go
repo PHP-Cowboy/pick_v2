@@ -1,6 +1,9 @@
 package rsp
 
-import "time"
+import (
+	"pick_v2/model"
+	"time"
+)
 
 type GetBatchListRsp struct {
 	Total int64    `json:"total"`
@@ -8,23 +11,23 @@ type GetBatchListRsp struct {
 }
 
 type Batch struct {
-	Id                int    `json:"id"`
-	CreateTime        string `json:"create_time"`
-	UpdateTime        string `json:"update_time"`
-	BatchName         string `json:"batch_name"`
-	DeliveryStartTime string `json:"delivery_start_time"`
-	DeliveryEndTime   string `json:"delivery_end_time"`
-	ShopNum           int    `json:"shop_num"`
-	OrderNum          int    `json:"order_num"`
-	GoodsNum          int    `json:"goods_num"`
-	UserName          string `json:"user_name"`
-	Line              string `json:"line"`
-	DeliveryMethod    int    `json:"delivery_method"`
-	EndTime           string `json:"end_time"`
-	Status            int    `json:"status"`
-	PrePickNum        int    `json:"pre_pick_num"`
-	PickNum           int    `json:"pick_num"`
-	RecheckSheetNum   int    `json:"recheck_sheet_num"`
+	Id                int           `json:"id"`
+	CreateTime        string        `json:"create_time"`
+	UpdateTime        string        `json:"update_time"`
+	BatchName         string        `json:"batch_name"`
+	DeliveryStartTime *model.MyTime `json:"delivery_start_time"`
+	DeliveryEndTime   *model.MyTime `json:"delivery_end_time"`
+	ShopNum           int           `json:"shop_num"`
+	OrderNum          int           `json:"order_num"`
+	GoodsNum          int           `json:"goods_num"`
+	UserName          string        `json:"user_name"`
+	Line              string        `json:"line"`
+	DeliveryMethod    int           `json:"delivery_method"`
+	EndTime           *model.MyTime `json:"end_time"`
+	Status            int           `json:"status"`
+	PrePickNum        int           `json:"pre_pick_num"`
+	PickNum           int           `json:"pick_num"`
+	RecheckSheetNum   int           `json:"recheck_sheet_num"`
 }
 
 type GetPrePickListRsp struct {
@@ -102,14 +105,14 @@ type Remark struct {
 }
 
 type GetBaseRsp struct {
-	CreateTime        string `json:"create_time"`
-	PayEndTime        string `json:"pay_end_time"`
-	DeliveryStartTime string `json:"delivery_start_time"`
-	DeliveryEndTime   string `json:"delivery_end_time"`
-	DeliveryMethod    int    `json:"delivery_method"`
-	Line              string `json:"line"`
-	Goods             string `json:"goods"`
-	Status            int    `json:"status"`
+	CreateTime        string        `json:"create_time"`
+	PayEndTime        *model.MyTime `json:"pay_end_time"`
+	DeliveryStartTime *model.MyTime `json:"delivery_start_time"`
+	DeliveryEndTime   *model.MyTime `json:"delivery_end_time"`
+	DeliveryMethod    int           `json:"delivery_method"`
+	Line              string        `json:"line"`
+	Goods             string        `json:"goods"`
+	Status            int           `json:"status"`
 }
 
 type GetPoolNumRsp struct {

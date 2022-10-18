@@ -543,7 +543,7 @@ func PickingRecord(c *gin.Context) {
 			ShopNum:          p.ShopNum,
 			OrderNum:         p.OrderNum,
 			NeedNum:          p.NeedNum,
-			TakeOrdersTime:   p.TakeOrdersTime.Format(timeutil.TimeFormat),
+			TakeOrdersTime:   p.TakeOrdersTime,
 			ReviewUser:       p.ReviewUser,
 			OutNum:           outNum,
 			ReviewStatus:     reviewStatus,
@@ -589,19 +589,9 @@ func PickingRecordDetail(c *gin.Context) {
 	res.UnselectedTotal = 0
 	res.PickUser = pick.PickUser
 
-	takeOrdersTime := ""
-	if pick.TakeOrdersTime != nil {
-		takeOrdersTime = pick.TakeOrdersTime.Format(timeutil.TimeFormat)
-	}
-	res.TakeOrdersTime = takeOrdersTime
+	res.TakeOrdersTime = pick.TakeOrdersTime
 	res.ReviewUser = pick.ReviewUser
-
-	var reviewTime string
-
-	if pick.ReviewTime != nil {
-		reviewTime = pick.ReviewTime.Format(timeutil.TimeFormat)
-	}
-	res.ReviewTime = reviewTime
+	res.ReviewTime = pick.ReviewTime
 
 	result = db.Where("pick_id = ?", form.PickId).Find(&pickGoods)
 

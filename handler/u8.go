@@ -449,34 +449,13 @@ func LogDetail(c *gin.Context) {
 		return
 	}
 
-	payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, pickOrder.PayAt, time.Local)
-
-	if payAtErr != nil {
-		xsq_net.ErrorJSON(c, ecode.DataTransformationError)
-		return
-	}
-
 	res.ShopName = pickOrder.ShopName
-	res.PayAt = payAt.Format(timeutil.TimeFormat)
+	res.PayAt = pickOrder.PayAt
 
 	res.PickUser = pick.PickUser
-
-	takeOrdersTime := ""
-
-	if pick.TakeOrdersTime != nil {
-		takeOrdersTime = pick.TakeOrdersTime.Format(timeutil.TimeFormat)
-	}
-
-	res.TakeOrdersTime = takeOrdersTime
+	res.TakeOrdersTime = pick.TakeOrdersTime
 	res.ReviewUser = pick.ReviewUser
-
-	reviewTime := ""
-
-	if pick.ReviewTime != nil {
-		reviewTime = pick.ReviewTime.Format(timeutil.TimeFormat)
-	}
-
-	res.ReviewTime = reviewTime
+	res.ReviewTime = pick.ReviewTime
 
 	result = db.Model(&model.PickGoods{}).Where(model.PickGoods{PickId: form.PickId, Number: form.Number}).Find(&pickGoods)
 

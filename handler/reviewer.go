@@ -97,12 +97,6 @@ func ReviewList(c *gin.Context) {
 				isRemark = true
 			}
 
-			reviewTime := ""
-
-			if p.ReviewTime != nil {
-				reviewTime = p.ReviewTime.Format(timeutil.TimeFormat)
-			}
-
 			list = append(list, rsp.Pick{
 				Id:             p.Id,
 				TaskName:       p.TaskName,
@@ -112,13 +106,13 @@ func ReviewList(c *gin.Context) {
 				OrderNum:       p.OrderNum,
 				NeedNum:        p.NeedNum,
 				PickUser:       p.PickUser,
-				TakeOrdersTime: p.TakeOrdersTime.Format(timeutil.TimeFormat),
+				TakeOrdersTime: p.TakeOrdersTime,
 				IsRemark:       isRemark,
 				PickNum:        p.PickNum,
 				ReviewNum:      p.ReviewNum,
 				Num:            p.Num,
 				ReviewUser:     p.ReviewUser,
-				ReviewTime:     reviewTime,
+				ReviewTime:     p.ReviewTime,
 			})
 		}
 	}
@@ -179,15 +173,9 @@ func ReviewDetail(c *gin.Context) {
 	res.TaskName = pick.TaskName
 	res.ShopCode = pick.ShopCode
 	res.PickUser = pick.PickUser
-	res.TakeOrdersTime = pick.TakeOrdersTime.Format(timeutil.TimeFormat)
+	res.TakeOrdersTime = pick.TakeOrdersTime
 	res.ReviewUser = pick.ReviewUser
-
-	var reviewTime string
-
-	if pick.ReviewTime != nil {
-		reviewTime = pick.ReviewTime.Format(timeutil.TimeFormat)
-	}
-	res.ReviewTime = reviewTime
+	res.ReviewTime = pick.ReviewTime
 
 	result = db.Where("pick_id = ?", form.Id).Find(&pickGoods)
 
@@ -709,7 +697,7 @@ func ConfirmDelivery(c *gin.Context) {
 		order[i].Picked = picked + o.Picked //订单被拆分成多个出，已拣累加
 		order[i].UnPicked = o.UnPicked - picked
 
-		order[i].LatestPickingTime = &now
+		order[i].LatestPickingTime = (*model.MyTime)(&now)
 
 		_, ok := lackNumberMp[o.Number]
 
@@ -721,13 +709,6 @@ func ConfirmDelivery(c *gin.Context) {
 		if o.UnPicked-picked == 0 && batch.Status == model.BatchClosedStatus {
 
 			completeNumber = append(completeNumber, o.Number)
-
-			payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
-
-			if payAtErr != nil {
-				xsq_net.ErrorJSON(c, ecode.DataTransformationError)
-				return
-			}
 
 			//完成订单
 			completeOrder = append(completeOrder, model.CompleteOrder{
@@ -746,7 +727,7 @@ func ConfirmDelivery(c *gin.Context) {
 				City:           o.City,
 				District:       o.District,
 				PickTime:       o.LatestPickingTime,
-				PayAt:          payAt.Format(timeutil.TimeFormat),
+				PayAt:          o.PayAt,
 			})
 		}
 	}

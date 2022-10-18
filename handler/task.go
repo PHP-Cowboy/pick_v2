@@ -128,18 +128,6 @@ func PickList(c *gin.Context) {
 			isRemark = true
 		}
 
-		takeOrdersTime := ""
-
-		if p.TakeOrdersTime != nil {
-			takeOrdersTime = p.TakeOrdersTime.Format(timeutil.TimeFormat)
-		}
-
-		reviewTime := ""
-
-		if p.ReviewTime != nil {
-			reviewTime = p.ReviewTime.Format(timeutil.TimeFormat)
-		}
-
 		list = append(list, rsp.Pick{
 			Id:             p.Id,
 			ShopCode:       p.ShopCode,
@@ -148,7 +136,7 @@ func PickList(c *gin.Context) {
 			OrderNum:       p.OrderNum,
 			NeedNum:        p.NeedNum,
 			PickUser:       p.PickUser,
-			TakeOrdersTime: takeOrdersTime,
+			TakeOrdersTime: p.TakeOrdersTime,
 			IsRemark:       isRemark,
 			Status:         p.Status,
 			UpdateTime:     p.UpdateTime.Format(timeutil.TimeFormat),
@@ -157,7 +145,7 @@ func PickList(c *gin.Context) {
 			Num:            p.Num,
 			PrintNum:       p.PrintNum,
 			ReviewUser:     p.ReviewUser,
-			ReviewTime:     reviewTime,
+			ReviewTime:     p.ReviewTime,
 		})
 	}
 
@@ -201,13 +189,7 @@ func GetPickDetail(c *gin.Context) {
 	res.OrderNum = pick.OrderNum
 	res.GoodsNum = pick.NeedNum
 	res.PickUser = pick.PickUser
-
-	takeOrdersTime := ""
-
-	if pick.TakeOrdersTime != nil {
-		takeOrdersTime = pick.TakeOrdersTime.Format(timeutil.TimeFormat)
-	}
-	res.TakeOrdersTime = takeOrdersTime
+	res.TakeOrdersTime = pick.TakeOrdersTime
 
 	result = db.Where("pick_id = ?", form.PickId).Find(&pickGoods)
 

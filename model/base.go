@@ -3,6 +3,8 @@ package model
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
 )
 
@@ -37,4 +39,43 @@ func (g GormList) Value() (driver.Value, error) {
 // 实现 sql.Scanner 接口，Scan 将 value 扫描至 Jsonb
 func (g *GormList) Scan(value interface{}) error {
 	return json.Unmarshal(value.([]byte), &g)
+}
+
+const (
+	TimeFormat = "2006-01-02 15:04:05"
+)
+
+// MyTime 自定义时间
+type MyTime time.Time
+
+func (t *MyTime) UnmarshalJSON(data []byte) error {
+	now, err := time.ParseInLocation(`"`+TimeFormat+`"`, string(data), time.Local)
+	*t = MyTime(now)
+	return err
+}
+
+func (t MyTime) MarshalJSON() ([]byte, error) {
+	var stamp = fmt.Sprintf("\"%s\"", time.Time(t).Format(TimeFormat))
+	return []byte(stamp), nil
+}
+
+func (t MyTime) Value() (driver.Value, error) {
+	// MyTime 转换成 time.Time 类型
+	tTime := time.Time(t)
+	return tTime.Format(TimeFormat), nil
+}
+
+func (t *MyTime) Scan(v interface{}) error {
+	switch vt := v.(type) {
+	case time.Time:
+		// 字符串转成 time.Time 类型
+		*t = MyTime(vt)
+	default:
+		return errors.New("类型处理错误")
+	}
+	return nil
+}
+
+func (t *MyTime) String() string {
+	return time.Time(*t).Format(TimeFormat)
 }

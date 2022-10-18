@@ -1,6 +1,9 @@
 package rsp
 
-import "time"
+import (
+	"pick_v2/model"
+	"time"
+)
 
 type PickListModel struct {
 	Id             int        `json:"id"`
@@ -29,24 +32,24 @@ type PickListRsp struct {
 }
 
 type Pick struct {
-	Id             int    `json:"id"`
-	TaskName       string `json:"task_name"`
-	ShopCode       string `json:"shop_code"`
-	ShopName       string `json:"shop_name"`
-	ShopNum        int    `json:"shop_num"`
-	OrderNum       int    `json:"order_num"`
-	NeedNum        int    `json:"need_num"`
-	PickUser       string `json:"pick_user"`
-	TakeOrdersTime string `json:"take_orders_time"`
-	IsRemark       bool   `json:"is_remark"`
-	Status         int    `json:"status"`
-	UpdateTime     string `json:"update_time"` //结束时间
-	PickNum        int    `json:"pick_num"`    //已拣数量
-	ReviewNum      int    `json:"review_num"`  //复核数
-	Num            int    `json:"num"`         //件数
-	ReviewUser     string `json:"review_user"` //复核人
-	ReviewTime     string `json:"review_time"` //复核时间
-	PrintNum       int    `json:"print_num"`
+	Id             int           `json:"id"`
+	TaskName       string        `json:"task_name"`
+	ShopCode       string        `json:"shop_code"`
+	ShopName       string        `json:"shop_name"`
+	ShopNum        int           `json:"shop_num"`
+	OrderNum       int           `json:"order_num"`
+	NeedNum        int           `json:"need_num"`
+	PickUser       string        `json:"pick_user"`
+	TakeOrdersTime *model.MyTime `json:"take_orders_time"`
+	IsRemark       bool          `json:"is_remark"`
+	Status         int           `json:"status"`
+	UpdateTime     string        `json:"update_time"` //结束时间
+	PickNum        int           `json:"pick_num"`    //已拣数量
+	ReviewNum      int           `json:"review_num"`  //复核数
+	Num            int           `json:"num"`         //件数
+	ReviewUser     string        `json:"review_user"` //复核人
+	ReviewTime     *model.MyTime `json:"review_time"` //复核时间
+	PrintNum       int           `json:"print_num"`
 	//Shelves    string `json:"shelves"`     //货位号不要了
 }
 
@@ -59,7 +62,7 @@ type GetPickDetailRsp struct {
 	OrderNum       int                         `json:"order_num"`
 	GoodsNum       int                         `json:"goods_num"`
 	PickUser       string                      `json:"pick_user"`
-	TakeOrdersTime string                      `json:"take_orders_time"`
+	TakeOrdersTime *model.MyTime               `json:"take_orders_time"`
 	Goods          map[string][]MergePickGoods `json:"goods"`
 	RemarkList     []PickRemark                `json:"remark_list"`
 }

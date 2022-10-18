@@ -10,8 +10,6 @@ import (
 	"pick_v2/global"
 	"pick_v2/model"
 	"pick_v2/utils/request"
-	"pick_v2/utils/timeutil"
-	"time"
 )
 
 type Form struct {
@@ -143,12 +141,6 @@ func Shipping(form Form, info rsp.OrderInfo) (consumer.ConsumeResult, error) {
 		hasRemark = 1
 	}
 
-	payAt := info.PayAt
-
-	if payAt == "" {
-		payAt = time.Now().Format(timeutil.TimeFormat)
-	}
-
 	order = append(order, model.Order{
 		Id:               info.OrderID,
 		ShopId:           info.ShopID,
@@ -233,12 +225,6 @@ func NoShipping(form Form, info rsp.OrderInfo) (consumer.ConsumeResult, error) {
 			ReviewCount: goods.PayCount,
 			GoodsRemark: goods.GoodsRemark,
 		})
-	}
-
-	payAt := info.PayAt
-
-	if payAt == "" {
-		payAt = time.Now().Format(timeutil.TimeFormat)
 	}
 
 	completeOrder = append(completeOrder, model.CompleteOrder{

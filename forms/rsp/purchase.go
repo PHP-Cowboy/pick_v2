@@ -27,25 +27,25 @@ type GoodsInfo struct {
 }
 
 type OrderInfo struct {
-	ShopID           int         `json:"shop_id"`
-	ShopName         string      `json:"shop_name"`
-	ShopType         string      `json:"shop_type"`
-	Number           string      `json:"number"`
-	HouseCode        string      `json:"house_code"`
-	Line             string      `json:"line"`
-	ShopCode         string      `json:"shop_code"`
-	DistributionType int         `json:"distribution_type"`
-	OrderRemark      string      `json:"order_remark"`
-	PayAt            string      `json:"pay_at"`
-	DeliveryAt       string      `json:"delivery_at"`
-	Province         string      `json:"province"`
-	City             string      `json:"city"`
-	District         string      `json:"district"`
-	OrderID          int         `json:"order_id"`
-	Address          string      `json:"address"`
-	ConsigneeName    string      `json:"consignee_name"`
-	ConsigneeTel     string      `json:"consignee_tel"`
-	GoodsInfo        []GoodsInfo `json:"goods_info"`
+	ShopID           int          `json:"shop_id"`
+	ShopName         string       `json:"shop_name"`
+	ShopType         string       `json:"shop_type"`
+	Number           string       `json:"number"`
+	HouseCode        string       `json:"house_code"`
+	Line             string       `json:"line"`
+	ShopCode         string       `json:"shop_code"`
+	DistributionType int          `json:"distribution_type"`
+	OrderRemark      string       `json:"order_remark"`
+	PayAt            model.MyTime `json:"pay_at"`
+	DeliveryAt       model.MyTime `json:"delivery_at"`
+	Province         string       `json:"province"`
+	City             string       `json:"city"`
+	District         string       `json:"district"`
+	OrderID          int          `json:"order_id"`
+	Address          string       `json:"address"`
+	ConsigneeName    string       `json:"consignee_name"`
+	ConsigneeTel     string       `json:"consignee_tel"`
+	GoodsInfo        []GoodsInfo  `json:"goods_info"`
 }
 
 // 返回给订货系统
@@ -56,10 +56,10 @@ type GetBatchOrderAndGoodsRsp struct {
 }
 
 type OutOrder struct {
-	DistributionType int        `json:"distribution_type"`
-	PayAt            string     `json:"pay_at"`
-	OrderId          int        `json:"order_id"`
-	GoodsInfo        []OutGoods `json:"goods_info"`
+	DistributionType int          `json:"distribution_type"`
+	PayAt            model.MyTime `json:"pay_at"`
+	OrderId          int          `json:"order_id"`
+	GoodsInfo        []OutGoods   `json:"goods_info"`
 }
 
 type OutGoods struct {

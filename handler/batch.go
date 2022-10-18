@@ -85,7 +85,7 @@ func CreateBatch(c *gin.Context) {
 		deliveryStartTime = &deliveryStart
 	}
 
-	batchId, err := SaveBatch(tx, userInfo, batchName, lines, sku, goodsName, form.DistributionType, &payTime, deliveryStartTime, &deliveryEndTime)
+	batchId, err := SaveBatch(tx, userInfo, batchName, lines, sku, goodsName, form.DistributionType, (*model.MyTime)(&payTime), (*model.MyTime)(deliveryStartTime), (*model.MyTime)(&deliveryEndTime))
 	if err != nil {
 		tx.Rollback()
 		xsq_net.ErrorJSON(c, errors.New("批次数据保存失败:"+err.Error()))
@@ -153,25 +153,10 @@ func CreateByOrder(c *gin.Context) {
 		return
 	}
 
-	payAt, err := time.ParseInLocation(timeutil.TimeZoneFormat, pickOrder.PayAt, time.Local)
-
-	if err != nil {
-		xsq_net.ErrorJSON(c, err)
-		return
-	}
-
-	deliveryEndTime, err := time.ParseInLocation(timeutil.TimeZoneFormat, pickOrder.DeliveryAt, time.Local)
-
-	if err != nil {
-		xsq_net.ErrorJSON(c, err)
-		return
-	}
-
 	tx := db.Begin()
 
-	var batchId int
 	//批次相关
-	batchId, err = SaveBatch(tx, userInfo, pickOrder.ShopName, pickOrder.Line, "", "", pickOrder.DistributionType, &payAt, nil, &deliveryEndTime)
+	batchId, err := SaveBatch(tx, userInfo, pickOrder.ShopName, pickOrder.Line, "", "", pickOrder.DistributionType, &pickOrder.PayAt, nil, &pickOrder.DeliveryAt)
 
 	if err != nil {
 		tx.Rollback()
@@ -244,7 +229,7 @@ func UpdateOrder(tx *gorm.DB, numbers []string, pickOrderGoodsId []int, orderGoo
 	return nil
 }
 
-func SaveBatch(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchName, line, sku, goods string, deliveryMethod int, payEndTime, deliveryStartTime, deliveryEndTime *time.Time) (int, error) {
+func SaveBatch(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchName, line, sku, goods string, deliveryMethod int, payEndTime, deliveryStartTime, deliveryEndTime *model.MyTime) (int, error) {
 
 	now := time.Now()
 
@@ -259,7 +244,7 @@ func SaveBatch(tx *gorm.DB, userInfo *middlewares.CustomClaims, batchName, line,
 		UserName:        userInfo.Name,
 		Line:            line,
 		DeliveryMethod:  deliveryMethod,
-		EndTime:         &now,
+		EndTime:         (*model.MyTime)(&now),
 		Status:          0,
 		PickNum:         0,
 		RecheckSheetNum: 0,
@@ -686,11 +671,6 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 
 		deleteNumbers = append(deleteNumbers, o.Number)
 
-		payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
-
-		if payAtErr != nil {
-			return ecode.DataTransformationError
-		}
 		//完成订单
 		completeOrder = append(completeOrder, model.CompleteOrder{
 			Number:         o.Number,
@@ -708,7 +688,7 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 			City:           o.City,
 			District:       o.District,
 			PickTime:       o.LatestPickingTime,
-			PayAt:          payAt.Format(timeutil.TimeFormat),
+			PayAt:          o.PayAt,
 		})
 	}
 
@@ -1083,16 +1063,9 @@ func GetBatchOrderAndGoods(c *gin.Context) {
 			return
 		}
 
-		payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, order.PayAt, time.Local)
-
-		if payAtErr != nil {
-			xsq_net.ErrorJSON(c, ecode.ParamInvalid)
-			return
-		}
-
 		list = append(list, rsp.OutOrder{
 			DistributionType: order.DistributionType,
-			PayAt:            payAt.Format(timeutil.TimeFormat),
+			PayAt:            order.PayAt,
 			OrderId:          order.OrderId,
 			GoodsInfo:        goodsInfo,
 		})
@@ -1269,25 +1242,20 @@ func GetBatchList(c *gin.Context) {
 	list := make([]*rsp.Batch, 0, len(batches))
 	for _, b := range batches {
 
-		deliveryStartTime := ""
-		if b.DeliveryStartTime != nil {
-			deliveryStartTime = b.DeliveryStartTime.Format(timeutil.DateFormat)
-		}
-
 		list = append(list, &rsp.Batch{
 			Id:                b.Id,
 			CreateTime:        b.CreateTime.Format(timeutil.MinuteFormat),
 			UpdateTime:        b.UpdateTime.Format(timeutil.MinuteFormat),
 			BatchName:         b.BatchName + helper.GetDeliveryMethod(b.DeliveryMethod),
-			DeliveryStartTime: deliveryStartTime,
-			DeliveryEndTime:   b.DeliveryEndTime.Format(timeutil.DateFormat),
+			DeliveryStartTime: b.DeliveryStartTime,
+			DeliveryEndTime:   b.DeliveryEndTime,
 			ShopNum:           b.ShopNum,
 			OrderNum:          b.OrderNum,
 			GoodsNum:          b.GoodsNum,
 			UserName:          b.UserName,
 			Line:              b.Line,
 			DeliveryMethod:    b.DeliveryMethod,
-			EndTime:           b.EndTime.Format(timeutil.MinuteFormat),
+			EndTime:           b.EndTime,
 			Status:            b.Status,
 			PrePickNum:        b.PrePickNum,
 			PickNum:           b.PickNum,
@@ -1369,16 +1337,11 @@ func GetBase(c *gin.Context) {
 		return
 	}
 
-	deliveryStartTime := ""
-	if batchCond.DeliveryStartTime != nil {
-		deliveryStartTime = batchCond.DeliveryStartTime.Format(timeutil.TimeFormat)
-	}
-
 	ret := rsp.GetBaseRsp{
 		CreateTime:        batchCond.CreateTime.Format(timeutil.TimeFormat),
-		PayEndTime:        batchCond.PayEndTime.Format(timeutil.TimeFormat),
-		DeliveryStartTime: deliveryStartTime,
-		DeliveryEndTime:   batchCond.DeliveryEndTime.Format(timeutil.TimeFormat),
+		PayEndTime:        batchCond.PayEndTime,
+		DeliveryStartTime: batchCond.DeliveryStartTime,
+		DeliveryEndTime:   batchCond.DeliveryEndTime,
 		DeliveryMethod:    batchCond.DeliveryMethod,
 		Line:              batchCond.Line,
 		Goods:             batchCond.Goods,

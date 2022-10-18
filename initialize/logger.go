@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-var logSlice = []string{"sql", "debug"}
+var logSlice = []string{"sql", "err", "info"}
 
 func InitLogger() {
 	encoder := getEncoder()

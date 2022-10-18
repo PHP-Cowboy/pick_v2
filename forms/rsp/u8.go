@@ -1,5 +1,7 @@
 package rsp
 
+import "pick_v2/model"
+
 type LogListRsp struct {
 	Total int64     `json:"total"`
 	List  []LogList `json:"list"`
@@ -43,11 +45,11 @@ type LogDetail struct {
 }
 
 type LogDetailRsp struct {
-	ShopName       string      `json:"shop_name"`
-	PickUser       string      `json:"pick_user"`
-	TakeOrdersTime string      `json:"take_orders_time"`
-	ReviewUser     string      `json:"review_user"`
-	ReviewTime     string      `json:"review_time"`
-	PayAt          string      `json:"pay_at"`
-	List           []LogDetail `json:"list"`
+	ShopName       string        `json:"shop_name"`
+	PickUser       string        `json:"pick_user"`
+	TakeOrdersTime *model.MyTime `json:"take_orders_time"`
+	ReviewUser     string        `json:"review_user"`
+	ReviewTime     *model.MyTime `json:"review_time"`
+	PayAt          model.MyTime  `json:"pay_at"`
+	List           []LogDetail   `json:"list"`
 }

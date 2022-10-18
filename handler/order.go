@@ -14,7 +14,6 @@ import (
 	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
-	"time"
 )
 
 // 拣货单列表
@@ -93,25 +92,13 @@ func PickOrderList(c *gin.Context) {
 	list := make([]rsp.PickOrder, 0, form.Size)
 
 	for _, o := range pickOrder {
-		latestPickingTime := ""
-
-		if o.LatestPickingTime != nil {
-			latestPickingTime = o.LatestPickingTime.Format(timeutil.MinuteFormat)
-		}
-
-		payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, o.PayAt, time.Local)
-
-		if payAtErr != nil {
-			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
-			return
-		}
 
 		list = append(list, rsp.PickOrder{
 			Id:                o.Id,
 			CreateTime:        o.CreateTime.Format(timeutil.MinuteFormat),
 			Number:            o.Number,
 			PickNumber:        o.PickNumber,
-			PayAt:             payAt.Format(timeutil.MinuteFormat),
+			PayAt:             o.PayAt,
 			ShopCode:          o.ShopCode,
 			ShopName:          o.ShopName,
 			ShopType:          o.ShopType,
@@ -123,7 +110,7 @@ func PickOrderList(c *gin.Context) {
 			Region:            o.Province + o.City + o.District,
 			OrderRemark:       o.OrderRemark,
 			OrderType:         o.OrderType,
-			LatestPickingTime: latestPickingTime,
+			LatestPickingTime: o.LatestPickingTime,
 		})
 	}
 
@@ -209,15 +196,8 @@ func GetPickOrderDetail(c *gin.Context) {
 		})
 	}
 
-	payAt, payAtErr := time.ParseInLocation(timeutil.TimeZoneFormat, orders.PayAt, time.Local)
-
-	if payAtErr != nil {
-		xsq_net.ErrorJSON(c, ecode.DataTransformationError)
-		return
-	}
-
 	res.Number = orders.Number
-	res.PayAt = payAt.Format(timeutil.TimeFormat)
+	res.PayAt = orders.PayAt
 	res.ShopCode = orders.ShopCode
 	res.ShopName = orders.ShopName
 	res.Line = orders.Line

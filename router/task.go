@@ -3,11 +3,10 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 	"pick_v2/handler"
-	"pick_v2/middlewares"
 )
 
 func TaskRoute(g *gin.RouterGroup) {
-	taskGroup := g.Group("/task", middlewares.JWTAuth(), middlewares.IsAdminAuth())
+	taskGroup := g.Group("/task")
 	{
 		//列表
 		taskGroup.GET("/list", handler.PickList)
