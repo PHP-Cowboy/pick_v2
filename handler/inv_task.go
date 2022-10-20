@@ -2,18 +2,19 @@ package handler
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/xuri/excelize/v2"
-	"gorm.io/gorm/clause"
 	"io"
+	"net/http"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
+	"pick_v2/middlewares"
 	"pick_v2/model"
-	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
@@ -22,7 +23,125 @@ import (
 
 // 同步任务
 func SyncTask(c *gin.Context) {
-	// todo u8接口暂无
+	u8 := global.ServerConfig.U8Api
+	url := fmt.Sprintf("%s:%d/api/v1/checklist", u8.Url, u8.Port)
+	method := "POST"
+
+	client := &http.Client{}
+	rq, err := http.NewRequest(method, url, nil)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	rq.Header.Add("x-sign", middlewares.Generate())
+
+	res, err := client.Do(rq)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	var result rsp.SyncTaskRsp
+
+	err = json.Unmarshal(body, &result)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	if result.Code != 200 {
+		xsq_net.ErrorJSON(c, errors.New(result.Msg))
+		return
+	}
+
+	var (
+		tasks      []model.InvTask                //已同步的盘点任务数据
+		tasksMp    = make(map[string]struct{}, 0) //已同步的盘点任务数据map
+		task       model.InvTask
+		taskRecord []model.InvTaskRecord
+	)
+
+	db := global.DB
+
+	dbRes := db.Model(&model.InvTask{}).Find(&tasks)
+
+	if dbRes.Error != nil {
+		xsq_net.ErrorJSON(c, dbRes.Error)
+		return
+	}
+
+	//已同步的盘点任务单号map
+	for _, t := range tasks {
+		tasksMp[t.OrderNo] = struct{}{}
+	}
+
+	now := time.Now()
+
+	var totalBookNum float64
+
+	for _, rd := range result.Data {
+
+		//数据库中已有盘点单，跳过
+		_, ok := tasksMp[rd.CcvCode]
+
+		if ok {
+			continue
+		}
+
+		if task.OrderNo == "" {
+			task.OrderNo = rd.CcvCode
+			task.TaskDate = (*model.MyTime)(&now)
+			task.TaskName = rd.CWhName + now.Format(timeutil.DateNumberFormat)
+			task.WarehouseId = 1
+			task.Warehouse = rd.CWhName
+			task.Remark = rd.CcvMeno
+		}
+
+		taskRecord = append(taskRecord, model.InvTaskRecord{
+			OrderNo:   rd.CcvCode,
+			Sku:       rd.CInvCode,
+			GoodsName: rd.CInvName,
+			GoodsType: rd.Cate,
+			GoodsSpe:  rd.CInvStd,
+			GoodsUnit: rd.CComUnitName,
+			BookNum:   rd.IcvQuantity,
+		})
+
+		totalBookNum += rd.IcvQuantity
+	}
+
+	if len(taskRecord) > 0 {
+		tx := db.Begin()
+
+		task.BookNum = totalBookNum
+
+		dbRes = tx.Save(&task)
+
+		if dbRes.Error != nil {
+			xsq_net.ErrorJSON(c, dbRes.Error)
+			return
+		}
+
+		dbRes = tx.Save(&taskRecord)
+
+		if dbRes.Error != nil {
+			xsq_net.ErrorJSON(c, dbRes.Error)
+			return
+		}
+
+		tx.Commit()
+	}
+
 	xsq_net.Success(c)
 }
 
@@ -58,9 +177,42 @@ func TaskList(c *gin.Context) {
 		return
 	}
 
+	var (
+		orderNoSlice []string
+		invNumSum    []rsp.InvNumSum
+		sumMp        = make(map[string]float64, 0)
+	)
+
+	//获取查询到的全部盘点单号，查询盘点数量并计算盈亏数量
+	for _, task := range tasks {
+		orderNoSlice = append(orderNoSlice, task.OrderNo)
+	}
+
+	result = db.Model(&model.InventoryRecord{}).
+		Select("sum(inventory_num) as sum,order_no").
+		Where("order_no in (?) and is_delete = 1", orderNoSlice).
+		Group("order_no").
+		Find(&invNumSum)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	for _, inv := range invNumSum {
+		sumMp[inv.OrderNo] = inv.Sum
+	}
+
 	list := make([]*rsp.TaskList, 0, len(tasks))
 
 	for _, task := range tasks {
+
+		invSum, sumOk := sumMp[task.OrderNo]
+
+		if !sumOk {
+			invSum = 0
+		}
+
 		list = append(list, &rsp.TaskList{
 			OrderNo:       task.OrderNo,
 			TaskName:      task.TaskName,
@@ -68,8 +220,8 @@ func TaskList(c *gin.Context) {
 			WarehouseId:   task.WarehouseId,
 			WarehouseName: task.Warehouse,
 			BookNum:       task.BookNum,
-			InventoryNum:  task.InventoryNum,
-			ProfitLossNum: task.ProfitLossNum,
+			InventoryNum:  invSum,
+			ProfitLossNum: invSum - task.BookNum,
 			Remark:        task.Remark,
 			Status:        task.Status,
 		})
@@ -105,9 +257,7 @@ func ChangeTask(c *gin.Context) {
 func Export(c *gin.Context) {
 	var form req.ExportForm
 
-	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
-
-	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+	if err := c.ShouldBind(&form); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
@@ -125,6 +275,32 @@ func Export(c *gin.Context) {
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
+	}
+
+	var (
+		skuSlice     []string
+		skuInvNumSum []rsp.SkuInvNumSum
+		sumMp        = make(map[string]float64, 0)
+	)
+
+	//获取查询到的全部sku，查询sku盘点数量并计算盈亏数量
+	for _, rs := range records {
+		skuSlice = append(skuSlice, rs.Sku)
+	}
+
+	result = db.Model(&model.InventoryRecord{}).
+		Select("sum(inventory_num) as sum,sku").
+		Where("order_no = ? and sku in (?) and is_delete = 1", form.OrderNo, skuSlice).
+		Group("sku").
+		Find(&skuInvNumSum)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	for _, inv := range skuInvNumSum {
+		sumMp[inv.Sku] = inv.Sum
 	}
 
 	xFile := excelize.NewFile()
@@ -146,13 +322,20 @@ func Export(c *gin.Context) {
 
 	startCount := 3
 	for idx, val := range records {
+
+		invSum, sumOk := sumMp[val.Sku]
+
+		if !sumOk {
+			invSum = 0
+		}
+
 		item := make([]interface{}, 0)
 		item = append(item, val.Sku)
 		item = append(item, val.GoodsName)
 		item = append(item, val.GoodsType)
 		item = append(item, val.BookNum)
-		item = append(item, val.InventoryNum)
-		item = append(item, val.ProfitLossNum)
+		item = append(item, invSum)
+		item = append(item, invSum-val.BookNum)
 
 		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+idx), &item)
 	}
@@ -214,17 +397,50 @@ func TaskRecordList(c *gin.Context) {
 		return
 	}
 
+	var (
+		skuSlice     []string
+		skuInvNumSum []rsp.SkuInvNumSum
+		sumMp        = make(map[string]float64, 0)
+	)
+
+	//获取查询到的全部sku，查询sku盘点数量并计算盈亏数量
+	for _, rs := range records {
+		skuSlice = append(skuSlice, rs.Sku)
+	}
+
+	result = db.Model(&model.InventoryRecord{}).
+		Select("sum(inventory_num) as sum,sku").
+		Where("order_no = ? and sku in (?) and is_delete = 1", form.OrderNo, skuSlice).
+		Group("sku").
+		Find(&skuInvNumSum)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	for _, inv := range skuInvNumSum {
+		sumMp[inv.Sku] = inv.Sum
+	}
+
 	list := make([]*rsp.RecordList, 0, len(records))
 
 	for _, record := range records {
+
+		invSum, sumOk := sumMp[record.Sku]
+
+		if !sumOk {
+			invSum = 0
+		}
+
 		list = append(list, &rsp.RecordList{
 			Sku:           record.Sku,
 			GoodsName:     record.GoodsName,
 			GoodsType:     record.GoodsType,
 			GoodsSpe:      record.GoodsSpe,
 			BookNum:       record.BookNum,
-			InventoryNum:  record.InventoryNum,
-			ProfitLossNum: record.ProfitLossNum,
+			InventoryNum:  invSum,
+			ProfitLossNum: invSum - record.BookNum,
 		})
 	}
 
@@ -340,10 +556,10 @@ func InvCount(c *gin.Context) {
 		return
 	}
 
-	userName, ok := c.Get("user_name")
+	userInfo := GetUserInfo(c)
 
-	if !ok {
-		xsq_net.ErrorJSON(c, errors.New("用户名称不存在"))
+	if userInfo == nil {
+		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
 		return
 	}
 
@@ -352,8 +568,7 @@ func InvCount(c *gin.Context) {
 	result := global.DB.
 		Model(&model.InventoryRecord{}).
 		Distinct("sku").
-		Group("user_name").
-		Where("user_name = ?", userName).
+		Where("order_no = ? and user_name = ? and is_delete = 1", form.OrderNo, userInfo.Name).
 		Count(&count)
 
 	if result.Error != nil {
@@ -373,10 +588,10 @@ func UserInventoryRecordList(c *gin.Context) {
 		return
 	}
 
-	userName, ok := c.Get("user_name")
+	userInfo := GetUserInfo(c)
 
-	if !ok {
-		xsq_net.ErrorJSON(c, errors.New("用户名称不存在"))
+	if userInfo == nil {
+		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
 		return
 	}
 
@@ -385,10 +600,11 @@ func UserInventoryRecordList(c *gin.Context) {
 		res     rsp.UserInventoryRecordListRsp
 	)
 
-	result := global.DB.
-		Model(&model.InventoryRecord{}).
+	db := global.DB
+
+	result := db.Model(&model.InventoryRecord{}).
 		Where(&model.InventoryRecord{Sku: form.Sku}).
-		Where("order_no = ? and user_name = ? and is_delete = 1", form.OrderNo, userName).
+		Where("order_no = ? and user_name = ? and is_delete = 1", form.OrderNo, userInfo.Name).
 		Find(&records)
 
 	if result.Error != nil {
@@ -398,11 +614,11 @@ func UserInventoryRecordList(c *gin.Context) {
 
 	res.Total = result.RowsAffected
 
-	result = global.DB.
-		Model(&model.InventoryRecord{}).
+	//分页
+	result = db.Model(&model.InventoryRecord{}).
 		Scopes(model.Paginate(form.Page, form.Size)).
 		Where(&model.InventoryRecord{Sku: form.Sku}).
-		Where("order_no = ? and user_name = ? and is_delete = 1", form.OrderNo, userName).
+		Where("order_no = ? and user_name = ? and is_delete = 1", form.OrderNo, userInfo.Name).
 		Find(&records)
 
 	if result.Error != nil {
@@ -410,9 +626,42 @@ func UserInventoryRecordList(c *gin.Context) {
 		return
 	}
 
+	//系统数量
+	var (
+		skuSlice     []string
+		skuInvNumSum []rsp.SkuInvNumSum
+		systemNumMp  = make(map[string]float64, 0)
+	)
+
+	for _, rs := range records {
+		skuSlice = append(skuSlice, rs.Sku)
+	}
+
+	result = db.Model(&model.InventoryRecord{}).
+		Select("sum(inventory_num) as sum,sku").
+		Where("order_no = ? and sku in (?) and is_delete = 1", form.OrderNo, skuSlice).
+		Group("sku").
+		Find(&skuInvNumSum)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	for _, inv := range skuInvNumSum {
+		systemNumMp[inv.Sku] = inv.Sum
+	}
+
 	list := make([]*rsp.UserInventoryRecord, 0, len(records))
 
 	for _, record := range records {
+
+		sysNum, sysOk := systemNumMp[record.Sku]
+
+		if !sysOk {
+			sysNum = 0
+		}
+
 		list = append(list, &rsp.UserInventoryRecord{
 			Id:           record.Id,
 			OrderNo:      record.OrderNo,
@@ -421,6 +670,7 @@ func UserInventoryRecordList(c *gin.Context) {
 			GoodsName:    record.GoodsName,
 			GoodsSpe:     record.GoodsSpe,
 			InventoryNum: record.InventoryNum,
+			SystemNum:    sysNum,
 		})
 	}
 
@@ -447,7 +697,7 @@ func UpdateInventoryRecord(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Model(&model.InventoryRecord{}).First(&record)
+	result := db.Model(&model.InventoryRecord{}).First(&record, form.Id)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -490,13 +740,6 @@ func BatchCreate(c *gin.Context) {
 		return
 	}
 
-	//rds 锁
-	err := cache.SetNx("batchCreate", "1")
-	if err != nil {
-		xsq_net.ErrorJSON(c, err)
-		return
-	}
-
 	userInfo := GetUserInfo(c)
 
 	if userInfo == nil {
@@ -533,10 +776,8 @@ func BatchCreate(c *gin.Context) {
 		return
 	}
 
-	//sku map
+	//sku map 验证是否在盘点列表中
 	mp := make(map[string]model.InvTaskRecord, 0)
-	taskRecordMp := make(map[string]int, len(form.Records))
-	var total int //本次提交盘点总数
 
 	for _, record := range taskRecords {
 		mp[record.Sku] = record
@@ -557,8 +798,6 @@ func BatchCreate(c *gin.Context) {
 			return
 		}
 
-		total += fm.InventoryNum
-
 		records = append(records, &model.InventoryRecord{
 			OrderNo:      form.OrderNo,
 			Sku:          fm.Sku,
@@ -569,73 +808,14 @@ func BatchCreate(c *gin.Context) {
 			InventoryNum: fm.InventoryNum,
 		})
 
-		taskRecordMp[fm.Sku] = fm.InventoryNum
 	}
 
-	trList := make([]model.InvTaskRecord, 0, len(form.Records))
-
-	for _, val := range taskRecords {
-		num, trOk := taskRecordMp[val.Sku]
-
-		if !trOk {
-			continue
-		}
-
-		invNum := val.InventoryNum + num
-
-		trList = append(trList, model.InvTaskRecord{
-			OrderNo:       val.OrderNo,
-			Sku:           val.Sku,
-			GoodsName:     val.GoodsName,
-			GoodsType:     val.GoodsType,
-			GoodsSpe:      val.GoodsSpe,
-			GoodsUnit:     val.GoodsUnit,
-			BookNum:       val.BookNum,
-			InventoryNum:  invNum,
-			ProfitLossNum: invNum - val.BookNum,
-		})
-	}
-
-	tx := db.Begin()
-
-	result = tx.Save(&records)
+	result = db.Save(&records)
 
 	if result.Error != nil {
-		tx.Rollback()
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
-
-	result = tx.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "order_no,sku"}},
-		DoUpdates: clause.AssignmentColumns([]string{"inventory_num", "profit_loss_num"}),
-	}).Save(&trList)
-
-	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	task.InventoryNum += total
-	task.ProfitLossNum = task.InventoryNum - task.BookNum
-
-	result = tx.Save(&task)
-
-	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	err = cache.Del("batchCreate")
-	if err != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, err)
-		return
-	}
-
-	tx.Commit()
 
 	xsq_net.Success(c)
 

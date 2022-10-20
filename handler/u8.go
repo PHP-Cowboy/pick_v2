@@ -348,7 +348,7 @@ func BatchSupplement(c *gin.Context) {
 		return
 	}
 
-	second, err := cache.GetTtlKey(constant.BATCH_SUPPLEMENT)
+	second, err := cache.TTL(constant.BATCH_SUPPLEMENT)
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return

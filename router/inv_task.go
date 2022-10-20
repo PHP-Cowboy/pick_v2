@@ -22,7 +22,7 @@ func InvTaskRoute(g *gin.RouterGroup) {
 		//变更任务
 		taskGroup.POST("/changeTask", handler.ChangeTask)
 		//导出
-		taskGroup.POST("/export", handler.Export)
+		taskGroup.GET("/export", handler.Export)
 
 	}
 

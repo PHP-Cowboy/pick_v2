@@ -20,15 +20,11 @@ func GetIncrNumberByKey(key string, padLength int) (string, error) {
 		return "", err
 	}
 
-	//ok, err := global.Redis.Expire(context.Background(), "key", 24*time.Hour).Result()
-	//
-	//if err != nil {
-	//	return "", errors.New("设置过期返回false")
-	//}
-	//
-	//if !ok {
-	//	return "", nil
-	//}
+	//设置过期时间
+	err = Expire(redisKey, 24*60*60)
+	if err != nil {
+		return "", err
+	}
 
 	number := strconv.Itoa(int(val.(int64)))
 
@@ -48,13 +44,8 @@ func GetIncrByKey(key string) (interface{}, error) {
 	return val, nil
 }
 
-func GetTtlKey(key string) (time.Duration, error) {
-
+func TTL(key string) (time.Duration, error) {
 	return global.Redis.TTL(context.Background(), key).Result()
-}
-
-func SetTtlKey(key string, second int) (bool, error) {
-	return global.Redis.Expire(context.Background(), key, time.Duration(second)*time.Second).Result()
 }
 
 func Set(key, val string, second int) (string, error) {
@@ -69,6 +60,12 @@ func SetNx(key string, val string) error {
 	return global.Redis.SetNX(context.Background(), key, val, 0).Err()
 }
 
+// 删除
 func Del(key string) error {
 	return global.Redis.Del(context.Background(), key).Err()
+}
+
+// 设置过期时间
+func Expire(key string, second int) error {
+	return global.Redis.Expire(context.Background(), key, time.Duration(second)).Err()
 }

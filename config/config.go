@@ -6,6 +6,7 @@ type ServerConfig struct {
 	JwtInfo    JWTConfig      `mapstructure:"jwt" json:"jwt"`
 	RedisInfo  RedisConfig    `mapstructure:"redis" json:"redis"`
 	GoodsApi   GoodsApiConfig `mapstructure:"goods_api" json:"goods_api"`
+	U8Api      GoodsApiConfig `mapstructure:"u8_api" json:"u8_api"`
 	YongSender string         `mapstructure:"yong_sender" json:"yong_sender"`
 	RocketMQ   string         `mapstructure:"rocket_mq" json:"rocket_mq"`
 }

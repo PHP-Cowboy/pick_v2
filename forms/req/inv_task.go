@@ -2,7 +2,7 @@ package req
 
 type TaskListForm struct {
 	Paging
-	Status int `json:"status"`
+	Status int `json:"status" form:"status"`
 }
 
 type ChangeTaskForm struct {
@@ -48,8 +48,8 @@ type UserInventoryRecordListForm struct {
 }
 
 type UpdateInventoryRecordForm struct {
-	Id           int `json:"id"`
-	InventoryNum int `json:"inventory_num"`
+	Id           int     `json:"id"`
+	InventoryNum float64 `json:"inventory_num"`
 }
 
 type BatchCreateForm struct {
@@ -58,6 +58,6 @@ type BatchCreateForm struct {
 }
 
 type InventoryRecord struct {
-	Sku          string `json:"sku" form:"sku"`
-	InventoryNum int    `json:"inventory_num" form:"inventory_num"`
+	Sku          string  `json:"sku" form:"sku"`
+	InventoryNum float64 `json:"inventory_num" form:"inventory_num"`
 }
