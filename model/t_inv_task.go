@@ -2,6 +2,7 @@ package model
 
 import "time"
 
+// 盘点任务表
 type InvTask struct {
 	OrderNo     string    `gorm:"primaryKey;type:varchar(64);comment:盘点单号"`
 	CreateTime  time.Time `gorm:"autoCreateTime;type:datetime;not null;comment:创建时间"`

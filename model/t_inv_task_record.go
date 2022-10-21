@@ -2,6 +2,7 @@ package model
 
 import "time"
 
+// 盘点任务商品记录表
 type InvTaskRecord struct {
 	OrderNo    string    `gorm:"primaryKey;type:varchar(64);comment:任务编号"`
 	Sku        string    `gorm:"primaryKey;type:varchar(64);comment:sku"`

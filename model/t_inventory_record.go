@@ -1,10 +1,11 @@
 package model
 
+// 用户盘点记录表
 type InventoryRecord struct {
 	Base
-	OrderNo      string  `gorm:"uniqueIndex:orderNoSkuUserName;type:varchar(64);comment:任务编号"`
-	Sku          string  `gorm:"uniqueIndex:orderNoSkuUserName;type:varchar(64);comment:sku"`
-	UserName     string  `gorm:"uniqueIndex:orderNoSkuUserName;type:varchar(16);not null;comment:盘点人"`
+	OrderNo      string  `gorm:"type:varchar(64);comment:任务编号"`
+	Sku          string  `gorm:"type:varchar(64);comment:sku"`
+	UserName     string  `gorm:"type:varchar(16);not null;comment:盘点人"`
 	GoodsName    string  `gorm:"type:varchar(64);comment:商品名称"`
 	GoodsSpe     string  `gorm:"type:varchar(64);comment:商品规格"`
 	GoodsUnit    string  `gorm:"type:varchar(32);comment:商品单位"`

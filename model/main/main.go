@@ -90,8 +90,8 @@ func main() {
 
 	_ = db.Set(model.TableOptions, model.GetOptions("盘点任务表")).AutoMigrate(&model.InvTask{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("盘点任务记录表")).AutoMigrate(&model.InvTaskRecord{})
+	_ = db.Set(model.TableOptions, model.GetOptions("盘点任务商品记录表")).AutoMigrate(&model.InvTaskRecord{})
 
-	_ = db.Set(model.TableOptions, model.GetOptions("盘点记录表")).AutoMigrate(&model.InventoryRecord{})
+	_ = db.Set(model.TableOptions, model.GetOptions("用户盘点记录表")).AutoMigrate(&model.InventoryRecord{})
 
 }

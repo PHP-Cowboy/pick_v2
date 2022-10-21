@@ -366,22 +366,22 @@ func TaskRecordList(c *gin.Context) {
 
 	db := global.DB
 
-	localDb := db.Model(&model.InvTaskRecord{}).Where(model.InvTaskRecord{OrderNo: form.OrderNo, GoodsType: form.GoodsType})
+	localDb := db.Model(&model.InvSum{}).Where(model.InvSum{OrderNo: form.OrderNo, GoodsType: form.GoodsType})
 
 	if form.GoodsName != "" {
-		localDb.Where("goods_name like %?%", form.GoodsName)
+		localDb.Where("goods_name like ?", "%"+form.GoodsName+"%")
 	}
 
 	if form.IsNeed {
-		localDb.Where("profit_loss_num > 0")
+		localDb.Where("book_num != inventory_num")
 	}
 
 	var (
-		records []model.InvTaskRecord
-		res     rsp.RecordListRsp
+		invSum []model.InvSum
+		res    rsp.RecordListRsp
 	)
 
-	result := localDb.Find(&records)
+	result := localDb.Find(&invSum)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -390,48 +390,22 @@ func TaskRecordList(c *gin.Context) {
 
 	res.Total = result.RowsAffected
 
-	result = localDb.Scopes(model.Paginate(form.Page, form.Size)).Find(&records)
+	if form.SortField != "" && form.SortRule != "" {
+		localDb.Order(fmt.Sprintf("%s %s", form.SortField, form.SortRule))
+	}
+
+	result = localDb.
+		Scopes(model.Paginate(form.Page, form.Size)).
+		Find(&invSum)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	var (
-		skuSlice     []string
-		skuInvNumSum []rsp.SkuInvNumSum
-		sumMp        = make(map[string]float64, 0)
-	)
+	list := make([]*rsp.RecordList, 0, len(invSum))
 
-	//获取查询到的全部sku，查询sku盘点数量并计算盈亏数量
-	for _, rs := range records {
-		skuSlice = append(skuSlice, rs.Sku)
-	}
-
-	result = db.Model(&model.InventoryRecord{}).
-		Select("sum(inventory_num) as sum,sku").
-		Where("order_no = ? and sku in (?) and is_delete = 1", form.OrderNo, skuSlice).
-		Group("sku").
-		Find(&skuInvNumSum)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	for _, inv := range skuInvNumSum {
-		sumMp[inv.Sku] = inv.Sum
-	}
-
-	list := make([]*rsp.RecordList, 0, len(records))
-
-	for _, record := range records {
-
-		invSum, sumOk := sumMp[record.Sku]
-
-		if !sumOk {
-			invSum = 0
-		}
+	for _, record := range invSum {
 
 		list = append(list, &rsp.RecordList{
 			Sku:           record.Sku,
@@ -439,8 +413,8 @@ func TaskRecordList(c *gin.Context) {
 			GoodsType:     record.GoodsType,
 			GoodsSpe:      record.GoodsSpe,
 			BookNum:       record.BookNum,
-			InventoryNum:  invSum,
-			ProfitLossNum: invSum - record.BookNum,
+			InventoryNum:  record.InventoryNum,
+			ProfitLossNum: record.InventoryNum - record.BookNum,
 		})
 	}
 
@@ -491,10 +465,6 @@ func InventoryRecordList(c *gin.Context) {
 	localDb := global.DB.Model(&model.InventoryRecord{}).
 		Where(&model.InventoryRecord{Sku: form.Sku, OrderNo: form.OrderNo}).
 		Where("is_delete = 1")
-
-	if form.SortRule != "" {
-		localDb.Order(fmt.Sprintf("%s %s", form.SortField, form.SortRule))
-	}
 
 	result := localDb.Find(&records)
 

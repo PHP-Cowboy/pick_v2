@@ -16,6 +16,8 @@ type TaskRecordListForm struct {
 	GoodsName string `json:"goods_name" form:"goods_name"`
 	GoodsType string `json:"goods_type" form:"goods_type"`
 	IsNeed    bool   `json:"is_need" form:"is_need"`
+	SortField string `json:"sort_field" form:"sort_field"`
+	SortRule  string `json:"sort_rule" form:"sort_rule" default:"asc"`
 }
 
 type ExportForm struct {
@@ -27,10 +29,8 @@ type TypeListForm struct {
 }
 
 type InventoryRecordListForm struct {
-	OrderNo   string `json:"order_no" form:"order_no"`
-	Sku       string `json:"sku" form:"sku"`
-	SortField string `json:"sort_field" form:"sort_field"`
-	SortRule  string `json:"sort_rule" form:"sort_rule" default:"asc"`
+	OrderNo string `json:"order_no" form:"order_no"`
+	Sku     string `json:"sku" form:"sku"`
 }
 
 type InventoryRecordDeleteForm struct {
