@@ -31,7 +31,7 @@ func SyncTask(c *gin.Context) {
 	rq, err := http.NewRequest(method, url, nil)
 
 	if err != nil {
-		fmt.Println(err)
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
@@ -39,14 +39,15 @@ func SyncTask(c *gin.Context) {
 
 	res, err := client.Do(rq)
 	if err != nil {
-		fmt.Println(err)
+		xsq_net.ErrorJSON(c, err)
+		global.Logger["err"].Infof("%s", url)
 		return
 	}
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		fmt.Println(err)
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
