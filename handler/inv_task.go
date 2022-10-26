@@ -688,9 +688,9 @@ func UpdateInventoryRecord(c *gin.Context) {
 		return
 	}
 
-	record.InventoryNum = form.InventoryNum
-
-	result = db.Save(&record)
+	result = db.Model(&model.InventoryRecord{}).
+		Where("id = ?", form.Id).
+		Update("inventory_num", form.InventoryNum)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
