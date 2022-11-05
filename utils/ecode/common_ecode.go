@@ -37,4 +37,7 @@ var (
 
 	WarehouseSelectError = New(2000, "仓库选择有误，请重试")
 	GetWarehouseFailed   = New(2001, "获取仓库数据失败")
+
+	InvTaskNotGoing    = New(3000, "盘点任务不在进行中")
+	InvTaskAlreadyBind = New(3001, "盘点任务已被绑定")
 )

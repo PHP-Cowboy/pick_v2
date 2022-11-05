@@ -15,4 +15,5 @@ type InvTask struct {
 	BookNum     float64   `gorm:"type:decimal(10,2);not null;default:0;comment:账面数量"`
 	Remark      string    `gorm:"type:varchar(255);default:'';comment:备注"`
 	Status      int       `gorm:"type:tinyint;default:1;comment:状态:1:进行中,2:结束"`
+	IsBind      int       `gorm:"type:tinyint;default:1;comment:是否绑定:1:待绑定,2:已绑定"`
 }

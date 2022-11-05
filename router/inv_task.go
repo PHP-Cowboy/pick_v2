@@ -23,7 +23,16 @@ func InvTaskRoute(g *gin.RouterGroup) {
 		taskGroup.POST("/changeTask", handler.ChangeTask)
 		//导出
 		taskGroup.GET("/export", handler.Export)
-
+		//自建盘点任务
+		taskGroup.POST("/selfBuiltTask", handler.SelfBuiltTask)
+		//修改自建盘点任务
+		taskGroup.POST("/changeSelfBuiltTask", handler.ChangeSelfBuiltTask)
+		//自建盘点任务列表
+		taskGroup.POST("/selfBuiltTaskList", handler.SelfBuiltTaskList)
+		//设置复盘
+		taskGroup.POST("/setSecondInventory", handler.SetSecondInventory)
+		//自建盘点任务列表
+		taskGroup.POST("/selfBuiltTaskList", handler.SelfBuiltTaskList)
 	}
 
 	rGroup := group.Group("/record", middlewares.JWTAuth())

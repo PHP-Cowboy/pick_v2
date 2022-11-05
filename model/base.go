@@ -20,8 +20,8 @@ func GetUserOptions(tableName string) string {
 
 type Base struct {
 	Id         int       `gorm:"primaryKey;type:int(11) unsigned AUTO_INCREMENT;comment:id"`
-	CreateTime time.Time `gorm:"autoCreateTime;type:datetime;not null;comment:创建时间"`
-	UpdateTime time.Time `gorm:"autoUpdateTime;type:datetime;not null;comment:更新时间"`
+	CreateTime time.Time `gorm:"type:datetime;comment:创建时间"` //autoCreateTime 针对 int类型
+	UpdateTime time.Time `gorm:"type:datetime;comment:更新时间"`
 	DeleteTime time.Time `gorm:"type:datetime;default:null;comment:删除时间"`
 }
 

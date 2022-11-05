@@ -1,6 +1,8 @@
 package rsp
 
-import "pick_v2/model"
+import (
+	"pick_v2/model"
+)
 
 type SyncTaskRsp struct {
 	Code int        `json:"code"`
@@ -64,6 +66,7 @@ type RecordList struct {
 	BookNum       float64 `json:"book_num"`
 	InventoryNum  float64 `json:"inventory_num"`
 	ProfitLossNum float64 `json:"profit_loss_num"`
+	InvType       int     `json:"inv_type"`
 }
 
 type InventoryRecordListRsp struct {
@@ -73,6 +76,7 @@ type InventoryRecordListRsp struct {
 
 type InventoryRecord struct {
 	Id           int     `json:"id"`
+	SelfBuiltId  int     `json:"self_built_id"`
 	OrderNo      string  `json:"order_no"`
 	Sku          string  `json:"sku"`
 	UserName     string  `json:"user_name"`
@@ -88,6 +92,7 @@ type UserInventoryRecordListRsp struct {
 
 type UserInventoryRecord struct {
 	Id           int     `json:"id"`
+	SelfBuiltId  int     `json:"self_built_id"`
 	OrderNo      string  `json:"order_no"`
 	Sku          string  `json:"sku"`
 	UserName     string  `json:"user_name"`
@@ -95,4 +100,27 @@ type UserInventoryRecord struct {
 	GoodsSpe     string  `json:"goods_spe"`
 	InventoryNum float64 `json:"inventory_num"`
 	SystemNum    float64 `json:"system_num"`
+}
+
+type UserNotInventoryRecord struct {
+	Sku       string `json:"sku"`
+	GoodsName string `json:"goods_name"`
+	GoodsSpe  string `json:"goods_spe"`
+}
+
+type SelfBuiltTaskRsp struct {
+	Total int64            `json:"total"`
+	List  []*SelfBuiltTask `json:"list"`
+}
+
+type SelfBuiltTask struct {
+	Id            int     `json:"id"`
+	CreateTime    string  `json:"create_time"`
+	OrderNo       string  `json:"order_no"`
+	TaskName      string  `json:"task_name"`
+	Status        int     `json:"status"`
+	BookNum       float64 `json:"book_num"`
+	InventoryNum  float64 `json:"inventory_num"`
+	ProfitLossNum float64 `json:"profit_loss_num"`
+	Remark        string  `json:"remark"`
 }
