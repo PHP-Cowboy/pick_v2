@@ -4,6 +4,7 @@ import "time"
 
 // 盘点任务商品记录 视图
 type InvOrderSkuSum struct {
+	SelfBuiltId  int       `gorm:"index;type:int(11);comment:自建盘点任务ID"`
 	OrderNo      string    `gorm:"primaryKey;type:varchar(64);comment:任务编号"`
 	Sku          string    `gorm:"primaryKey;type:varchar(64);comment:sku"`
 	CreateTime   time.Time `gorm:"autoCreateTime;type:datetime;not null;comment:创建时间"`
@@ -16,4 +17,5 @@ type InvOrderSkuSum struct {
 	BookNum      float64   `gorm:"type:decimal(10,2);default:0;comment:账面数量"`
 	InventoryNum float64   `gorm:"type:decimal(10,2);default:0;comment:盘点数量"`
 	InvType      int       `gorm:"type:tinyint;default:1;comment:盘点类型:1:首次,2:复盘"`
+	IsDelete     int       `gorm:"type:tinyint;default:1;comment:1:正常,2:删除"`
 }

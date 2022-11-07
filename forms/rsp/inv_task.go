@@ -1,9 +1,5 @@
 package rsp
 
-import (
-	"pick_v2/model"
-)
-
 type SyncTaskRsp struct {
 	Code int        `json:"code"`
 	Msg  string     `json:"msg"`
@@ -30,22 +26,9 @@ type InvNumSum struct {
 	OrderNo string  `json:"order_no"`
 }
 
-type TaskListRsp struct {
-	Total int64       `json:"total"`
-	Data  []*TaskList `json:"list"`
-}
-
 type TaskList struct {
-	OrderNo       string        `json:"order_no"`
-	TaskName      string        `json:"task_name"`
-	TaskDate      *model.MyTime `json:"task_time"`
-	WarehouseId   int           `json:"warehouse_id"`
-	WarehouseName string        `json:"warehouse_name"`
-	BookNum       float64       `json:"book_num"`
-	InventoryNum  float64       `json:"inventory_num"`
-	ProfitLossNum float64       `json:"profit_loss_num"`
-	Remark        string        `json:"remark"`
-	Status        int           `json:"status"`
+	OrderNo  string `json:"order_no"`
+	TaskName string `json:"task_name"`
 }
 
 type SkuInvNumSum struct {
@@ -59,6 +42,7 @@ type RecordListRsp struct {
 }
 
 type RecordList struct {
+	SelfBuiltId   int     `json:"self_built_id"`
 	Sku           string  `json:"sku"`
 	GoodsName     string  `json:"goods_name"`
 	GoodsType     string  `json:"goods_type"`

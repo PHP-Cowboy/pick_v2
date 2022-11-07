@@ -154,89 +154,31 @@ func SyncGoods(c *gin.Context) {
 
 // 盘点任务列表
 func TaskList(c *gin.Context) {
-	var form req.TaskListForm
-
-	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
-		return
-	}
 
 	var (
 		tasks []model.InvTask
-		res   rsp.TaskListRsp
 	)
 
 	db := global.DB
 
-	result := db.Model(&model.InvTask{}).Where(&model.InvTask{Status: form.Status}).Find(&tasks)
+	result := db.Model(&model.InvTask{}).Where(&model.InvTask{IsBind: 1}).Find(&tasks)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	res.Total = result.RowsAffected
-
-	result = db.Model(&model.InvTask{}).Where(&model.InvTask{Status: form.Status}).Scopes(model.Paginate(form.Page, form.Size)).Find(&tasks)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	var (
-		orderNoSlice []string
-		invNumSum    []rsp.InvNumSum
-		sumMp        = make(map[string]float64, 0)
-	)
-
-	//获取查询到的全部盘点单号，查询盘点数量并计算盈亏数量
-	for _, task := range tasks {
-		orderNoSlice = append(orderNoSlice, task.OrderNo)
-	}
-
-	result = db.Model(&model.InventoryRecord{}).
-		Select("sum(inventory_num) as sum,order_no").
-		Where("order_no in (?) and is_delete = 1", orderNoSlice).
-		Group("order_no").
-		Find(&invNumSum)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	for _, inv := range invNumSum {
-		sumMp[inv.OrderNo] = inv.Sum
-	}
-
-	list := make([]*rsp.TaskList, 0, len(tasks))
+	list := make([]rsp.TaskList, 0, len(tasks))
 
 	for _, task := range tasks {
 
-		invSum, sumOk := sumMp[task.OrderNo]
-
-		if !sumOk {
-			invSum = 0
-		}
-
-		list = append(list, &rsp.TaskList{
-			OrderNo:       task.OrderNo,
-			TaskName:      task.TaskName,
-			TaskDate:      task.TaskDate,
-			WarehouseId:   task.WarehouseId,
-			WarehouseName: task.Warehouse,
-			BookNum:       task.BookNum,
-			InventoryNum:  invSum,
-			ProfitLossNum: invSum - task.BookNum,
-			Remark:        task.Remark,
-			Status:        task.Status,
+		list = append(list, rsp.TaskList{
+			OrderNo:  task.OrderNo,
+			TaskName: task.TaskName,
 		})
 	}
 
-	res.Data = list
-
-	xsq_net.SucJson(c, res)
+	xsq_net.SucJson(c, list)
 }
 
 // 结束任务
@@ -250,7 +192,7 @@ func ChangeTask(c *gin.Context) {
 		return
 	}
 
-	result := global.DB.Model(&model.InvTask{}).Where("order_no = ?", form.OrderNo).Update("status", form.Status)
+	result := global.DB.Model(&model.InvTaskSelfBuilt{}).Where("id = ?", form.Id).Update("status", form.Status)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -362,7 +304,7 @@ func Export(c *gin.Context) {
 	xsq_net.SucJson(c, "")
 }
 
-// 任务记录列表
+// 任务商品数据列表
 func TaskRecordList(c *gin.Context) {
 	var form req.TaskRecordListForm
 
@@ -374,7 +316,11 @@ func TaskRecordList(c *gin.Context) {
 	db := global.DB
 
 	localDb := db.Model(&model.InvOrderSkuSum{}).
-		Where(model.InvOrderSkuSum{OrderNo: form.OrderNo, InvType: form.InvType, GoodsType: form.GoodsType})
+		Where(model.InvOrderSkuSum{SelfBuiltId: form.SelfBuiltId, GoodsType: form.GoodsType})
+
+	if form.InvType > 1 {
+		localDb.Where(model.InvOrderSkuSum{InvType: form.InvType})
+	}
 
 	if form.GoodsName != "" {
 		localDb.Where("goods_name like ?", "%"+form.GoodsName+"%")
@@ -416,6 +362,7 @@ func TaskRecordList(c *gin.Context) {
 	for _, record := range invOrderSkuSum {
 
 		list = append(list, &rsp.RecordList{
+			SelfBuiltId:   record.SelfBuiltId,
 			Sku:           record.Sku,
 			GoodsName:     record.GoodsName,
 			GoodsType:     record.GoodsType,
@@ -547,7 +494,7 @@ func InvCount(c *gin.Context) {
 	result := global.DB.
 		Model(&model.InventoryRecord{}).
 		Distinct("sku").
-		Where("order_no = ? and inv_type = ? and user_name = ? and is_delete = 1", form.OrderNo, form.InvType, userInfo.Name).
+		Where("self_built_id = ? and inv_type = ? and user_name = ? and is_delete = 1", form.SelfBuiltId, form.InvType, userInfo.Name).
 		Count(&count)
 
 	if result.Error != nil {
@@ -696,7 +643,7 @@ func UserInventoryRecordList(c *gin.Context) {
 
 	result := db.Model(&model.InventoryRecord{}).
 		Where(&model.InventoryRecord{Sku: form.Sku}).
-		Where("order_no = ? and inv_type = ? and user_name = ? and is_delete = 1", form.OrderNo, form.InvType, userInfo.Name).
+		Where("self_built_id = ? and inv_type = ? and user_name = ? and is_delete = 1", form.SelfBuiltId, form.InvType, userInfo.Name).
 		Find(&records)
 
 	if result.Error != nil {
@@ -710,7 +657,7 @@ func UserInventoryRecordList(c *gin.Context) {
 	result = db.Model(&model.InventoryRecord{}).
 		Scopes(model.Paginate(form.Page, form.Size)).
 		Where(&model.InventoryRecord{Sku: form.Sku}).
-		Where("order_no = ? and inv_type = ? and user_name = ? and is_delete = 1", form.OrderNo, form.InvType, userInfo.Name).
+		Where("self_built_id = ? and inv_type = ? and user_name = ? and is_delete = 1", form.SelfBuiltId, form.InvType, userInfo.Name).
 		Order("id desc").
 		Find(&records)
 
@@ -732,7 +679,7 @@ func UserInventoryRecordList(c *gin.Context) {
 
 	result = db.Model(&model.InventoryRecord{}).
 		Select("sum(inventory_num) as sum,sku").
-		Where("order_no = ? and sku in (?) and inv_type = ?  and is_delete = 1", form.OrderNo, skuSlice, form.InvType).
+		Where("self_built_id = ? and sku in (?) and inv_type = ?  and is_delete = 1", form.SelfBuiltId, skuSlice, form.InvType).
 		Group("sku").
 		Find(&skuInvNumSum)
 
@@ -847,7 +794,7 @@ func BatchCreate(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Model(&model.InvTaskSelfBuilt{}).Where("order_no = ?", form.SelfBuiltId).First(&selfBuiltTask)
+	result := db.Model(&model.InvTaskSelfBuilt{}).Where("id = ?", form.SelfBuiltId).First(&selfBuiltTask)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -861,7 +808,7 @@ func BatchCreate(c *gin.Context) {
 	}
 
 	result = db.Model(&model.InvTaskRecord{}).
-		Where("self_built_id = ?", form.SelfBuiltId).
+		Where("order_no = ?", selfBuiltTask.OrderNo).
 		Find(&taskRecords)
 
 	if result.Error != nil {
@@ -887,7 +834,7 @@ func BatchCreate(c *gin.Context) {
 		}
 
 		if fm.InventoryNum < 0 {
-			xsq_net.ErrorJSON(c, errors.New("盘点数量不能为负"))
+			xsq_net.ErrorJSON(c, errors.New("盘点数量不能为负,sku:"+fm.Sku))
 			return
 		}
 
@@ -899,6 +846,7 @@ func BatchCreate(c *gin.Context) {
 			GoodsSpe:     mpSku.GoodsSpe,
 			GoodsUnit:    mpSku.GoodsUnit,
 			InventoryNum: fm.InventoryNum,
+			InvType:      form.InvType,
 		})
 
 	}
@@ -952,7 +900,8 @@ func ChangeSelfBuiltTask(c *gin.Context) {
 	}
 
 	var (
-		task model.InvTask
+		task          model.InvTask
+		selfBuiltTask model.InvTaskSelfBuilt
 	)
 
 	db := global.DB
@@ -969,13 +918,20 @@ func ChangeSelfBuiltTask(c *gin.Context) {
 		return
 	}
 
+	result = db.First(&selfBuiltTask, form.Id)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
 	tx := db.Begin()
 
 	result = tx.Model(&model.InvTaskSelfBuilt{}).
 		Where("id = ?", form.Id).
 		Update("order_no", form.OrderNo)
 
-	if result.Error != nil || result.RowsAffected == 0 {
+	if result.Error != nil {
 		tx.Rollback()
 		xsq_net.ErrorJSON(c, result.Error)
 		return
@@ -987,6 +943,8 @@ func ChangeSelfBuiltTask(c *gin.Context) {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
+
+	tx.Commit()
 
 	xsq_net.Success(c)
 }
@@ -1007,48 +965,32 @@ func SelfBuiltTaskList(c *gin.Context) {
 		res   rsp.SelfBuiltTaskRsp
 	)
 
-	result := db.Table("t_inv_task_self_built sbt").
+	localDb := db.Table("t_inv_task_self_built sbt").
 		Select("sbt.*,it.warehouse,it.book_num,it.remark").
 		Joins("left join t_inv_task it on sbt.order_no = it.order_no").
-		Where("it.status = 1").
-		Find(&tasks)
+		Where("sbt.status = 1")
 
-	var (
-		orderNoSlice []string
-		invNumSum    []rsp.InvNumSum
-		sumMp        = make(map[string]float64, 0)
-	)
-
-	//获取查询到的全部盘点单号，查询盘点数量并计算盈亏数量
-	for _, task := range tasks {
-		orderNoSlice = append(orderNoSlice, task.OrderNo)
-	}
-
-	//todo 盘点数量重构 todo 有问题，必须重构
-	result = db.Model(&model.InventoryRecord{}).
-		Select("sum(inventory_num) as sum,order_no").
-		Where("order_no in (?) and is_delete = 1", orderNoSlice).
-		Group("order_no").
-		Find(&invNumSum)
+	result := localDb.Find(&tasks)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	for _, inv := range invNumSum {
-		sumMp[inv.OrderNo] = inv.Sum
+	res.Total = result.RowsAffected
+
+	result = localDb.Scopes(model.Paginate(form.Page, form.Size)).Find(&tasks)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
 	}
 
 	list := make([]*rsp.SelfBuiltTask, 0, len(tasks))
 
+	invSum := 0.00
+
 	for _, task := range tasks {
-
-		invSum, sumOk := sumMp[task.OrderNo]
-
-		if !sumOk {
-			invSum = 0
-		}
 
 		list = append(list, &rsp.SelfBuiltTask{
 			Id:            task.Id,
@@ -1085,7 +1027,7 @@ func SetSecondInventory(c *gin.Context) {
 		invTaskSelfBuilt model.InvTaskSelfBuilt
 	)
 
-	result := db.Where("order_no = ?", form.OrderNo).First(&invTaskSelfBuilt)
+	result := db.First(&invTaskSelfBuilt, form.Id)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -1097,8 +1039,13 @@ func SetSecondInventory(c *gin.Context) {
 		return
 	}
 
+	if invTaskSelfBuilt.OrderNo == "" {
+		xsq_net.ErrorJSON(c, ecode.UnBindTaskNotAllow)
+		return
+	}
+
 	result = db.Model(&model.InvTaskRecord{}).
-		Where("order_no = ? and sku in (?)", form.OrderNo, form.Sku).
+		Where("order_no = ? and sku in (?)", invTaskSelfBuilt.OrderNo, form.Sku).
 		Updates(map[string]interface{}{
 			"inv_type": form.InvType,
 		})
@@ -1113,5 +1060,27 @@ func SetSecondInventory(c *gin.Context) {
 
 // 重新盘点
 func InvAgain(c *gin.Context) {
+	var form req.InvAgainForm
 
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	db := global.DB
+
+	result := db.Model(&model.InventoryRecord{}).
+		Where("self_built_id = ? and sku in (?) and inv_type = 2", form.SelfBuiltId, form.Sku).
+		Updates(map[string]interface{}{
+			"is_delete": 2,
+		})
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	xsq_net.Success(c)
 }

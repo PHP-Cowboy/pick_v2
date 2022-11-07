@@ -12,7 +12,8 @@ func InvTaskRoute(g *gin.RouterGroup) {
 	{
 		//盘点任务列表
 		group.GET("/list", handler.TaskList)
-
+		//自建盘点任务列表
+		group.GET("/selfBuiltTaskList", handler.SelfBuiltTaskList)
 	}
 
 	taskGroup := g.Group("/invTask", middlewares.JWTAuth(), middlewares.IsAdminAuth())
@@ -27,17 +28,15 @@ func InvTaskRoute(g *gin.RouterGroup) {
 		taskGroup.POST("/selfBuiltTask", handler.SelfBuiltTask)
 		//修改自建盘点任务
 		taskGroup.POST("/changeSelfBuiltTask", handler.ChangeSelfBuiltTask)
-		//自建盘点任务列表
-		taskGroup.POST("/selfBuiltTaskList", handler.SelfBuiltTaskList)
 		//设置复盘
 		taskGroup.POST("/setSecondInventory", handler.SetSecondInventory)
 		//自建盘点任务列表
-		taskGroup.POST("/selfBuiltTaskList", handler.SelfBuiltTaskList)
+		taskGroup.POST("/invAgain", handler.InvAgain)
 	}
 
 	rGroup := group.Group("/record", middlewares.JWTAuth())
 	{
-		//任务记录列表
+		//任务商品数据列表
 		rGroup.GET("/list", handler.TaskRecordList)
 		//盘库记录
 		rGroup.GET("/inventoryRecord", handler.InventoryRecordList)
@@ -57,5 +56,9 @@ func InvTaskRoute(g *gin.RouterGroup) {
 		recordGroup.POST("/updateInventoryRecord", handler.UpdateInventoryRecord)
 		//批量盘点
 		recordGroup.POST("/batchCreate", handler.BatchCreate)
+		//未盘商品数量
+		recordGroup.GET("/notInvCount", handler.NotInvCount)
+		//未盘商品列表
+		recordGroup.GET("/userNotInventoryRecordList", handler.UserNotInventoryRecordList)
 	}
 }
