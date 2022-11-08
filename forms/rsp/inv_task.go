@@ -102,6 +102,8 @@ type SelfBuiltTask struct {
 	CreateTime    string  `json:"create_time"`
 	OrderNo       string  `json:"order_no"`
 	TaskName      string  `json:"task_name"`
+	Warehouse     string  `json:"warehouse"`
+	TaskDate      string  `json:"task_date"`
 	Status        int     `json:"status"`
 	BookNum       float64 `json:"book_num"`
 	InventoryNum  float64 `json:"inventory_num"`

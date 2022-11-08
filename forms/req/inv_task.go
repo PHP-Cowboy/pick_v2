@@ -36,16 +36,15 @@ type InventoryRecordDeleteForm struct {
 
 type CountForm struct {
 	SelfBuiltId int `json:"self_built_id" form:"self_built_id"`
-	InvType     int `json:"inv_type" binding:"required,oneof=1 2"`
+	InvType     int `json:"inv_type" form:"inv_type" binding:"required,oneof=1 2"`
 }
 
 type NotInvCountForm struct {
-	OrderNo string `json:"order_no" form:"order_no"`
+	SelfBuiltId int `json:"self_built_id" form:"self_built_id"`
 }
 
 type UserNotInventoryRecordListForm struct {
 	SelfBuiltId int    `json:"self_built_id" form:"self_built_id" binding:"required"`
-	OrderNo     string `json:"order_no" form:"order_no" binding:"required"`
 	Sku         string `json:"sku" form:"sku"`
 }
 
@@ -53,7 +52,7 @@ type UserInventoryRecordListForm struct {
 	Paging
 	SelfBuiltId int    `json:"self_built_id" form:"self_built_id" binding:"required"`
 	Sku         string `json:"sku" form:"sku"`
-	InvType     int    `json:"inv_type" binding:"required,oneof=1 2"`
+	InvType     int    `json:"inv_type" form:"inv_type" binding:"required,oneof=1 2"`
 }
 
 type UpdateInventoryRecordForm struct {

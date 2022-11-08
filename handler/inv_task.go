@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/xuri/excelize/v2"
+	"gorm.io/gorm"
 	"io"
 	"net/http"
 	"pick_v2/forms/req"
@@ -147,9 +148,36 @@ func SyncTask(c *gin.Context) {
 }
 
 // 同步商品
-func SyncGoods(c *gin.Context) {
-	// todo sku 唯一 save
-	xsq_net.Success(c)
+func SyncGoods(tx *gorm.DB, selfBuiltId int) error {
+	// 自建盘点单，暂不绑定时,同步全部商品
+	//todo 拉取商品数据
+	resp := []int{1}
+	//构造任务商品数据
+	list := make([]model.InvTaskRecord, 0, len(resp))
+
+	for _, d := range resp {
+		list = append(list, model.InvTaskRecord{
+			SelfBuiltId: selfBuiltId,
+			OrderNo:     "",
+			Sku:         "1010001",
+			InvType:     d,
+			GoodsName:   "草莓果泥",
+			GoodsType:   "果酱类",
+			GoodsSpe:    "2L*8瓶/件",
+			GoodsUnit:   "瓶",
+			BookNum:     0,
+		})
+	}
+
+	result := tx.Model(&model.InvTaskRecord{}).Save(&list)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	//self_built_id order_no sku inv_type 唯一 save
+
+	return nil
 }
 
 // 盘点任务列表
@@ -316,11 +344,7 @@ func TaskRecordList(c *gin.Context) {
 	db := global.DB
 
 	localDb := db.Model(&model.InvOrderSkuSum{}).
-		Where(model.InvOrderSkuSum{SelfBuiltId: form.SelfBuiltId, GoodsType: form.GoodsType})
-
-	if form.InvType > 1 {
-		localDb.Where(model.InvOrderSkuSum{InvType: form.InvType})
-	}
+		Where(model.InvOrderSkuSum{SelfBuiltId: form.SelfBuiltId, InvType: form.InvType, GoodsType: form.GoodsType})
 
 	if form.GoodsName != "" {
 		localDb.Where("goods_name like ?", "%"+form.GoodsName+"%")
@@ -529,7 +553,7 @@ func NotInvCount(c *gin.Context) {
 	db := global.DB
 
 	result := db.Model(&model.InvTaskRecord{}).
-		Where("order_no = ? and inv_type = ?", form.OrderNo, 2).
+		Where("self_built_id = ? and inv_type = ?", form.SelfBuiltId, 2).
 		Count(&cTaskRec)
 
 	if result.Error != nil {
@@ -539,7 +563,7 @@ func NotInvCount(c *gin.Context) {
 
 	result = db.Model(&model.InventoryRecord{}).
 		Distinct("sku").
-		Where("order_no = ? and inv_type = ?", form.OrderNo, 2).
+		Where("self_built_id = ? and inv_type = ? and is_delete = 1", form.SelfBuiltId, 2).
 		Count(&cUserInvRec)
 
 	if result.Error != nil {
@@ -559,13 +583,6 @@ func UserNotInventoryRecordList(c *gin.Context) {
 		return
 	}
 
-	userInfo := GetUserInfo(c)
-
-	if userInfo == nil {
-		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
-		return
-	}
-
 	db := global.DB
 
 	var (
@@ -577,7 +594,7 @@ func UserNotInventoryRecordList(c *gin.Context) {
 	)
 
 	result := db.Model(&model.InvTaskRecord{}).
-		Where(&model.InvTaskRecord{OrderNo: form.OrderNo, Sku: form.Sku, InvType: secInv}).
+		Where(&model.InvTaskRecord{SelfBuiltId: form.SelfBuiltId, Sku: form.Sku, InvType: secInv}).
 		Order("goods_type desc").
 		Order("sku asc").
 		Find(&invTaskRecords)
@@ -588,7 +605,7 @@ func UserNotInventoryRecordList(c *gin.Context) {
 	}
 
 	result = db.Model(&model.InventoryRecord{}).
-		Where(&model.InventoryRecord{SelfBuiltId: form.SelfBuiltId, Sku: form.Sku, InvType: secInv, UserName: userInfo.Name}).
+		Where(&model.InventoryRecord{SelfBuiltId: form.SelfBuiltId, Sku: form.Sku, InvType: secInv}).
 		Find(&invRecords)
 
 	if result.Error != nil {
@@ -878,12 +895,39 @@ func SelfBuiltTask(c *gin.Context) {
 	task.OrderNo = form.OrderNo
 	task.TaskName = form.TaskName
 
-	result := global.DB.Save(&task)
+	tx := global.DB.Begin()
+
+	result := tx.Save(&task)
 
 	if result.Error != nil {
+		tx.Rollback()
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
+
+	if form.OrderNo == "" {
+		//暂不绑定盘点单
+		//同步u8商品  self_built_id 为 自建盘点单id order_no为 空字符串
+		if err := SyncGoods(tx, task.Id); err != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, errors.New("商品数据同步失败"))
+			return
+		}
+	} else {
+		//直接绑定盘点单
+		//将 self_built_id 为 0 order_no 为u8的盘点单号 的数据 的 self_built_id 更新为当前自建盘点单的id
+		result = tx.Model(&model.InvTaskRecord{}).
+			Where("self_built_id = 0 and order_no = ?", form.OrderNo).
+			Update("self_built_id", task.Id)
+
+		if result.Error != nil {
+			tx.Rollback()
+			xsq_net.ErrorJSON(c, result.Error)
+			return
+		}
+	}
+
+	tx.Commit()
 
 	xsq_net.Success(c)
 }
@@ -913,6 +957,7 @@ func ChangeSelfBuiltTask(c *gin.Context) {
 		return
 	}
 
+	//验证盘点单是否已经被绑定
 	if task.IsBind != 1 {
 		xsq_net.ErrorJSON(c, ecode.InvTaskAlreadyBind)
 		return
@@ -925,8 +970,14 @@ func ChangeSelfBuiltTask(c *gin.Context) {
 		return
 	}
 
+	if selfBuiltTask.OrderNo != "" {
+		xsq_net.ErrorJSON(c, errors.New("已绑定的暂不允许更换"))
+		return
+	}
+
 	tx := db.Begin()
 
+	//自建盘点任务绑定u8盘点单
 	result = tx.Model(&model.InvTaskSelfBuilt{}).
 		Where("id = ?", form.Id).
 		Update("order_no", form.OrderNo)
@@ -937,9 +988,33 @@ func ChangeSelfBuiltTask(c *gin.Context) {
 		return
 	}
 
-	result = tx.Model(&model.InvTask{}).Where("order_no = ?", form.OrderNo).Update("is_bind", 2)
+	//更新u8盘点单绑定状态
+	result = tx.Model(&model.InvTask{}).
+		Where("order_no = ?", form.OrderNo).
+		Update("is_bind", 2)
 
 	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//删除暂不绑定时生成的数据
+	result = tx.Delete(&model.InvTaskRecord{}, "self_built_id = ?", form.Id)
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//更新盘点任务商品记录表
+	result = tx.Model(&model.InvTaskRecord{}).
+		Where("self_built_id = 0 and order_no = ", form.OrderNo).
+		Update("self_built_id", form.Id)
+
+	if result.Error != nil {
+		tx.Rollback()
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
@@ -966,7 +1041,7 @@ func SelfBuiltTaskList(c *gin.Context) {
 	)
 
 	localDb := db.Table("t_inv_task_self_built sbt").
-		Select("sbt.*,it.warehouse,it.book_num,it.remark").
+		Select("sbt.*,it.task_date,it.warehouse,it.book_num,it.remark").
 		Joins("left join t_inv_task it on sbt.order_no = it.order_no").
 		Where("sbt.status = 1")
 
@@ -986,17 +1061,65 @@ func SelfBuiltTaskList(c *gin.Context) {
 		return
 	}
 
+	taskIds := make([]int, 0, len(tasks))
+
+	for _, ts := range tasks {
+		taskIds = append(taskIds, ts.Id)
+	}
+
+	var (
+		invRecordSums []model.InvRecordSum
+		builtSkuMp    = make(map[int]map[string]float64, 0)
+		builtNumMp    = make(map[int]float64, 0)
+	)
+
+	result = db.Model(&model.InvRecordSum{}).
+		Where("self_built_id in (?)", taskIds).
+		Order("sku asc, inv_type ASC").
+		Find(&invRecordSums)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//sku去重，map覆盖
+	for _, sum := range invRecordSums {
+		skuVal, skuOk := builtSkuMp[sum.SelfBuiltId]
+
+		if !skuOk {
+			skuVal = make(map[string]float64, 0)
+		}
+
+		skuVal[sum.Sku] = sum.InventoryNum
+
+		builtSkuMp[sum.SelfBuiltId] = skuVal
+	}
+
+	// builtSkuMp[self_built_id][sku]inventory_num
+	for i, m := range builtSkuMp {
+		for _, n := range m {
+			builtNumMp[i] += n
+		}
+	}
+
 	list := make([]*rsp.SelfBuiltTask, 0, len(tasks))
 
-	invSum := 0.00
-
 	for _, task := range tasks {
+
+		invSum, numMpOk := builtNumMp[task.Id]
+
+		if !numMpOk {
+			invSum = 0.00
+		}
 
 		list = append(list, &rsp.SelfBuiltTask{
 			Id:            task.Id,
 			CreateTime:    task.CreateTime.Format(timeutil.TimeFormat),
 			OrderNo:       task.OrderNo,
 			TaskName:      task.TaskName,
+			Warehouse:     task.Warehouse,
+			TaskDate:      task.TaskDate.Format(timeutil.DateFormat),
 			Status:        task.Status,
 			BookNum:       task.BookNum,
 			InventoryNum:  invSum,
@@ -1025,6 +1148,7 @@ func SetSecondInventory(c *gin.Context) {
 
 	var (
 		invTaskSelfBuilt model.InvTaskSelfBuilt
+		taskRecords      []model.InvTaskRecord
 	)
 
 	result := db.First(&invTaskSelfBuilt, form.Id)
@@ -1045,10 +1169,44 @@ func SetSecondInventory(c *gin.Context) {
 	}
 
 	result = db.Model(&model.InvTaskRecord{}).
-		Where("order_no = ? and sku in (?)", invTaskSelfBuilt.OrderNo, form.Sku).
-		Updates(map[string]interface{}{
-			"inv_type": form.InvType,
+		Where("self_built_id = ? and order_no = ? and sku in (?)", form.Id, invTaskSelfBuilt.OrderNo, form.Sku).
+		Find(&taskRecords)
+
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	taskRecordMp := make(map[string]model.InvTaskRecord, 0)
+
+	for _, tr := range taskRecords {
+		taskRecordMp[tr.Sku] = tr
+	}
+
+	//生成复盘记录数据
+	list := make([]model.InvTaskRecord, 0, len(form.Sku))
+
+	for _, s := range form.Sku {
+		skuVal, ok := taskRecordMp[s]
+
+		if !ok {
+			continue
+		}
+
+		list = append(list, model.InvTaskRecord{
+			SelfBuiltId: form.Id,
+			OrderNo:     invTaskSelfBuilt.OrderNo,
+			Sku:         s,
+			InvType:     2,
+			GoodsName:   skuVal.GoodsName,
+			GoodsType:   skuVal.GoodsType,
+			GoodsSpe:    skuVal.GoodsSpe,
+			GoodsUnit:   skuVal.GoodsUnit,
+			BookNum:     skuVal.BookNum,
 		})
+	}
+
+	result = db.Model(&model.InvTaskRecord{}).Save(&list)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
