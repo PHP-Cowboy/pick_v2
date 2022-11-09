@@ -1578,16 +1578,14 @@ func Topping(c *gin.Context) {
 		return
 	}
 
-	val, err := cache.GetIncrByKey(constant.BATCH_TOPPING)
+	val, err := cache.Incr(constant.BATCH_TOPPING)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
-	sort := int(val.(int64))
-
-	result := global.DB.Model(model.Batch{}).Where("id = ?", form.Id).Update("sort", sort)
+	result := global.DB.Model(model.Batch{}).Where("id = ?", form.Id).Update("sort", val)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

@@ -132,6 +132,8 @@ func GetGoodsList(c *gin.Context) {
 		return
 	}
 
+	res.Total = total
+
 	res.List = list
 
 	xsq_net.SucJson(c, res)

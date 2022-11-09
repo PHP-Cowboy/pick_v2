@@ -5,7 +5,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
@@ -139,24 +139,7 @@ func SyncShop(c *gin.Context) {
 
 	db := global.DB
 
-	//更新时不能更新线路，新增时保存线路
-	maxShopId := 0
-
-	res := db.Raw("SELECT id FROM t_shop ORDER BY id DESC LIMIT 1")
-	if res.Error != nil {
-		if !errors.Is(res.Error, gorm.ErrRecordNotFound) {
-			xsq_net.ErrorJSON(c, res.Error)
-			return
-		}
-	} else {
-		res.Scan(&maxShopId)
-	}
-
 	for _, shop := range result.Data {
-		//接口查到的id比当前存储的最大id大时，保存数据
-		if shop.Id <= maxShopId {
-			continue
-		}
 
 		shops = append(shops, &model.Shop{
 			Id:        shop.Id,
@@ -176,18 +159,20 @@ func SyncShop(c *gin.Context) {
 		})
 	}
 
-	//有需要保存的店铺数据
-	if len(shops) > 0 {
-		res = db.Save(&shops)
+	res := db.Model(&model.Shop{}).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"shop_id", "shop_name", "house_code", "warehouse", "typ", "province", "city", "district", "shop_code", "status"}),
+		}).
+		Create(&shops)
 
-		if res.Error != nil {
-			xsq_net.ErrorJSON(c, res.Error)
-		}
+	if res.Error != nil {
+		xsq_net.ErrorJSON(c, res.Error)
+	}
 
-		if err = cache.SetShopLine(); err != nil {
-			xsq_net.ErrorJSON(c, errors.New("店铺更新成功，但缓存更新失败"))
-			return
-		}
+	if err = cache.SetShopLine(); err != nil {
+		xsq_net.ErrorJSON(c, errors.New("店铺更新成功，但缓存更新失败"))
+		return
 	}
 
 	xsq_net.Success(c)

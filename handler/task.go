@@ -33,16 +33,14 @@ func PickTopping(c *gin.Context) {
 		return
 	}
 
-	val, err := cache.GetIncrByKey(constant.PICK_TOPPING)
+	val, err := cache.Incr(constant.PICK_TOPPING)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
-	rdsSort := int(val.(int64))
-
-	result := global.DB.Model(model.Pick{}).Where("id = ?", form.Id).Update("sort", rdsSort)
+	result := global.DB.Model(model.Pick{}).Where("id = ?", form.Id).Update("sort", val)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

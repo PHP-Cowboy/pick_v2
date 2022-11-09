@@ -99,29 +99,50 @@ func GetUserList(c *gin.Context) {
 
 	var (
 		users []model.User
+		count int64
 		res   rsp.UserListRsp
 	)
 
-	db := global.DB
+	localDb := global.DB.
+		Model(&model.User{}).
+		Where(&model.User{
+			WarehouseId: form.WarehouseId,
+			RoleId:      form.RoleId,
+		}).
+		Where("delete_time is null")
 
-	result := db.Where("delete_time is null").Find(&users)
+	if form.Name != "" {
+		localDb.Where("name like (?)", "%"+form.Name+"%")
+	}
+
+	result := localDb.Count(&count)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	res.Total = result.RowsAffected
+	res.Total = count
 
-	db.Where("delete_time is null").Scopes(model.Paginate(form.Page, form.Size)).Find(&users)
+	result = localDb.
+		Scopes(model.Paginate(form.Page, form.Size)).
+		Find(&users)
 
-	status := false
+	if result.Error != nil {
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	list := make([]*rsp.User, 0, len(users))
 
 	for _, user := range users {
+
+		status := false
+
 		if user.Status == 1 {
 			status = true
 		}
-		res.List = append(res.List, &rsp.User{
+		list = append(list, &rsp.User{
 			Id:          user.Id,
 			Account:     strconv.Itoa(user.Id),
 			Name:        user.Name,
@@ -131,6 +152,8 @@ func GetUserList(c *gin.Context) {
 			CreateTime:  user.CreateTime.Format(timeutil.TimeFormat),
 		})
 	}
+
+	res.List = list
 
 	xsq_net.SucJson(c, res)
 }

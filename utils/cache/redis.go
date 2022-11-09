@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"pick_v2/global"
 	"pick_v2/utils/str_util"
 	"pick_v2/utils/timeutil"
@@ -15,33 +16,23 @@ func GetIncrNumberByKey(key string, padLength int) (string, error) {
 	//rds key
 	redisKey := key + dateNumber
 
-	val, err := global.Redis.Do(context.Background(), "incr", redisKey).Result()
+	val, err := Incr(redisKey)
 	if err != nil {
 		return "", err
 	}
 
 	//设置过期时间
-	err = Expire(redisKey, 24*60*60)
-	if err != nil {
-		return "", err
-	}
+	err = Expire(redisKey, 24*time.Hour)
 
-	number := strconv.Itoa(int(val.(int64)))
+	number := strconv.Itoa(int(val))
 
 	No := dateNumber + str_util.StrPad(number, padLength, "0", 0)
 
 	return No, nil
 }
 
-func GetIncrByKey(key string) (interface{}, error) {
-
-	val, err := global.Redis.Do(context.Background(), "incr", key).Result()
-
-	if err != nil {
-		return val, err
-	}
-
-	return val, nil
+func Incr(key string) (int64, error) {
+	return global.Redis.Incr(context.Background(), key).Result()
 }
 
 func TTL(key string) (time.Duration, error) {
@@ -57,15 +48,38 @@ func Get(key string) (string, error) {
 }
 
 func SetNx(key string, val string) error {
-	return global.Redis.SetNX(context.Background(), key, val, 0).Err()
+	ok, err := global.Redis.SetNX(context.Background(), key, val, 0).Result()
+
+	if !ok {
+		return errors.New("设置过期时间失败")
+	}
+
+	return err
 }
 
-// 删除
-func Del(key string) error {
-	return global.Redis.Del(context.Background(), key).Err()
+// DEL 命令用于删除已存在的键。不存在的 key 会被忽略。
+// 返回值: 被删除 key 的数量。
+func Del(key string) (int64, error) {
+	return global.Redis.Del(context.Background(), key).Result()
 }
 
 // 设置过期时间
-func Expire(key string, second int) error {
-	return global.Redis.Expire(context.Background(), key, time.Duration(second)).Err()
+func Expire(key string, d time.Duration) error {
+	ok, err := global.Redis.Expire(context.Background(), key, d).Result()
+
+	if !ok {
+		return errors.New("设置过期时间失败")
+	}
+
+	return err
+}
+
+func ExpireAt(key string, second int) error {
+	ok, err := global.Redis.ExpireAt(context.Background(), key, time.Now().Add(time.Duration(second))).Result()
+
+	if !ok {
+		return errors.New("设置过期时间失败")
+	}
+
+	return err
 }
