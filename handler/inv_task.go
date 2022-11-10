@@ -319,14 +319,15 @@ func Export(c *gin.Context) {
 	sheet := xFile.NewSheet("sheet1")
 
 	// 设置单元格的值
-	xFile.MergeCell("Sheet1", "A1", "F1")
+	xFile.MergeCell("Sheet1", "A1", "H1")
 	xFile.SetCellValue("Sheet1", "A2", "Sku")
 	xFile.SetCellValue("Sheet1", "B2", "商品名称")
 	xFile.SetCellValue("Sheet1", "C2", "商品分类")
 	xFile.SetCellValue("Sheet1", "D2", "账面数量")
 	xFile.SetCellValue("Sheet1", "E2", "首次盘点数量")
-	xFile.SetCellValue("Sheet1", "F2", "盈亏数量")
+	xFile.SetCellValue("Sheet1", "F2", "首次盈亏数量")
 	xFile.SetCellValue("Sheet1", "G2", "二次盘点数量")
+	xFile.SetCellValue("Sheet1", "H2", "二次盈亏数量")
 
 	xFile.SetActiveSheet(sheet)
 	//设置指定行高 指定列宽
@@ -350,6 +351,9 @@ func Export(c *gin.Context) {
 			sNum, sOk := invNum[2]
 			if sOk {
 				secondInvNum = sNum
+			} else {
+				//导出时二次盘点如果盘了，就取二次盘点数量，如果没盘就取一次盘点数量
+				secondInvNum = firstInvNum
 			}
 		}
 
@@ -361,6 +365,7 @@ func Export(c *gin.Context) {
 		item = append(item, firstInvNum)
 		item = append(item, firstInvNum-val.BookNum)
 		item = append(item, secondInvNum)
+		item = append(item, secondInvNum-val.BookNum)
 
 		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+idx), &item)
 	}
