@@ -150,32 +150,66 @@ func SyncTask(c *gin.Context) {
 // 同步商品
 func SyncGoods(tx *gorm.DB, selfBuiltId int) error {
 	// 自建盘点单，暂不绑定时,同步全部商品
-	//todo 拉取商品数据
-	resp := []int{1}
-	//构造任务商品数据
-	list := make([]model.InvTaskRecord, 0, len(resp))
+	// 拉取商品数据
+	u8 := global.ServerConfig.U8Api
+	url := fmt.Sprintf("%s:%d/api/v1/checklist", u8.Url, u8.Port)
+	method := "POST"
 
-	for _, d := range resp {
+	client := &http.Client{}
+	rq, err := http.NewRequest(method, url, nil)
+
+	if err != nil {
+		return err
+	}
+
+	rq.Header.Add("x-sign", middlewares.Generate())
+
+	res, err := client.Do(rq)
+	if err != nil {
+		global.Logger["err"].Infof("%s", url)
+		return err
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	var resp rsp.SyncTaskRsp
+
+	err = json.Unmarshal(body, &resp)
+
+	if err != nil {
+		return err
+	}
+
+	if resp.Code != 200 {
+		return errors.New(resp.Msg)
+	}
+
+	//构造任务商品数据
+	list := make([]model.InvTaskRecord, 0, len(resp.Data))
+
+	for _, d := range resp.Data {
 		list = append(list, model.InvTaskRecord{
 			SelfBuiltId: selfBuiltId,
 			OrderNo:     "",
-			Sku:         "1010001",
-			InvType:     d,
-			GoodsName:   "草莓果泥",
-			GoodsType:   "果酱类",
-			GoodsSpe:    "2L*8瓶/件",
-			GoodsUnit:   "瓶",
+			Sku:         d.CInvCode,
+			GoodsName:   d.CInvName,
+			GoodsType:   d.Cate,
+			GoodsSpe:    d.CInvStd,
+			GoodsUnit:   d.CComUnitName,
 			BookNum:     0,
 		})
 	}
 
+	//self_built_id order_no sku inv_type 唯一
 	result := tx.Model(&model.InvTaskRecord{}).Save(&list)
 
 	if result.Error != nil {
 		return result.Error
 	}
-
-	//self_built_id order_no sku inv_type 唯一 save
 
 	return nil
 }
@@ -245,8 +279,9 @@ func Export(c *gin.Context) {
 
 	db := global.DB
 
+	//只拿 inv_type 为1的，二次盘点的数量根据sku填充
 	result := db.Model(&model.InvTaskRecord{}).
-		Where(model.InvTaskRecord{OrderNo: form.OrderNo}).
+		Where(model.InvTaskRecord{SelfBuiltId: form.Id, InvType: 1}).
 		Find(&records)
 
 	if result.Error != nil {
@@ -255,29 +290,29 @@ func Export(c *gin.Context) {
 	}
 
 	var (
-		skuSlice     []string
-		skuInvNumSum []rsp.SkuInvNumSum
-		sumMp        = make(map[string]float64, 0)
+		invSumMp     = make(map[string]map[int]float64, 0)
+		invRecordSum []model.InvRecordSum
 	)
 
-	//获取查询到的全部sku，查询sku盘点数量并计算盈亏数量
-	for _, rs := range records {
-		skuSlice = append(skuSlice, rs.Sku)
-	}
-
-	result = db.Model(&model.InventoryRecord{}).
-		Select("sum(inventory_num) as sum,sku").
-		Where("order_no = ? and sku in (?) and is_delete = 1", form.OrderNo, skuSlice).
-		Group("sku").
-		Find(&skuInvNumSum)
+	result = db.Model(&model.InvRecordSum{}).Where("self_built_id = ? ", form.Id).Find(&invRecordSum)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	for _, inv := range skuInvNumSum {
-		sumMp[inv.Sku] = inv.Sum
+	// invSumMp["1010001"][1] = 100.01
+	for _, ir := range invRecordSum {
+
+		val, ok := invSumMp[ir.Sku]
+
+		if !ok {
+			val = make(map[int]float64, 0)
+		}
+
+		val[ir.InvType] = ir.InventoryNum
+
+		invSumMp[ir.Sku] = val
 	}
 
 	xFile := excelize.NewFile()
@@ -289,8 +324,9 @@ func Export(c *gin.Context) {
 	xFile.SetCellValue("Sheet1", "B2", "商品名称")
 	xFile.SetCellValue("Sheet1", "C2", "商品分类")
 	xFile.SetCellValue("Sheet1", "D2", "账面数量")
-	xFile.SetCellValue("Sheet1", "E2", "盘点数量")
+	xFile.SetCellValue("Sheet1", "E2", "首次盘点数量")
 	xFile.SetCellValue("Sheet1", "F2", "盈亏数量")
+	xFile.SetCellValue("Sheet1", "G2", "二次盘点数量")
 
 	xFile.SetActiveSheet(sheet)
 	//设置指定行高 指定列宽
@@ -300,10 +336,21 @@ func Export(c *gin.Context) {
 	startCount := 3
 	for idx, val := range records {
 
-		invSum, sumOk := sumMp[val.Sku]
+		var firstInvNum, secondInvNum float64
 
-		if !sumOk {
-			invSum = 0
+		invNum, invSumOk := invSumMp[val.Sku]
+
+		if invSumOk {
+			//首次盘点数量
+			fNum, fOk := invNum[1]
+			if fOk {
+				firstInvNum = fNum
+			}
+			//二次盘点数量
+			sNum, sOk := invNum[2]
+			if sOk {
+				secondInvNum = sNum
+			}
 		}
 
 		item := make([]interface{}, 0)
@@ -311,8 +358,9 @@ func Export(c *gin.Context) {
 		item = append(item, val.GoodsName)
 		item = append(item, val.GoodsType)
 		item = append(item, val.BookNum)
-		item = append(item, invSum)
-		item = append(item, invSum-val.BookNum)
+		item = append(item, firstInvNum)
+		item = append(item, firstInvNum-val.BookNum)
+		item = append(item, secondInvNum)
 
 		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+idx), &item)
 	}
@@ -1010,7 +1058,7 @@ func ChangeSelfBuiltTask(c *gin.Context) {
 
 	//更新盘点任务商品记录表
 	result = tx.Model(&model.InvTaskRecord{}).
-		Where("self_built_id = 0 and order_no = ", form.OrderNo).
+		Where("self_built_id = 0 and order_no = ?", form.OrderNo).
 		Update("self_built_id", form.Id)
 
 	if result.Error != nil {
@@ -1042,8 +1090,7 @@ func SelfBuiltTaskList(c *gin.Context) {
 
 	localDb := db.Table("t_inv_task_self_built sbt").
 		Select("sbt.*,it.task_date,it.warehouse,it.book_num,it.remark").
-		Joins("left join t_inv_task it on sbt.order_no = it.order_no").
-		Where("sbt.status = 1")
+		Joins("left join t_inv_task it on sbt.order_no = it.order_no")
 
 	result := localDb.Find(&tasks)
 
@@ -1115,11 +1162,11 @@ func SelfBuiltTaskList(c *gin.Context) {
 
 		list = append(list, &rsp.SelfBuiltTask{
 			Id:            task.Id,
-			CreateTime:    task.CreateTime.Format(timeutil.TimeFormat),
+			CreateTime:    timeutil.FormatToDateTime(task.CreateTime),
 			OrderNo:       task.OrderNo,
 			TaskName:      task.TaskName,
 			Warehouse:     task.Warehouse,
-			TaskDate:      task.TaskDate.Format(timeutil.DateFormat),
+			TaskDate:      timeutil.FormatToDate(task.TaskDate),
 			Status:        task.Status,
 			BookNum:       task.BookNum,
 			InventoryNum:  invSum,

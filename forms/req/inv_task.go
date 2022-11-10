@@ -1,8 +1,8 @@
 package req
 
 type ChangeTaskForm struct {
-	Id     string `json:"id" binding:"required"`
-	Status int    `json:"status" binding:"required"`
+	Id     int `json:"id" binding:"required"`
+	Status int `json:"status" binding:"required"`
 }
 
 type TaskRecordListForm struct {
@@ -17,11 +17,11 @@ type TaskRecordListForm struct {
 }
 
 type ExportForm struct {
-	OrderNo string `json:"order_no" form:"order_no" binding:"required"`
+	Id int `json:"id" form:"id" binding:"required"`
 }
 
 type TypeListForm struct {
-	OrderNo string `json:"order_no" form:"order_no" binding:"required"`
+	OrderNo string `json:"order_no" form:"order_no"`
 }
 
 type InventoryRecordListForm struct {
