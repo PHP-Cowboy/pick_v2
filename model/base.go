@@ -26,8 +26,8 @@ type Base struct {
 }
 
 type Creator struct {
-	CreatorId int    `gorm:"type:int(11) unsigned;comment:操作人id"`
-	Creator   string `gorm:"type:varchar(32);comment:操作人昵称"`
+	CreatorId int    `gorm:"type:int(11) unsigned;comment:创建人id"`
+	Creator   string `gorm:"type:varchar(32);comment:创建人昵称"`
 }
 
 type GormList []string

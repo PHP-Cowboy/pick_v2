@@ -575,7 +575,7 @@ func EndBatch(c *gin.Context) {
 	//查询批次下全部订单
 	result = db.Model(&model.PickGoods{}).Where("batch_id = ? ", form.Id).Find(&pickGoods)
 	if result.Error != nil {
-		global.SugarLogger.Error("批次结束成功，但推送u8拣货数据查询失败:" + result.Error.Error())
+		global.Logger["err"].Infof("批次结束成功，但推送u8拣货数据查询失败:%s", result.Error.Error())
 		xsq_net.ErrorJSON(c, errors.New("批次结束成功，但推送u8拣货数据查询失败"))
 		return
 	}
@@ -583,7 +583,7 @@ func EndBatch(c *gin.Context) {
 	result = db.Model(&model.Pick{}).Where("batch_id = ?", form.Id).Find(&pick)
 
 	if result.Error != nil {
-		global.SugarLogger.Error("批次结束成功，但推送u8拣货数据查询失败:" + result.Error.Error())
+		global.Logger["err"].Infof("批次结束成功，但推送u8拣货数据查询失败:%s", result.Error.Error())
 		xsq_net.ErrorJSON(c, errors.New("批次结束成功，但推送u8拣货主表数据查询失败"))
 		return
 	}
@@ -847,7 +847,7 @@ func SyncBatch(batchId int) error {
 	err := p.Start()
 
 	if err != nil {
-		global.SugarLogger.Errorf("start producer error: %s", err.Error())
+		global.Logger["err"].Infof("start producer error: %s", err.Error())
 		return err
 	}
 
@@ -861,16 +861,16 @@ func SyncBatch(batchId int) error {
 	res, err := p.SendSync(context.Background(), msg)
 
 	if err != nil {
-		global.SugarLogger.Errorf("send message error: %s\n", err)
+		global.Logger["err"].Infof("send message error: %s", err.Error())
 		return err
 	} else {
-		global.SugarLogger.Infof("send message success: result=%s\n", res.String())
+		global.Logger["info"].Infof("send message success: result=%s", res.String())
 	}
 
 	err = p.Shutdown()
 
 	if err != nil {
-		global.SugarLogger.Errorf("shutdown producer error: %s", err.Error())
+		global.Logger["err"].Infof("shutdown producer error: %s", err.Error())
 		return err
 	}
 
@@ -2322,8 +2322,6 @@ func PrintCallGet(c *gin.Context) {
 		xsq_net.SucJson(c, nil)
 		return
 	}
-
-	global.SugarLogger.Infof("house_code:%+v", printCh)
 
 	var (
 		pick          model.Pick

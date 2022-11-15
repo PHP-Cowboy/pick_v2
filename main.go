@@ -16,15 +16,11 @@ import (
 
 func main() {
 
-	initialize.InitLogger()
-
 	initialize.InitNewLogger()
 
 	initialize.InitConfig()
 
 	initialize.InitMysql()
-
-	//initialize.InitSqlServer()
 
 	initialize.InitJob()
 
@@ -55,7 +51,7 @@ func main() {
 	}
 
 	if err := c.Subscribe("purchase_order", consumer.MessageSelector{}, handler.Order); err != nil {
-		global.SugarLogger.Errorf("消费topic：purchase_order失败:%s", err.Error())
+		global.Logger["err"].Infof("消费topic：purchase_order失败:%s", err.Error())
 	}
 
 	_ = c.Start()

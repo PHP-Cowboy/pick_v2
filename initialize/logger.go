@@ -11,15 +11,6 @@ import (
 
 var logSlice = []string{"sql", "err", "info"}
 
-func InitLogger() {
-	encoder := getEncoder()
-	writeSyncer := getLogWriter("./logs/")
-	core := zapcore.NewCore(encoder, writeSyncer, zapcore.DebugLevel)
-
-	logger := zap.New(core, zap.AddCaller())
-	global.SugarLogger = logger.Sugar()
-}
-
 func InitNewLogger() {
 	encoder := getEncoder()
 

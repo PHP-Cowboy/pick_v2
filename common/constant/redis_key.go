@@ -7,4 +7,5 @@ var (
 	DELIVERY_ORDER_NO = "DeliveryOrderNo"
 	PICK_ORDER_NO     = "PickOrderNo"
 	BATCH_SUPPLEMENT  = "BatchSupplement"
+	OUTBOUND_ORDER_NO = "OutBoundOrderNo"
 )

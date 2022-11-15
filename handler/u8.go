@@ -53,7 +53,6 @@ type PickGoods struct {
 }
 
 func SendShopXml(xml string) (string, error) {
-	global.SugarLogger.Info(xml)
 	var (
 		requestUrl string
 		err        error
@@ -65,21 +64,21 @@ func SendShopXml(xml string) (string, error) {
 
 	request, err = http.NewRequest(http.MethodPost, requestUrl, strings.NewReader(xml))
 	if err != nil {
-		global.SugarLogger.Error("请求失败", err)
+		global.Logger["err"].Infof("请求失败:%s", err.Error())
 		return "", err
 	}
 	request.Header.Set("Content-Type", "application/xml")
 	client := &http.Client{}
 	response, err = client.Do(request)
 	if err != nil {
-		global.SugarLogger.Error("请求用友失败1", err)
+		global.Logger["err"].Infof("请求用友失败1:%s", err.Error())
 		return "", err
 	}
 	defer response.Body.Close()
 
 	rspBody, err = io.ReadAll(response.Body)
 	if err != nil {
-		global.SugarLogger.Error("请求用友失败2", err)
+		global.Logger["err"].Infof("请求用友失败2:%s", err.Error())
 		return "", err
 	}
 	return string(rspBody), nil

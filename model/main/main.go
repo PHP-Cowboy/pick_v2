@@ -96,4 +96,10 @@ func main() {
 
 	_ = db.Set(model.TableOptions, model.GetOptions("用户盘点记录表")).AutoMigrate(&model.InventoryRecord{})
 
+	_ = db.Set(model.TableOptions, model.GetOptions("出库单任务表")).AutoMigrate(&model.OutboundTask{})
+
+	_ = db.Set(model.TableOptions, model.GetOptions("出库单订单表")).AutoMigrate(&model.OutboundOrder{})
+
+	_ = db.Set(model.TableOptions, model.GetOptions("出库单商品表")).AutoMigrate(&model.OutboundGoods{})
+
 }

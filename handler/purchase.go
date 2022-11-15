@@ -26,7 +26,7 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 	for i := range messages {
 		err := json.Unmarshal(messages[i].Body, &Id)
 		if err != nil {
-			global.SugarLogger.Errorf("解析json失败:%s", err.Error())
+			global.Logger["err"].Infof("解析json失败:%s", err.Error())
 			return consumer.ConsumeRetryLater, nil
 		}
 		form.OrderId = append(form.OrderId, Id)
@@ -35,7 +35,7 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 	orderRsp, err := GetOrderInfo(form)
 
 	if err != nil {
-		global.SugarLogger.Error(err.Error())
+		global.Logger["err"].Infof(err.Error())
 		return consumer.ConsumeRetryLater, err
 	}
 

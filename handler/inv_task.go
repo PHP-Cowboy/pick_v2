@@ -41,7 +41,6 @@ func SyncTask(c *gin.Context) {
 	res, err := client.Do(rq)
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
-		global.Logger["err"].Infof("%s", url)
 		return
 	}
 	defer res.Body.Close()
@@ -166,7 +165,6 @@ func SyncGoods(tx *gorm.DB, selfBuiltId int) error {
 
 	res, err := client.Do(rq)
 	if err != nil {
-		global.Logger["err"].Infof("%s", url)
 		return err
 	}
 	defer res.Body.Close()
