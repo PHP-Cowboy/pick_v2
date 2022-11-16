@@ -40,4 +40,22 @@ type OutboundOrderListForm struct {
 }
 
 type OutboundOrderDetailForm struct {
+	TaskId int    `json:"task_id" form:"task_id" binding:"required"`
+	Number string `json:"number" form:"number" binding:"required"`
+}
+
+type OrderLimitForm struct {
+	TaskId     int          `json:"task_id" binding:"required"`
+	Number     string       `json:"number" binding:"required"`
+	OrderLimit []OrderLimit `json:"order_limit" binding:"required"`
+}
+
+type OrderLimit struct {
+	Sku      string `json:"sku" binding:"required"`
+	LimitNum int    `json:"limit_num" binding:"required"`
+}
+
+type TaskLimitForm struct {
+	TaskId int    `json:"task_id" form:"task_id" binding:"required"`
+	Sku    string `json:"sku" form:"sku" binding:"required"`
 }

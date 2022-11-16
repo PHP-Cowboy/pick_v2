@@ -1,11 +1,15 @@
 package dao
 
 import (
+	"errors"
+	"fmt"
 	"gorm.io/gorm"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/middlewares"
 	"pick_v2/model"
+	"pick_v2/utils/cache"
+	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"strings"
 	"time"
@@ -283,15 +287,36 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 }
 
 // 出库订单列表
-func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, res rsp.OutboundTaskListRsp) {
+func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, res rsp.OutboundOrderListRsp) {
+
+	var (
+		numbers        []string
+		outboundOrders []model.OutboundOrder
+	)
 
 	if form.Sku != "" {
+		var outboundGoods []model.OutboundGoods
+		goodsRes := db.Model(&model.OutboundGoods{}).
+			Select("number").
+			Where(&model.OutboundGoods{TaskId: form.TaskId, Sku: form.Sku}).
+			Find(&outboundGoods)
 
+		if goodsRes.Error != nil {
+			return goodsRes.Error, res
+		}
+
+		for _, good := range outboundGoods {
+			numbers = append(numbers, good.Number)
+		}
 	}
 
-	localDb := db.Model(&model.OutboundOrder{}).Where(&model.OutboundOrder{
-		TaskId:           form.TaskId,
-		Number:           form.Number,
+	localDb := db.Model(&model.OutboundOrder{}).Where("task_id = ?", form.TaskId)
+
+	if len(numbers) > 0 {
+		localDb.Where("number in (?)", numbers)
+	}
+
+	localDb.Where(&model.OutboundOrder{
 		ShopId:           form.ShopId,
 		ShopType:         form.ShopType,
 		DistributionType: form.DistributionType,
@@ -305,6 +330,129 @@ func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, 
 	if form.HasRemark != nil {
 		localDb.Where("has_remark = ?", *form.HasRemark)
 	}
+
+	result := localDb.Find(&outboundOrders)
+
+	if result.Error != nil {
+		return result.Error, res
+	}
+
+	res.Total = result.RowsAffected
+
+	result = localDb.Scopes(model.Paginate(form.Page, form.Size)).Find(&outboundOrders)
+
+	if result.Error != nil {
+		return result.Error, res
+	}
+
+	list := make([]rsp.OutboundOrderList, 0, len(outboundOrders))
+
+	for _, order := range outboundOrders {
+		list = append(list, rsp.OutboundOrderList{
+			Number:            order.Number,
+			PayAt:             order.PayAt,
+			ShopName:          order.ShopName,
+			ShopType:          order.ShopType,
+			DistributionType:  order.DistributionType,
+			GoodsNum:          order.GoodsNum,
+			LimitNum:          order.LimitNum,
+			CloseNum:          order.CloseNum,
+			Line:              order.Line,
+			Region:            fmt.Sprintf("%s-%s-%s", order.Province, order.City, order.District),
+			LatestPickingTime: order.LatestPickingTime,
+			OrderRemark:       order.OrderRemark,
+			OrderType:         order.OrderType,
+		})
+	}
+
+	res.List = list
+
+	return nil, res
+}
+
+func OutboundOrderDetail(db *gorm.DB, form req.OutboundOrderDetailForm) (err error, res rsp.OrderDetail) {
+
+	var (
+		outboundOrder model.OutboundOrder
+		outboundGoods []model.OutboundGoods
+	)
+
+	result := db.Model(&model.OutboundOrder{}).
+		Where(&model.OutboundOrder{
+			TaskId: form.TaskId,
+			Number: form.Number,
+		}).
+		First(&outboundOrder)
+
+	if result.Error != nil {
+		return result.Error, res
+	}
+
+	result = db.Model(&model.OutboundGoods{}).
+		Where(&model.OutboundGoods{
+			TaskId: form.TaskId,
+			Number: form.Number,
+		}).
+		Find(&outboundGoods)
+
+	if result.Error != nil {
+		return result.Error, res
+	}
+
+	mp, err := cache.GetClassification()
+
+	if err != nil {
+		return err, res
+	}
+
+	detailMap := make(map[string]*rsp.Detail, 0)
+
+	deliveryOrderNoArr := make(model.GormList, 0)
+
+	for _, goods := range outboundGoods {
+		goodsType, ok := mp[goods.GoodsType]
+
+		if !ok {
+			return errors.New("商品类型:" + goods.GoodsType + "数据未同步"), res
+		}
+
+		deliveryOrderNoArr = append(deliveryOrderNoArr, goods.DeliveryOrderNo...)
+
+		if _, detailOk := detailMap[goodsType]; !detailOk {
+			detailMap[goodsType] = &rsp.Detail{
+				Total: 0,
+				List:  make([]*rsp.GoodsDetail, 0),
+			}
+		}
+
+		detailMap[goodsType].Total += goods.PayCount
+
+		detailMap[goodsType].List = append(detailMap[goodsType].List, &rsp.GoodsDetail{
+			Name:        goods.GoodsName,
+			GoodsSpe:    goods.GoodsSpe,
+			Shelves:     goods.Shelves,
+			PayCount:    goods.PayCount,
+			CloseCount:  goods.CloseCount,
+			LackCount:   goods.LimitNum, //需拣数 以限发数为准
+			OutCount:    goods.OutCount,
+			GoodsRemark: goods.GoodsRemark,
+		})
+	}
+
+	res.Number = outboundOrder.Number
+	res.PayAt = *outboundOrder.PayAt
+	res.ShopCode = outboundOrder.ShopCode
+	res.ShopName = outboundOrder.ShopName
+	res.Line = outboundOrder.Line
+	res.Region = outboundOrder.Province + outboundOrder.City + outboundOrder.District
+	res.ShopType = outboundOrder.ShopType
+	res.OrderRemark = outboundOrder.OrderRemark
+
+	res.Detail = detailMap
+
+	deliveryOrderNoArr = slice.UniqueStringSlice(deliveryOrderNoArr)
+	//历史出库单号
+	res.DeliveryOrderNo = deliveryOrderNoArr
 
 	return nil, res
 }

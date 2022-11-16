@@ -99,4 +99,12 @@ func OutboundOrderDetail(c *gin.Context) {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
+
+	err, rsp := dao.OutboundOrderDetail(global.DB, form)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.SucJson(c, rsp)
 }

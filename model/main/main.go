@@ -86,6 +86,8 @@ func main() {
 
 	_ = db.Set(model.TableOptions, model.GetOptions("限制发货")).AutoMigrate(&model.RestrictedShipment{})
 
+	_ = db.Set(model.TableOptions, model.GetOptions("限制发货")).AutoMigrate(&model.LimitShipment{})
+
 	_ = db.Set(model.TableOptions, model.GetOptions("推送日志")).AutoMigrate(&model.StockLog{})
 
 	_ = db.Set(model.TableOptions, model.GetOptions("盘点任务表")).AutoMigrate(&model.InvTask{})
