@@ -16,10 +16,6 @@ func OrderRoute(g *gin.RouterGroup) {
 		orderGroup.GET("/pickOrderCount", handler.PickOrderCount)
 		//拣货单明细
 		orderGroup.GET("/pickOrderDetail", handler.GetPickOrderDetail)
-		//配送方式明细
-		orderGroup.GET("/deliveryMethodInfo", handler.DeliveryMethodInfo)
-		//修改配送方式
-		orderGroup.POST("/changeDeliveryMethod", handler.ChangeDeliveryMethod)
 		//拣货单商品列表
 		orderGroup.GET("/orderGoodsList", handler.OrderGoodsList)
 		//限发

@@ -1,5 +1,7 @@
 package model
 
+import "gorm.io/gorm"
+
 // 预拣货商品明细
 type PrePickGoods struct {
 	Base
@@ -22,4 +24,10 @@ type PrePickGoods struct {
 	OutCount         int    `gorm:"type:int;comment:出库数量"`
 	NeedOutNum       int    `gorm:"type:int;comment:需出库数量"`
 	Status           int    `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:已进入拣货池"`
+}
+
+func PrePickGoodsBatchSave(db *gorm.DB, list []PrePickGoods) (err error) {
+	result := db.Model(&PrePickGoods{}).Save(&list)
+
+	return result.Error
 }

@@ -14,7 +14,7 @@ type OutboundTaskList struct {
 	DeliveryEndTime   *model.MyTime `json:"delivery_end_time"`
 	Line              string        `json:"line"`
 	DistributionType  int           `json:"distribution_type"`
-	EndTime           *model.MyTime `json:"end_time"`
+	PayEndTime        *model.MyTime `json:"pay_end_time"`
 	Status            int           `json:"status"`
 	IsPush            int           `json:"is_push"`
 }

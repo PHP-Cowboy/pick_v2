@@ -30,15 +30,6 @@ type PickOrderCountForm struct {
 	PayEndTime       string `json:"pay_end_time"  form:"pay_end_time"`
 }
 
-type ChangeDeliveryMethodForm struct {
-	Id             int `json:"id"`
-	DeliveryMethod int `json:"delivery_method"`
-}
-
-type DeliveryMethodInfoForm struct {
-	Id int `json:"id" form:"id" binding:"required"`
-}
-
 type OrderGoodsListForm struct {
 	PickNumber string `json:"pick_number" form:"pick_number"`
 }

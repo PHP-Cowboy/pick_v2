@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"gorm.io/gorm"
+	"time"
+)
 
 // 订单商品表
 type OrderGoods struct {
@@ -79,3 +82,10 @@ const (
 	OrderGoodsUnhandledStatus  //未处理
 	OrderGoodsProcessingStatus //处理中
 )
+
+// 更新订单商品数据
+func UpdateOrderGoodsByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
+	result := db.Model(&OrderGoods{}).Where("id in (?)", ids).Updates(mp)
+
+	return result.Error
+}

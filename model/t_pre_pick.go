@@ -1,5 +1,7 @@
 package model
 
+import "gorm.io/gorm"
+
 // 预拣货列表
 type PrePick struct {
 	Base
@@ -10,4 +12,10 @@ type PrePick struct {
 	ShopName    string `gorm:"type:varchar(64);not null;comment:店铺名称"`
 	Line        string `gorm:"type:varchar(255);not null;comment:线路"`
 	Status      int    `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:已进入拣货池"`
+}
+
+func PrePickBatchSave(db *gorm.DB, list []PrePick) (err error, res []PrePick) {
+	result := db.Model(&PrePick{}).Save(&list)
+
+	return result.Error, list
 }

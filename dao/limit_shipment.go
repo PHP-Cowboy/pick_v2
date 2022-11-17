@@ -71,14 +71,15 @@ func OrderLimit(db *gorm.DB, form req.OrderLimitForm) error {
 
 	tx := db.Begin()
 
-	result = tx.Model(&model.LimitShipment{}).Save(&limitShipment)
+	err := model.LimitShipmentSave(tx, limitShipment)
 
-	if result.Error != nil {
+	if err != nil {
 		tx.Rollback()
-		return result.Error
+		return err
 	}
 
-	err := UpdateOutboundGoodsLimit(tx, outboundGoods)
+	//更新出库单商品的限发数量
+	err = UpdateOutboundGoodsLimit(tx, outboundGoods)
 
 	if err != nil {
 		tx.Rollback()
@@ -90,6 +91,7 @@ func OrderLimit(db *gorm.DB, form req.OrderLimitForm) error {
 	return nil
 }
 
+// 更新出库单商品的限发数量
 func UpdateOutboundGoodsLimit(db *gorm.DB, list []model.OutboundGoods) error {
 	result := db.Model(&model.OutboundGoods{}).
 		Select("limit_num").
@@ -108,8 +110,9 @@ func TaskLimit(db *gorm.DB, form req.TaskLimitForm) error {
 		outboundGoodsJoinOrder []model.OutboundGoodsJoinOrder
 	)
 
-	result := db.Model(&model.OutboundGoodsJoinOrder{}).
-		Select("sku,shop_name,goods_name,goods_spe").
+	result := db.Table("t_outbound_goods og").
+		Select("og.number,shop_name,goods_name,goods_spe").
+		Joins("left join t_outbound_order o on og.task_id = o.task_id and og.number = o.number").
 		Where(&model.OutboundGoodsJoinOrder{
 			TaskId: form.TaskId,
 			Sku:    form.Sku,
@@ -119,6 +122,48 @@ func TaskLimit(db *gorm.DB, form req.TaskLimitForm) error {
 	if result.Error != nil {
 		return result.Error
 	}
+
+	var (
+		limitShipment = make([]model.LimitShipment, 0, len(outboundGoodsJoinOrder))
+		outboundGoods = make([]model.OutboundGoods, 0, len(outboundGoodsJoinOrder))
+	)
+
+	for _, order := range outboundGoodsJoinOrder {
+		limitShipment = append(limitShipment, model.LimitShipment{
+			TaskId:    form.TaskId,
+			Number:    order.Number,
+			Sku:       form.Sku,
+			ShopName:  order.ShopName,
+			GoodsName: order.GoodsName,
+			GoodsSpe:  order.GoodsSpe,
+			LimitNum:  form.LimitNum,
+		})
+
+		outboundGoods = append(outboundGoods, model.OutboundGoods{
+			TaskId:   form.TaskId,
+			Number:   order.Number,
+			Sku:      form.Sku,
+			LimitNum: form.LimitNum,
+		})
+	}
+
+	tx := db.Begin()
+
+	err := model.LimitShipmentSave(tx, limitShipment)
+
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err = UpdateOutboundGoodsLimit(tx, outboundGoods)
+
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	tx.Commit()
 
 	return nil
 }

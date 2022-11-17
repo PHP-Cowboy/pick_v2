@@ -102,7 +102,7 @@ func OutboundTaskList(db *gorm.DB, form req.OutboundTaskListForm) (err error, re
 			DeliveryEndTime:   task.DeliveryEndTime,
 			Line:              task.Line,
 			DistributionType:  task.DistributionType,
-			EndTime:           task.EndTime,
+			PayEndTime:        task.PayEndTime,
 			Status:            task.Status,
 			IsPush:            task.IsPush,
 		})
@@ -139,7 +139,7 @@ func OutboundTaskSave(db *gorm.DB, form req.CreateOutboundForm, userInfo *middle
 		DeliveryEndTime:   (*model.MyTime)(&deliveryEndTime),
 		Line:              strings.Join(form.Lines, ""),
 		DistributionType:  form.DistributionType,
-		EndTime:           (*model.MyTime)(&payTime),
+		PayEndTime:        (*model.MyTime)(&payTime),
 		Creator: model.Creator{
 			CreatorId: userInfo.ID,
 			Creator:   userInfo.Name,
@@ -455,4 +455,19 @@ func OutboundOrderDetail(db *gorm.DB, form req.OutboundOrderDetailForm) (err err
 	res.DeliveryOrderNo = deliveryOrderNoArr
 
 	return nil, res
+}
+
+// 结束任务
+func EndOutboundTask(db *gorm.DB, form req.EndOutboundTaskForm) error {
+	return nil
+}
+
+// 关闭订单
+func OutboundTaskCloseOrder(db *gorm.DB, form req.OutboundTaskCloseOrderForm) (err error) {
+	return nil
+}
+
+// 临时加单
+func OutboundTaskAddOrder(db *gorm.DB, form req.OutboundTaskAddOrderForm) (err error) {
+	return nil
 }

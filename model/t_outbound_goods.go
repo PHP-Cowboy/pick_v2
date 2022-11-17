@@ -2,11 +2,12 @@ package model
 
 import (
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"time"
 )
 
 type OutboundGoods struct {
-	TaskId          int       `gorm:"primaryKey;type:int(11);not null;comment:t_outbound_task表ID"`
+	TaskId          int       `gorm:"primaryKey;type:int(11);comment:t_outbound_task表ID"`
 	Number          string    `gorm:"primaryKey;type:varchar(64);comment:订单编号"`
 	Sku             string    `gorm:"primaryKey;type:varchar(64);comment:sku"`
 	CreateTime      time.Time `gorm:"autoCreateTime;type:datetime;comment:创建时间"`
@@ -76,9 +77,39 @@ type OutboundGoodsJoinOrder struct {
 	DeliveryOrderNo   GormList `gorm:"type:varchar(255);comment:出库单号"`
 }
 
+const (
+	OutboundGoodsStatusUnhandled        = iota //未处理
+	OutboundGoodsStatusPicking                 //拣货中
+	OutboundGoodsStatusOutboundDelivery        //已出库
+)
+
 func OutboundGoodsBatchSave(db *gorm.DB, list []OutboundGoods) error {
 
 	result := db.Model(&OutboundGoods{}).Save(list)
+
+	return result.Error
+}
+
+func GetOutboundGoodsJoinOrderList(db *gorm.DB, taskId int, number string) (err error, list []OutboundGoodsJoinOrder) {
+
+	result := db.Table("t_outbound_goods og").
+		Select("*").
+		Joins("left join t_outbound_order oo on og.task_id = oo.task_id and og.number = oo.number").
+		Where("oo.task_id = ? and oo.number = ?", taskId, number).
+		Find(&list)
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	return nil, list
+}
+
+func ReplaceSave(db *gorm.DB, list []OutboundGoods, values []string) error {
+	result := db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "task_id,number,sku"}},
+		DoUpdates: clause.AssignmentColumns(values),
+	}).Save(&list)
 
 	return result.Error
 }

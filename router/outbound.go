@@ -18,6 +18,12 @@ func OutboundRoute(g *gin.RouterGroup) {
 		outboundGroup.GET("/orderList", handler.OutboundOrderList)
 		//出库单订单详情
 		outboundGroup.GET("/orderDetail", handler.OutboundOrderDetail)
+		//结束任务
+		outboundGroup.POST("/endOutboundTask", handler.EndOutboundTask)
+		//关闭订单
+		outboundGroup.POST("/closeOrder", handler.OutboundTaskCloseOrder)
+		//加单
+		outboundGroup.POST("/addOrder", handler.OutboundTaskAddOrder)
 	}
 
 }

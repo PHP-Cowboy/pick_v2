@@ -1,5 +1,11 @@
 package req
 
+type NewCreateBatchForm struct {
+	TaskId    int    `json:"task_id" binding:"required"`
+	Number    string `json:"number" binding:"required"`
+	BatchName string `json:"batch_name" binding:"required"`
+}
+
 type CreateBatchForm struct {
 	BatchName         string   `json:"batch_name" form:"batch_name"`
 	DeliveryStartTime string   `json:"delivery_start_time" form:"delivery_start_time"`                //发货开始

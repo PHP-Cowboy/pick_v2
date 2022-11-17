@@ -1,5 +1,7 @@
 package model
 
+import "gorm.io/gorm"
+
 // 批次
 type Batch struct {
 	Base
@@ -39,4 +41,11 @@ func GetDeliveryMethod(method int) string {
 	}
 
 	return s
+}
+
+func BatchSave(db *gorm.DB, list Batch) (err error, b Batch) {
+
+	result := db.Model(&Batch{}).Save(&list)
+
+	return result.Error, list
 }

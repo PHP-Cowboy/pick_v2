@@ -23,6 +23,8 @@ func InitRouter() *gin.Engine {
 	router.OutboundRoute(group)
 	//拣货单
 	router.OrderRoute(group)
+	//限发
+	router.LimitRoute(group)
 	//批次
 	router.BatchRoute(group)
 	//任务
@@ -49,6 +51,8 @@ func InitRouter() *gin.Engine {
 	router.YongYouRoute(group)
 	//盘点
 	router.InvTaskRoute(group)
+	//配置
+	router.ConfigRoute(group)
 
 	return r
 }

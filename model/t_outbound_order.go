@@ -48,3 +48,9 @@ func OutboundOrderBatchSave(db *gorm.DB, data []OutboundOrder) error {
 
 	return result.Error
 }
+
+func OutboundOrderBatchUpdate(db *gorm.DB, where OutboundOrder, mp map[string]interface{}) error {
+	result := db.Model(&OutboundOrder{}).Where(&where).Updates(mp)
+
+	return result.Error
+}

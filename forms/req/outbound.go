@@ -56,6 +56,18 @@ type OrderLimit struct {
 }
 
 type TaskLimitForm struct {
-	TaskId int    `json:"task_id" form:"task_id" binding:"required"`
-	Sku    string `json:"sku" form:"sku" binding:"required"`
+	TaskId   int    `json:"task_id" form:"task_id" binding:"required"`
+	Sku      string `json:"sku" form:"sku" binding:"required"`
+	LimitNum int    `json:"limit_num" form:"limit_num" binding:"required"`
+}
+
+type EndOutboundTaskForm struct {
+}
+
+type OutboundTaskCloseOrderForm struct {
+}
+
+type OutboundTaskAddOrderForm struct {
+	TaskId int    `json:"task_id" binding:"required"`
+	Number string `json:"number" binding:"required"`
 }

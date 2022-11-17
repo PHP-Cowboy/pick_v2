@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 	"gorm.io/gorm"
 	"pick_v2/common/constant"
+	"pick_v2/dao"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
@@ -26,6 +27,33 @@ import (
 	"strings"
 	"time"
 )
+
+func NewBatch(c *gin.Context) {
+	var form req.NewCreateBatchForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	claims := GetUserInfo(c)
+
+	if claims != nil {
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
+		return
+	}
+
+	err := dao.CreateBatch(global.DB, form, claims)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+}
 
 // 生成拣货批次
 func CreateBatch(c *gin.Context) {
