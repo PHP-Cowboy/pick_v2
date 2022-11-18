@@ -1,6 +1,7 @@
 package dao
 
 import (
+	"errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"pick_v2/forms/req"
@@ -55,6 +56,8 @@ func OrderLimit(db *gorm.DB, form req.OrderLimitForm) error {
 			GoodsName: orderGoods.GoodsName,
 			GoodsSpe:  orderGoods.GoodsSpe,
 			LimitNum:  limitNum,
+			Status:    model.LimitShipmentStatusNormal,
+			Typ:       model.LimitShipmentTypOrder,
 		})
 
 		outboundGoods = append(outboundGoods, model.OutboundGoods{
@@ -104,6 +107,7 @@ func UpdateOutboundGoodsLimit(db *gorm.DB, list []model.OutboundGoods) error {
 	return result.Error
 }
 
+// 任务批量限发
 func TaskLimit(db *gorm.DB, form req.TaskLimitForm) error {
 
 	var (
@@ -137,6 +141,8 @@ func TaskLimit(db *gorm.DB, form req.TaskLimitForm) error {
 			GoodsName: order.GoodsName,
 			GoodsSpe:  order.GoodsSpe,
 			LimitNum:  form.LimitNum,
+			Status:    model.LimitShipmentStatusNormal,
+			Typ:       model.LimitShipmentTypTask,
 		})
 
 		outboundGoods = append(outboundGoods, model.OutboundGoods{
@@ -161,6 +167,47 @@ func TaskLimit(db *gorm.DB, form req.TaskLimitForm) error {
 	if err != nil {
 		tx.Rollback()
 		return err
+	}
+
+	tx.Commit()
+
+	return nil
+}
+
+// 撤销限发
+func RevokeLimit(db *gorm.DB, form req.RevokeLimitForm) error {
+
+	var outboundGoods model.OutboundGoods
+
+	result := db.Model(&model.OutboundGoods{}).
+		Where("task_id = ? and number = ? and sku = ?", form.TaskId, form.Number, form.Sku).
+		First(&outboundGoods)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if outboundGoods.Status != model.OutboundGoodsStatusUnhandled {
+		return errors.New("当前订单不允许撤销限发")
+	}
+
+	tx := db.Begin()
+
+	result = tx.Model(&model.LimitShipment{}).
+		Where("task_id = ? and number = ? and sku = ?", form.TaskId, form.Number, form.Sku).
+		Update("status", model.LimitShipmentStatusRevoke)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	//更新限发数量为原始值(欠货数)
+	outboundGoods.LimitNum = outboundGoods.LackCount
+	//todo 和  OutboundGoods.ReplaceSave() 对比 测试一下
+	result = tx.Model(&model.OutboundGoods{}).Select("limit_num").Save(&outboundGoods)
+
+	if result.Error != nil {
+		return result.Error
 	}
 
 	tx.Commit()

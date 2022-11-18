@@ -24,6 +24,8 @@ func OutboundRoute(g *gin.RouterGroup) {
 		outboundGroup.POST("/closeOrder", handler.OutboundTaskCloseOrder)
 		//加单
 		outboundGroup.POST("/addOrder", handler.OutboundTaskAddOrder)
+		//订单出库记录
+		outboundGroup.POST("/orderOutboundRecord", handler.OrderOutboundRecord)
 	}
 
 }

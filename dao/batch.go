@@ -45,7 +45,7 @@ func CreateBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.C
 	}
 
 	//批量更新 t_outbound_goods 状态
-	if err = model.ReplaceSave(tx, outboundGoods, []string{"status"}); err != nil {
+	if err = model.OutboundGoodsReplaceSave(tx, outboundGoods, []string{"status"}); err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -70,6 +70,7 @@ func BatchSaveLogic(db *gorm.DB, form req.NewCreateBatchForm, claims *middleware
 
 	//t_batch
 	err, batch = model.BatchSave(db, model.Batch{
+		TaskId:            form.TaskId,
 		WarehouseId:       claims.WarehouseId,
 		BatchName:         form.BatchName,
 		DeliveryStartTime: outboundTask.DeliveryStartTime,

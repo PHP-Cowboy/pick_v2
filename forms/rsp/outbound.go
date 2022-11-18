@@ -42,3 +42,6 @@ type OutboundOrderList struct {
 
 type OutboundOrderDetailRsp struct {
 }
+
+type OrderOutboundRecordList struct {
+}

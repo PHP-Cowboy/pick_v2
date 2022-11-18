@@ -45,3 +45,23 @@ func TaskLimit(c *gin.Context) {
 	}
 	xsq_net.Success(c)
 }
+
+// 撤销限发
+func RevokeLimit(c *gin.Context) {
+	var form req.RevokeLimitForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err := dao.RevokeLimit(global.DB, form)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+}

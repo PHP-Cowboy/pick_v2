@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"gorm.io/gorm"
+	"time"
+)
 
 // 订单表
 type Order struct {
@@ -41,3 +44,16 @@ const (
 	LackOrderType    //欠货单
 	CloseOrderType   //已关闭
 )
+
+func UpdateOrder(db *gorm.DB, list []Order) error {
+	result := db.Model(&Order{}).
+		Omit("id,create_time").
+		Select("shop_id,shop_name,shop_type,shop_code,house_code,line").
+		Save(&list)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
+}

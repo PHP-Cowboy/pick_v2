@@ -2,6 +2,7 @@ package model
 
 import (
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"time"
 )
 
@@ -51,6 +52,17 @@ func OutboundOrderBatchSave(db *gorm.DB, data []OutboundOrder) error {
 
 func OutboundOrderBatchUpdate(db *gorm.DB, where OutboundOrder, mp map[string]interface{}) error {
 	result := db.Model(&OutboundOrder{}).Where(&where).Updates(mp)
+
+	return result.Error
+}
+
+func OutboundOrderReplaceSave(db *gorm.DB, list []OutboundOrder, values []string) error {
+	result := db.Model(&OutboundOrder{}).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "task_id,number,sku"}},
+			DoUpdates: clause.AssignmentColumns(values),
+		}).
+		Save(&list)
 
 	return result.Error
 }

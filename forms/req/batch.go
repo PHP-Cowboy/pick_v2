@@ -1,9 +1,9 @@
 package req
 
 type NewCreateBatchForm struct {
-	TaskId    int    `json:"task_id" binding:"required"`
-	Number    string `json:"number" binding:"required"`
-	BatchName string `json:"batch_name" binding:"required"`
+	TaskId    int      `json:"task_id" binding:"required"`
+	Number    []string `json:"number" binding:"required"`
+	BatchName string   `json:"batch_name" binding:"required"`
 }
 
 type CreateBatchForm struct {

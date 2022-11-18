@@ -33,6 +33,7 @@ func CreateOutboundTask(c *gin.Context) {
 		return
 	}
 
+	//出库任务相关保存
 	taskId, err := dao.OutboundTaskSave(tx, form, userInfo)
 
 	if err != nil {
@@ -41,6 +42,7 @@ func CreateOutboundTask(c *gin.Context) {
 		return
 	}
 
+	//出库订单相关保存
 	err = dao.OutboundOrderBatchSave(tx, form, taskId)
 
 	if err != nil {
@@ -141,7 +143,10 @@ func OutboundTaskCloseOrder(c *gin.Context) {
 		return
 	}
 
-	err := dao.OutboundTaskCloseOrder(global.DB, form)
+	tx := global.DB.Begin()
+
+	err := dao.OutboundTaskCloseOrder(tx, form)
+
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return
@@ -169,4 +174,25 @@ func OutboundTaskAddOrder(c *gin.Context) {
 	}
 
 	xsq_net.Success(c)
+}
+
+// 订单出库记录
+func OrderOutboundRecord(c *gin.Context) {
+	var form req.OrderOutboundRecordForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err, list := dao.OrderOutboundRecord(global.DB, form)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.SucJson(c, list)
 }

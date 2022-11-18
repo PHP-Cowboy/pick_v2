@@ -5,6 +5,7 @@ import "gorm.io/gorm"
 // 批次
 type Batch struct {
 	Base
+	TaskId            int     `gorm:"type:int(11);index;comment:出库任务ID"`
 	WarehouseId       int     `gorm:"type:int(11);comment:仓库"`
 	BatchName         string  `gorm:"type:varchar(64);comment:批次名称"`
 	DeliveryStartTime *MyTime `gorm:"type:datetime;default:null;comment:发货起始时间"`
@@ -46,6 +47,13 @@ func GetDeliveryMethod(method int) string {
 func BatchSave(db *gorm.DB, list Batch) (err error, b Batch) {
 
 	result := db.Model(&Batch{}).Save(&list)
+
+	return result.Error, list
+}
+
+func GetBatchListByTaskId(db *gorm.DB, taskId int) (err error, list []Batch) {
+
+	result := db.Model(&Batch{}).Where(&Batch{TaskId: taskId}).Find(&list)
 
 	return result.Error, list
 }

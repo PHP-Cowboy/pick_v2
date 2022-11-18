@@ -2,6 +2,7 @@ package model
 
 import (
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"time"
 )
 
@@ -56,7 +57,7 @@ type OrderJoinGoods struct {
 	OrderType         int      `json:"order_type"`
 	HasRemark         int      `json:"has_remark"`
 	LatestPickingTime *MyTime  `json:"latest_picking_time"`
-	Id                int      `json:"id"` //order_goods 表
+	Id                int      `json:"id"` //order_goods 表 这里的查询需要注意一下，别查到了order表id
 	GoodsName         string   `gorm:"type:varchar(64);comment:商品名称"`
 	Sku               string   `gorm:"type:varchar(64);index:number_sku_idx;comment:sku"`
 	GoodsType         string   `gorm:"type:varchar(64);comment:商品类型"`
@@ -83,9 +84,34 @@ const (
 	OrderGoodsProcessingStatus //处理中
 )
 
-// 更新订单商品数据
+// 批量更新订单商品数据
 func UpdateOrderGoodsByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
 	result := db.Model(&OrderGoods{}).Where("id in (?)", ids).Updates(mp)
+
+	return result.Error
+}
+
+// 订单&&商品信息
+func GetOrderJoinGoodsList(db *gorm.DB, number []string) (err error, list []OrderJoinGoods) {
+	result := db.Table("t_order_goods og").
+		Omit("o.id").
+		Select("*").
+		Joins("left join t_order o on og.number = o.number").
+		Where("og.number in (?)", number).
+		Find(&list)
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	return nil, list
+}
+
+func UpdateOrderGoodsStatus(db *gorm.DB, list []OrderGoods, values []string) error {
+	result := db.Model(&OrderGoods{}).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns(values),
+	}).Save(&list)
 
 	return result.Error
 }

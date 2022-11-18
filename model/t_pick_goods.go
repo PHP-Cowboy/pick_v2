@@ -1,5 +1,7 @@
 package model
 
+import "gorm.io/gorm"
+
 // 拣货商品明细
 type PickGoods struct {
 	Base
@@ -21,4 +23,10 @@ type PickGoods struct {
 	CompleteNum      int    `gorm:"type:int;default:0;comment:已拣数量"`
 	ReviewNum        int    `gorm:"type:int;default:0;comment:复核数量"`
 	Unit             string `gorm:"type:varchar(64);comment:单位"`
+}
+
+func GetPickGoodsByNumber(db *gorm.DB, numbers []string) (err error, list []PickGoods) {
+	result := db.Model(&PickGoods{}).Where("number in (?)", numbers).Find(&list)
+
+	return result.Error, list
 }

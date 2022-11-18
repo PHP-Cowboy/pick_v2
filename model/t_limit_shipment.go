@@ -11,9 +11,28 @@ type LimitShipment struct {
 	GoodsSpe  string `gorm:"type:varchar(128);comment:商品规格" json:"goods_spe"`
 	LimitNum  int    `gorm:"type:int;default:0;comment:限发数量" json:"limit_num"`
 	Status    int    `gorm:"type:tinyint;default:1;comment:状态:0:撤销,1:正常" json:"status"`
+	Typ       int    `gorm:"type:tinyint;default:1;comment:状态:1:订单限发,2:任务限发" json:"typ"`
 }
+
+const (
+	LimitShipmentStatusRevoke = iota //撤销
+	LimitShipmentStatusNormal        //正常
+)
+
+const (
+	LimitShipmentTyp      = iota
+	LimitShipmentTypOrder //订单限发
+	LimitShipmentTypTask  //任务限发
+)
 
 func LimitShipmentSave(db *gorm.DB, list []LimitShipment) error {
 	result := db.Model(&LimitShipment{}).Save(&list)
 	return result.Error
+}
+
+func GetLimitShipmentListByTaskIdAndNumbers(db *gorm.DB, taskId int, number []string) (err error, list []LimitShipment) {
+
+	result := db.Model(&LimitShipment{}).Where("task_id = ? and number in (?)", taskId, number).Find(&list)
+
+	return result.Error, list
 }

@@ -20,6 +20,7 @@ type NumberMp struct {
 	HasRemark int
 }
 
+// 出库单任务列表
 func OutboundTaskList(db *gorm.DB, form req.OutboundTaskListForm) (err error, res rsp.OutboundTaskListRsp) {
 
 	var taskIds []int
@@ -188,17 +189,18 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 	}
 
 	var (
-		outboundOrderMp = make(map[string]model.OutboundOrder, 0)
-		numberMp        = make(map[string]NumberMp, 0)
-		outboundOrders  = make([]model.OutboundOrder, 0)
-		outboundGoods   = make([]model.OutboundGoods, 0, len(orderJoinGoods))
+		outboundOrderMp = make(map[string]model.OutboundOrder, 0)             //出库订单map 以订单号为key，用于更新订单备注以及限发总数，然后存储
+		numberMp        = make(map[string]NumberMp, 0)                        //订单map，用于处理 订单备注以及限发总数
+		outboundOrders  = make([]model.OutboundOrder, 0)                      //出库订单
+		outboundGoods   = make([]model.OutboundGoods, 0, len(orderJoinGoods)) //出库订单商品
+		order           []model.Order                                         //订单数据，用于更新订单表数据
+		orderGoods      []model.OrderGoods                                    //订单商品数据，用于更新订单商品表数据
 	)
 
 	for _, goods := range orderJoinGoods {
 		_, ok := outboundOrderMp[goods.Number]
 
 		if !ok {
-
 			outboundOrderMp[goods.Number] = model.OutboundOrder{
 				TaskId:            taskId,
 				Number:            goods.Number,
@@ -224,6 +226,18 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 				HasRemark:         0,
 				OrderRemark:       goods.OrderRemark,
 			}
+
+			//更新订单表数据
+			order = append(order, model.Order{
+				ShopId:    goods.ShopId,
+				ShopName:  goods.ShopName,
+				ShopType:  goods.ShopType,
+				ShopCode:  goods.ShopCode,
+				Number:    goods.Number,
+				HouseCode: goods.HouseCode,
+				Line:      goods.Line,
+				OrderType: model.NewOrderType,
+			})
 		}
 
 		mp, _ := numberMp[goods.Number]
@@ -258,26 +272,41 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 			BatchId:         0,
 			DeliveryOrderNo: nil,
 		})
+
+		//更新订单商品表数据
+		orderGoods = append(orderGoods, model.OrderGoods{
+			Id:     goods.Id,
+			Status: model.OrderGoodsUnhandledStatus,
+		})
 	}
 
-	for s, order := range outboundOrderMp {
+	for s, oo := range outboundOrderMp {
 
 		val, ok := numberMp[s]
 
 		if ok {
-			order.HasRemark = val.HasRemark
-			order.LimitNum = val.LimitNum
+			oo.HasRemark = val.HasRemark
+			oo.LimitNum = val.LimitNum
 		}
 
-		outboundOrders = append(outboundOrders, order)
+		outboundOrders = append(outboundOrders, oo)
 	}
 
+	//出库订单保存
 	err := model.OutboundOrderBatchSave(db, outboundOrders)
 	if err != nil {
 		return err
 	}
 
+	//出库商品保存
 	err = model.OutboundGoodsBatchSave(db, outboundGoods)
+
+	if err != nil {
+		return err
+	}
+
+	//更新订单数据
+	err = UpdateOrderAndGoods(db, order, orderGoods)
 
 	if err != nil {
 		return err
@@ -464,10 +493,271 @@ func EndOutboundTask(db *gorm.DB, form req.EndOutboundTaskForm) error {
 
 // 关闭订单
 func OutboundTaskCloseOrder(db *gorm.DB, form req.OutboundTaskCloseOrderForm) (err error) {
+
+	//关闭预拣池订单
+	err = ClosePrePickOrder(db, form)
+	if err != nil {
+		return err
+	}
+
+	//关闭出库任务
+	err = CloseOutboundOrder(db, form)
+
+	if err != nil {
+		return err
+	}
+
+	//订单
+	err = CloseOrder(db, form)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// 关闭预拣池订单
+func ClosePrePickOrder(db *gorm.DB, form req.OutboundTaskCloseOrderForm) error {
+
+	err, pickGoodsList := model.GetPickGoodsByNumber(db, form.Number)
+
+	if err != nil {
+		return err
+	}
+
+	if len(pickGoodsList) > 0 {
+		var numbers []string
+		for _, goods := range pickGoodsList {
+			numbers = append(numbers, goods.Number)
+		}
+		return errors.New("订单号:" + strings.Join(numbers, ",") + "已在拣货池中，请先取消拣货")
+	}
+
+	//预拣池
+	err, prePickGoodsJoinPrePickList := model.GetPrePickGoodsJoinPrePickListByNumber(db, form.Number)
+	if err != nil {
+		return err
+	}
+
+	var (
+		prePickIds      []int
+		prePickGoodsIds []int
+	)
+
+	for _, pick := range prePickGoodsJoinPrePickList {
+		prePickIds = append(prePickIds, pick.PrePickId)
+		prePickGoodsIds = append(prePickGoodsIds, pick.PrePickGoodsId)
+	}
+
+	prePickIds = slice.UniqueIntSlice(prePickIds)
+
+	//更新预拣池
+	err = model.UpdatePrePickStatusByIds(db, prePickIds, model.PrePickStatusClose)
+
+	if err != nil {
+		return err
+	}
+
+	//更新预拣池商品
+	err = model.UpdatePrePickGoodsStatusByIds(db, prePickGoodsIds, model.PrePickGoodsStatusClose)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// 关闭出库任务
+func CloseOutboundOrder(db *gorm.DB, form req.OutboundTaskCloseOrderForm) error {
+	//出库任务
+	err, outboundGoodsJoinOrderList := model.GetOutboundGoodsJoinOrderListByNumbers(db, form.Number)
+	if err != nil {
+		return err
+	}
+
+	var (
+		outboundOrder []model.OutboundOrder
+		outboundGoods []model.OutboundGoods
+	)
+
+	for _, outbound := range outboundGoodsJoinOrderList {
+		outboundOrder = append(outboundOrder, model.OutboundOrder{
+			TaskId:    outbound.TaskId,
+			Number:    outbound.Number,
+			OrderType: model.OutboundOrderTypeClose,
+		})
+
+		outboundGoods = append(outboundGoods, model.OutboundGoods{
+			TaskId: outbound.TaskId,
+			Number: outbound.Number,
+			Sku:    outbound.Sku,
+			Status: model.OutboundGoodsStatusOutboundClose,
+		})
+	}
+
+	err = model.OutboundOrderReplaceSave(db, outboundOrder, []string{"order_type"})
+
+	if err != nil {
+		return err
+	}
+
+	err = model.OutboundGoodsReplaceSave(db, outboundGoods, []string{"status"})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// 关闭订单
+func CloseOrder(db *gorm.DB, form req.OutboundTaskCloseOrderForm) error {
 	return nil
 }
 
 // 临时加单
 func OutboundTaskAddOrder(db *gorm.DB, form req.OutboundTaskAddOrderForm) (err error) {
+
+	var (
+		outboundGoodsMp = make(map[string]struct{}, 0)
+		outboundOrderMp = make(map[string]struct{}, 0)
+		limitShipmentMp = make(map[string]int, 0)
+		outboundOrder   []model.OutboundOrder
+		outboundGoods   []model.OutboundGoods
+	)
+
+	err, limitShipmentList := model.GetLimitShipmentListByTaskIdAndNumbers(db, form.TaskId, form.Number)
+	if err != nil {
+		return err
+	}
+
+	//加单时，如果已经对任务中sku设置了批量限发，则取限发数量
+	for _, shipment := range limitShipmentList {
+		//不是任务批量限发的，不处理
+		if shipment.Typ != model.LimitShipmentTypTask {
+			continue
+		}
+		limitShipmentMp[shipment.Sku] = shipment.LimitNum
+	}
+
+	//出库单信息
+	err, outboundList := model.GetOutboundGoodsJoinOrderList(db, form.TaskId, form.Number)
+	if err != nil {
+		return err
+	}
+
+	for _, outbound := range outboundList {
+		key := fmt.Sprintf("%s%s", outbound.Number, outbound.Sku)
+		outboundGoodsMp[key] = struct{}{}
+		outboundOrderMp[outbound.Number] = struct{}{}
+	}
+
+	//订单信息
+	err, orderList := model.GetOrderJoinGoodsList(db, form.Number)
+	if err != nil {
+		return err
+	}
+
+	for _, order := range orderList {
+		key := fmt.Sprintf("%s%s", order.Number, order.Sku)
+
+		_, goodsOk := outboundGoodsMp[key]
+
+		//如果当前订单的sku已经在任务中，跳过
+		if goodsOk {
+			continue
+		}
+
+		//key 中包含了number 如果 goodsOk == true 则订单本身已存在了
+		_, orderOk := outboundOrderMp[order.Number]
+
+		if !orderOk {
+			hasRemark := 0
+
+			if order.OrderRemark != "" {
+				hasRemark = 1
+			}
+
+			outboundOrder = append(outboundOrder, model.OutboundOrder{
+				TaskId:            form.TaskId,
+				Number:            order.Number,
+				PayAt:             &order.PayAt,
+				ShopId:            order.ShopId,
+				ShopName:          order.ShopName,
+				ShopType:          order.ShopType,
+				ShopCode:          order.ShopCode,
+				HouseCode:         order.HouseCode,
+				DistributionType:  order.DistributionType,
+				Line:              order.Line,
+				Province:          order.Province,
+				City:              order.City,
+				District:          order.District,
+				Address:           order.Address,
+				ConsigneeName:     order.ConsigneeName,
+				ConsigneeTel:      order.ConsigneeTel,
+				OrderType:         model.OutboundOrderTypeNew,
+				LatestPickingTime: nil,
+				HasRemark:         hasRemark,
+				OrderRemark:       order.OrderRemark,
+			})
+		}
+
+		//如果任务设置了限发，则取限发数量，否则取欠货数量
+		limitNum, limitOk := limitShipmentMp[order.Sku]
+
+		if !limitOk {
+			limitNum = order.LackCount
+		}
+
+		outboundGoods = append(outboundGoods, model.OutboundGoods{
+			TaskId:          form.TaskId,
+			Number:          order.Number,
+			Sku:             order.Sku,
+			OrderGoodsId:    order.Id,
+			BatchId:         0,
+			GoodsName:       order.GoodsName,
+			GoodsType:       order.GoodsType,
+			GoodsSpe:        order.GoodsSpe,
+			Shelves:         order.Shelves,
+			DiscountPrice:   order.DiscountPrice,
+			GoodsUnit:       order.GoodsUnit,
+			SaleUnit:        order.SaleUnit,
+			SaleCode:        order.SaleCode,
+			PayCount:        order.PayCount,
+			CloseCount:      order.CloseCount,
+			LackCount:       order.LackCount,
+			OutCount:        order.OutCount,
+			LimitNum:        limitNum,
+			GoodsRemark:     order.GoodsRemark,
+			Status:          model.OutboundGoodsStatusUnhandled,
+			DeliveryOrderNo: order.DeliveryOrderNo,
+		})
+	}
+
+	tx := db.Begin()
+
+	err = model.OutboundOrderBatchSave(tx, outboundOrder)
+
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err = model.OutboundGoodsBatchSave(tx, outboundGoods)
+
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	tx.Commit()
+
 	return nil
+}
+
+// 订单出库记录
+func OrderOutboundRecord(db *gorm.DB, form req.OrderOutboundRecordForm) (err error, list rsp.OrderOutboundRecordList) {
+	return
 }

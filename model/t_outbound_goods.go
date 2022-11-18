@@ -81,6 +81,7 @@ const (
 	OutboundGoodsStatusUnhandled        = iota //未处理
 	OutboundGoodsStatusPicking                 //拣货中
 	OutboundGoodsStatusOutboundDelivery        //已出库
+	OutboundGoodsStatusOutboundClose           //已关闭
 )
 
 func OutboundGoodsBatchSave(db *gorm.DB, list []OutboundGoods) error {
@@ -90,12 +91,12 @@ func OutboundGoodsBatchSave(db *gorm.DB, list []OutboundGoods) error {
 	return result.Error
 }
 
-func GetOutboundGoodsJoinOrderList(db *gorm.DB, taskId int, number string) (err error, list []OutboundGoodsJoinOrder) {
+func GetOutboundGoodsJoinOrderList(db *gorm.DB, taskId int, number []string) (err error, list []OutboundGoodsJoinOrder) {
 
 	result := db.Table("t_outbound_goods og").
 		Select("*").
 		Joins("left join t_outbound_order oo on og.task_id = oo.task_id and og.number = oo.number").
-		Where("oo.task_id = ? and oo.number = ?", taskId, number).
+		Where("oo.task_id = ? and oo.number in (?)", taskId, number).
 		Find(&list)
 
 	if result.Error != nil {
@@ -105,11 +106,28 @@ func GetOutboundGoodsJoinOrderList(db *gorm.DB, taskId int, number string) (err 
 	return nil, list
 }
 
-func ReplaceSave(db *gorm.DB, list []OutboundGoods, values []string) error {
-	result := db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "task_id,number,sku"}},
-		DoUpdates: clause.AssignmentColumns(values),
-	}).Save(&list)
+func GetOutboundGoodsJoinOrderListByNumbers(db *gorm.DB, number []string) (err error, list []OutboundGoodsJoinOrder) {
+
+	result := db.Table("t_outbound_goods og").
+		Select("*").
+		Joins("left join t_outbound_order oo on og.task_id = oo.task_id and og.number = oo.number").
+		Where("oo.number in (?)", number).
+		Find(&list)
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	return nil, list
+}
+
+func OutboundGoodsReplaceSave(db *gorm.DB, list []OutboundGoods, values []string) error {
+	result := db.Model(&OutboundGoods{}).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "task_id,number,sku"}},
+			DoUpdates: clause.AssignmentColumns(values),
+		}).
+		Save(&list)
 
 	return result.Error
 }

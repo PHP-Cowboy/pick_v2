@@ -43,3 +43,21 @@ func StrDiff(a []string, b []string) []string {
 
 	return c
 }
+
+func UniqueIntSlice(arr []int) []int {
+	ret := make([]int, 0)
+
+	mp := make(map[int]struct{}, 0)
+
+	for _, s := range arr {
+		_, ok := mp[s]
+		if ok {
+			continue
+		}
+
+		mp[s] = struct{}{}
+		ret = append(ret, s)
+	}
+
+	return ret
+}
