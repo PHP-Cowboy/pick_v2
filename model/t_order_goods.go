@@ -33,6 +33,7 @@ type OrderGoods struct {
 }
 
 type OrderJoinGoods struct {
+	OrderId           int      `json:"order_id"`
 	ShopId            int      `json:"shop_id"` //order表
 	ShopName          string   `json:"shop_name"`
 	ShopType          string   `json:"shop_type"`
@@ -57,6 +58,7 @@ type OrderJoinGoods struct {
 	OrderType         int      `json:"order_type"`
 	HasRemark         int      `json:"has_remark"`
 	LatestPickingTime *MyTime  `json:"latest_picking_time"`
+	OrderGoodsId      int      `json:"order_goods_id"`
 	Id                int      `json:"id"` //order_goods 表 这里的查询需要注意一下，别查到了order表id
 	GoodsName         string   `gorm:"type:varchar(64);comment:商品名称"`
 	Sku               string   `gorm:"type:varchar(64);index:number_sku_idx;comment:sku"`
@@ -94,8 +96,7 @@ func UpdateOrderGoodsByIds(db *gorm.DB, ids []int, mp map[string]interface{}) er
 // 订单&&商品信息
 func GetOrderJoinGoodsList(db *gorm.DB, number []string) (err error, list []OrderJoinGoods) {
 	result := db.Table("t_order_goods og").
-		Omit("o.id").
-		Select("*").
+		Select("o.*,o.id as order_id,og.*,og.id as order_goods_id").
 		Joins("left join t_order o on og.number = o.number").
 		Where("og.number in (?)", number).
 		Find(&list)

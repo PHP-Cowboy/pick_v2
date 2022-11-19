@@ -5,6 +5,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"pick_v2/forms/req"
+	"pick_v2/forms/rsp"
 	"pick_v2/model"
 	"pick_v2/utils/ecode"
 )
@@ -97,10 +98,10 @@ func OrderLimit(db *gorm.DB, form req.OrderLimitForm) error {
 // 更新出库单商品的限发数量
 func UpdateOutboundGoodsLimit(db *gorm.DB, list []model.OutboundGoods) error {
 	result := db.Model(&model.OutboundGoods{}).
-		Select("limit_num").
+		Select("task_id,number,sku,limit_num").
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "task_id,number,sku"}},
-			DoUpdates: clause.AssignmentColumns([]string{"limit_num"}),
+			DoUpdates: clause.AssignmentColumns([]string{"task_id", "number", "sku", "limit_num"}),
 		}).
 		Save(&list)
 
@@ -117,10 +118,7 @@ func TaskLimit(db *gorm.DB, form req.TaskLimitForm) error {
 	result := db.Table("t_outbound_goods og").
 		Select("og.number,shop_name,goods_name,goods_spe").
 		Joins("left join t_outbound_order o on og.task_id = o.task_id and og.number = o.number").
-		Where(&model.OutboundGoodsJoinOrder{
-			TaskId: form.TaskId,
-			Sku:    form.Sku,
-		}).
+		Where("og.task_id = ? and og.sku = ?", form.TaskId, form.Sku).
 		Find(&outboundGoodsJoinOrder)
 
 	if result.Error != nil {
@@ -203,14 +201,39 @@ func RevokeLimit(db *gorm.DB, form req.RevokeLimitForm) error {
 
 	//更新限发数量为原始值(欠货数)
 	outboundGoods.LimitNum = outboundGoods.LackCount
-	//todo 和  OutboundGoods.ReplaceSave() 对比 测试一下
-	result = tx.Model(&model.OutboundGoods{}).Select("limit_num").Save(&outboundGoods)
 
-	if result.Error != nil {
-		return result.Error
+	list := []model.OutboundGoods{outboundGoods}
+
+	err := model.OutboundGoodsReplaceSave(tx, list, []string{"limit_num"})
+
+	if err != nil {
+		return err
 	}
 
 	tx.Commit()
 
 	return nil
+}
+
+// 限发列表
+func LimitShipmentList(db *gorm.DB, form req.LimitShipmentListForm) (error, []rsp.LimitShipmentList) {
+	err, limitShipmentList := model.GetLimitShipmentListByTaskId(db, form.TaskId)
+	if err != nil {
+		return err, nil
+	}
+
+	list := make([]rsp.LimitShipmentList, 0, len(limitShipmentList))
+
+	for _, shipment := range limitShipmentList {
+		list = append(list, rsp.LimitShipmentList{
+			OutboundNumber: model.GetOutboundNumber(shipment.TaskId, shipment.Number),
+			ShopName:       shipment.ShopName,
+			GoodsName:      shipment.GoodsName,
+			GoodsSpe:       shipment.GoodsSpe,
+			LimitNum:       shipment.LimitNum,
+			Status:         shipment.Status,
+		})
+	}
+
+	return nil, list
 }

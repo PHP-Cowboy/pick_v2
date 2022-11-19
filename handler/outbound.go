@@ -18,7 +18,7 @@ func CreateOutboundTask(c *gin.Context) {
 	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
 
 	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
-		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 

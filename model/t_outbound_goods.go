@@ -131,3 +131,33 @@ func OutboundGoodsReplaceSave(db *gorm.DB, list []OutboundGoods, values []string
 
 	return result.Error
 }
+
+type OutboundGoodsGoodsNumsStatistical struct {
+	Number     string `json:"number"`
+	PayCount   int    `json:"pay_count"`
+	CloseCount int    `json:"close_count"`
+	OutCount   int    `json:"out_count"`
+	LimitNum   int    `json:"limit_num"`
+}
+
+// 获取出库任务订单 商品相关数量
+func OutboundGoodsNumsStatisticalByTaskIdAndNumbers(db *gorm.DB, taskId int, number []string) (err error, mp map[string]OutboundGoodsGoodsNumsStatistical) {
+	var nums []OutboundGoodsGoodsNumsStatistical
+
+	result := db.Model(&OutboundGoods{}).
+		Select("number,sum(pay_count) as pay_count,sum(close_count) as close_count,sum(out_count) as out_count,sum(limit_num) as limit_num").
+		Where("task_id = ? and number in (?)", taskId, number).
+		Find(&nums)
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	mp = make(map[string]OutboundGoodsGoodsNumsStatistical, 0)
+
+	for _, n := range nums {
+		mp[n.Number] = n
+	}
+
+	return err, mp
+}

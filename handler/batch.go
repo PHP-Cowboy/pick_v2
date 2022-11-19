@@ -28,6 +28,7 @@ import (
 	"time"
 )
 
+// 创建批次
 func NewBatch(c *gin.Context) {
 	var form req.NewCreateBatchForm
 
@@ -40,7 +41,7 @@ func NewBatch(c *gin.Context) {
 
 	claims := GetUserInfo(c)
 
-	if claims != nil {
+	if claims == nil {
 		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
 		return
 	}
@@ -1352,9 +1353,9 @@ func GetBatchPoolNum(c *gin.Context) {
 func GetBase(c *gin.Context) {
 
 	var (
-		form      req.GetBaseForm
-		batchCond model.BatchCondition
-		batches   model.Batch
+		form         req.GetBaseForm
+		batch        model.Batch
+		outboundTask model.OutboundTask
 	)
 
 	if err := c.ShouldBind(&form); err != nil {
@@ -1364,14 +1365,14 @@ func GetBase(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Where("batch_id = ?", form.BatchId).First(&batchCond)
+	result := db.First(&batch, form.BatchId)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
 
-	result = db.First(&batches, form.BatchId)
+	result = db.First(&outboundTask, batch.TaskId)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -1379,14 +1380,14 @@ func GetBase(c *gin.Context) {
 	}
 
 	ret := rsp.GetBaseRsp{
-		CreateTime:        batchCond.CreateTime.Format(timeutil.TimeFormat),
-		PayEndTime:        batchCond.PayEndTime,
-		DeliveryStartTime: batchCond.DeliveryStartTime,
-		DeliveryEndTime:   batchCond.DeliveryEndTime,
-		DeliveryMethod:    batchCond.DeliveryMethod,
-		Line:              batchCond.Line,
-		Goods:             batchCond.Goods,
-		Status:            batches.Status,
+		CreateTime:        timeutil.FormatToDateTime(batch.CreateTime),
+		PayEndTime:        batch.PayEndTime,
+		DeliveryStartTime: batch.DeliveryStartTime,
+		DeliveryEndTime:   batch.DeliveryEndTime,
+		DeliveryMethod:    batch.DeliveryMethod,
+		Line:              batch.Line,
+		Goods:             outboundTask.GoodsName,
+		Status:            batch.Status,
 	}
 
 	xsq_net.SucJson(c, ret)

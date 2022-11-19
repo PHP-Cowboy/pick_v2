@@ -65,3 +65,21 @@ func RevokeLimit(c *gin.Context) {
 
 	xsq_net.Success(c)
 }
+
+// 限发列表
+func LimitShipmentList(c *gin.Context) {
+	var form req.LimitShipmentListForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err, list := dao.LimitShipmentList(global.DB, form)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.SucJson(c, list)
+}

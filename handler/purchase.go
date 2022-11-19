@@ -128,6 +128,7 @@ func Shipping(form Form, info rsp.OrderInfo) (consumer.ConsumeResult, error) {
 			PayCount:      goods.PayCount,
 			LackCount:     goods.PayCount, //欠货数 默认等于 下单数
 			GoodsRemark:   goods.GoodsRemark,
+			Status:        model.OrderGoodsUnhandledStatus,
 		})
 
 		//商品有备注 - 即为订单是有备注的

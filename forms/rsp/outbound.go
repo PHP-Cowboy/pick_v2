@@ -33,6 +33,7 @@ type OutboundOrderList struct {
 	GoodsNum          int           `json:"goods_num"`
 	LimitNum          int           `json:"limit_num"`
 	CloseNum          int           `json:"close_num"`
+	OutCount          int           `json:"out_count"`
 	Line              string        `json:"line"`
 	Region            string        `json:"region"`
 	LatestPickingTime *model.MyTime `json:"latest_picking_time"`

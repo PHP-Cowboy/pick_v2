@@ -6,7 +6,7 @@ type DeliveryMethodInfoForm struct {
 }
 
 type ChangeDeliveryMethodForm struct {
-	TaskId         int    `json:"task_id" binding:"required"`
-	Number         string `json:"number" form:"number" binding:"required"`
-	DeliveryMethod int    `json:"delivery_method"  binding:"required"`
+	TaskId           int    `json:"task_id" binding:"required"`
+	Number           string `json:"number" form:"number" binding:"required"`
+	DistributionType int    `json:"distribution_type"  binding:"required"`
 }

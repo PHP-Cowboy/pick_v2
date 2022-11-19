@@ -45,9 +45,9 @@ func ChangeDeliveryMethod(db *gorm.DB, form req.ChangeDeliveryMethodForm) (err e
 	}
 
 	//校验是否在字典中
-	if ok, _ := slice.InArray(form.DeliveryMethod, dict); !ok {
+	if ok, _ := slice.InArray(form.DistributionType, dict); !ok {
 		return ecode.DataCannotBeModified
 	}
 
-	return model.OutboundOrderBatchUpdate(db, model.OutboundOrder{TaskId: form.TaskId, Number: form.Number}, map[string]interface{}{"distribution_type": form.DeliveryMethod})
+	return model.OutboundOrderBatchUpdate(db, model.OutboundOrder{TaskId: form.TaskId, Number: form.Number}, map[string]interface{}{"distribution_type": form.DistributionType})
 }

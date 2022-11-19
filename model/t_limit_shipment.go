@@ -36,3 +36,10 @@ func GetLimitShipmentListByTaskIdAndNumbers(db *gorm.DB, taskId int, number []st
 
 	return result.Error, list
 }
+
+func GetLimitShipmentListByTaskId(db *gorm.DB, taskId int) (err error, list []LimitShipment) {
+
+	result := db.Model(&LimitShipment{}).Where("task_id = ? ", taskId).Find(&list)
+
+	return result.Error, list
+}

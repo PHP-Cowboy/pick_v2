@@ -12,7 +12,6 @@ import (
 	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"strings"
-	"time"
 )
 
 type NumberMp struct {
@@ -116,19 +115,20 @@ func OutboundTaskList(db *gorm.DB, form req.OutboundTaskListForm) (err error, re
 
 // 出库任务相关保存
 func OutboundTaskSave(db *gorm.DB, form req.CreateOutboundForm, userInfo *middlewares.CustomClaims) (taskId int, err error) {
-	deliveryStartTime, deliveryStartTimeErr := time.ParseInLocation(timeutil.TimeFormat, form.DeliveryStartTime, time.Local)
+
+	deliveryStartTime, deliveryStartTimeErr := timeutil.DateStrToTime(form.DeliveryStartTime)
 
 	if deliveryStartTimeErr != nil {
 		return taskId, deliveryStartTimeErr
 	}
 
-	deliveryEndTime, deliveryEndTimeErr := time.ParseInLocation(timeutil.TimeFormat, form.DeliveryEndTime, time.Local)
+	deliveryEndTime, deliveryEndTimeErr := timeutil.DateStrToTime(form.DeliveryEndTime)
 
 	if deliveryEndTimeErr != nil {
 		return taskId, deliveryEndTimeErr
 	}
 
-	payTime, payTimeErr := time.ParseInLocation(timeutil.TimeFormat, form.PayTime, time.Local)
+	payTime, payTimeErr := timeutil.DateStrToTime(form.PayTime)
 
 	if payTimeErr != nil {
 		return taskId, payTimeErr
@@ -136,15 +136,17 @@ func OutboundTaskSave(db *gorm.DB, form req.CreateOutboundForm, userInfo *middle
 
 	task := model.OutboundTask{
 		TaskName:          form.OutboundName,
-		DeliveryStartTime: (*model.MyTime)(&deliveryStartTime),
-		DeliveryEndTime:   (*model.MyTime)(&deliveryEndTime),
+		DeliveryStartTime: (*model.MyTime)(deliveryStartTime),
+		DeliveryEndTime:   (*model.MyTime)(deliveryEndTime),
 		Line:              strings.Join(form.Lines, ""),
 		DistributionType:  form.DistributionType,
-		PayEndTime:        (*model.MyTime)(&payTime),
+		PayEndTime:        (*model.MyTime)(payTime),
 		Creator: model.Creator{
 			CreatorId: userInfo.ID,
 			Creator:   userInfo.Name,
 		},
+		Sku:       strings.Join(form.Sku, ","),
+		GoodsName: strings.Join(form.GoodsName, ","),
 	}
 
 	err = model.OutboundTaskSave(db, &task)
@@ -165,7 +167,7 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 
 	localDb := db.Table("t_order_goods og").
 		Joins("left join t_order o on og.number = o.number").
-		Select("og.*,o.shop_id,o.shop_name,o.shop_code,o.line,o.distribution_type,o.order_remark").
+		Select("og.*,og.id as order_goods_id,o.*,o.id as order_id").
 		Where("o.distribution_type = ? and o.pay_at <= ? and o.delivery_at <= ? ", form.DistributionType, form.PayTime, form.DeliveryEndTime)
 
 	if form.DeliveryStartTime != "" {
@@ -181,7 +183,7 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 	}
 
 	//新订单或欠货的订单商品数据
-	result := localDb.Where("og.status = ？", model.OrderGoodsUnhandledStatus).
+	result := localDb.Where("og.`status` = ?", model.OrderGoodsUnhandledStatus).
 		Find(&orderJoinGoods)
 
 	if result.Error != nil {
@@ -193,8 +195,8 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 		numberMp        = make(map[string]NumberMp, 0)                        //订单map，用于处理 订单备注以及限发总数
 		outboundOrders  = make([]model.OutboundOrder, 0)                      //出库订单
 		outboundGoods   = make([]model.OutboundGoods, 0, len(orderJoinGoods)) //出库订单商品
-		order           []model.Order                                         //订单数据，用于更新订单表数据
-		orderGoods      []model.OrderGoods                                    //订单商品数据，用于更新订单商品表数据
+		orderIds        []int                                                 //订单id数据，用于更新订单表数据
+		orderGoodsIds   []int                                                 //订单商品id数据，用于更新订单商品表数据
 	)
 
 	for _, goods := range orderJoinGoods {
@@ -228,16 +230,7 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 			}
 
 			//更新订单表数据
-			order = append(order, model.Order{
-				ShopId:    goods.ShopId,
-				ShopName:  goods.ShopName,
-				ShopType:  goods.ShopType,
-				ShopCode:  goods.ShopCode,
-				Number:    goods.Number,
-				HouseCode: goods.HouseCode,
-				Line:      goods.Line,
-				OrderType: model.NewOrderType,
-			})
+			orderIds = append(orderIds, goods.OrderId)
 		}
 
 		mp, _ := numberMp[goods.Number]
@@ -254,7 +247,7 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 			TaskId:          taskId,
 			Number:          goods.Number,
 			Sku:             goods.Sku,
-			OrderGoodsId:    goods.Id, //order_goods表ID
+			OrderGoodsId:    goods.OrderGoodsId, //order_goods表ID
 			GoodsName:       goods.GoodsName,
 			GoodsType:       goods.GoodsType,
 			GoodsSpe:        goods.GoodsSpe,
@@ -274,10 +267,7 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 		})
 
 		//更新订单商品表数据
-		orderGoods = append(orderGoods, model.OrderGoods{
-			Id:     goods.Id,
-			Status: model.OrderGoodsUnhandledStatus,
-		})
+		orderGoodsIds = append(orderGoodsIds, goods.OrderGoodsId)
 	}
 
 	for s, oo := range outboundOrderMp {
@@ -306,7 +296,7 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 	}
 
 	//更新订单数据
-	err = UpdateOrderAndGoods(db, order, orderGoods)
+	err = UpdateOrderAndGoods(db, orderIds, orderGoodsIds)
 
 	if err != nil {
 		return err
@@ -374,18 +364,38 @@ func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, 
 		return result.Error, res
 	}
 
+	//筛选没有number时
+	if len(numbers) == 0 {
+		for _, order := range outboundOrders {
+			numbers = append(numbers, order.Number)
+		}
+	}
+
+	err, numsMp := model.OutboundGoodsNumsStatisticalByTaskIdAndNumbers(db, form.TaskId, numbers)
+	if err != nil {
+		return err, res
+	}
+
 	list := make([]rsp.OutboundOrderList, 0, len(outboundOrders))
 
 	for _, order := range outboundOrders {
+
+		nums, numsOk := numsMp[order.Number]
+
+		if !numsOk {
+			return errors.New("订单统计数量不存在"), res
+		}
+
 		list = append(list, rsp.OutboundOrderList{
 			Number:            order.Number,
 			PayAt:             order.PayAt,
 			ShopName:          order.ShopName,
 			ShopType:          order.ShopType,
 			DistributionType:  order.DistributionType,
-			GoodsNum:          order.GoodsNum,
-			LimitNum:          order.LimitNum,
-			CloseNum:          order.CloseNum,
+			GoodsNum:          nums.PayCount,
+			LimitNum:          nums.LimitNum,
+			CloseNum:          nums.CloseCount,
+			OutCount:          nums.OutCount,
 			Line:              order.Line,
 			Region:            fmt.Sprintf("%s-%s-%s", order.Province, order.City, order.District),
 			LatestPickingTime: order.LatestPickingTime,
@@ -715,7 +725,7 @@ func OutboundTaskAddOrder(db *gorm.DB, form req.OutboundTaskAddOrderForm) (err e
 			TaskId:          form.TaskId,
 			Number:          order.Number,
 			Sku:             order.Sku,
-			OrderGoodsId:    order.Id,
+			OrderGoodsId:    order.OrderGoodsId,
 			BatchId:         0,
 			GoodsName:       order.GoodsName,
 			GoodsType:       order.GoodsType,

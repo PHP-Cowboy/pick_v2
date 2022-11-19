@@ -1,7 +1,7 @@
 package req
 
 type CreateOutboundForm struct {
-	OutboundName      string   `json:"outbound_name" form:"outbound_name"`
+	OutboundName      string   `json:"outbound_name" form:"outbound_name" binding:"required"`
 	DeliveryStartTime string   `json:"delivery_start_time" form:"delivery_start_time"`                //发货开始
 	DeliveryEndTime   string   `json:"delivery_end_time" form:"delivery_end_time" binding:"required"` //发货截止
 	Lines             []string `json:"lines" form:"lines"`                                            //线路
@@ -18,25 +18,25 @@ type OutboundTaskListForm struct {
 	Number           string `json:"number"`
 	Line             string `json:"line"`
 	DistributionType int    `json:"distribution_type"`
-	Status           int    `json:"status"`
+	Status           int    `json:"status" binding:"required"`
 	StartTime        string `json:"start_time"`
 	EndTime          string `json:"end_time"`
 }
 
 type OutboundOrderListForm struct {
 	Paging
-	TaskId           int    `json:"task_id"`
-	ShopId           int    `json:"shop_id"`
-	Number           string `json:"number"`
-	Sku              string `json:"sku"`
-	Line             string `json:"line"`
-	DistributionType int    `json:"distribution_type"`
-	ShopType         string `json:"shop_type"`
-	Province         string `json:"province"`
-	City             string `json:"city"`
-	District         string `json:"district"`
-	HasRemark        *int   `json:"has_remark"`
-	OrderType        int    `json:"order_type"`
+	TaskId           int    `json:"task_id" form:"task_id" binding:"required"`
+	ShopId           int    `json:"shop_id" form:"shop_id" `
+	Number           string `json:"number" form:"number" `
+	Sku              string `json:"sku" form:"sku" `
+	Line             string `json:"line" form:"line" `
+	DistributionType int    `json:"distribution_type" form:"distribution_type" `
+	ShopType         string `json:"shop_type" form:"shop_type" `
+	Province         string `json:"province" form:"province" `
+	City             string `json:"city" form:"city" `
+	District         string `json:"district" form:"district" `
+	HasRemark        *int   `json:"has_remark" form:"has_remark" `
+	OrderType        int    `json:"order_type" form:"order_type" `
 }
 
 type OutboundOrderDetailForm struct {
@@ -44,28 +44,16 @@ type OutboundOrderDetailForm struct {
 	Number string `json:"number" form:"number" binding:"required"`
 }
 
-type OrderLimitForm struct {
-	TaskId     int          `json:"task_id" binding:"required"`
-	Number     string       `json:"number" binding:"required"`
-	OrderLimit []OrderLimit `json:"order_limit" binding:"required"`
-}
-
 type OrderLimit struct {
 	Sku      string `json:"sku" binding:"required"`
 	LimitNum int    `json:"limit_num" binding:"required"`
 }
 
-type TaskLimitForm struct {
-	TaskId   int    `json:"task_id" form:"task_id" binding:"required"`
-	Sku      string `json:"sku" form:"sku" binding:"required"`
-	LimitNum int    `json:"limit_num" form:"limit_num" binding:"required"`
-}
-
 type EndOutboundTaskForm struct {
+	TaskId int `json:"task_id" form:"task_id" binding:"required"`
 }
 
 type OutboundTaskCloseOrderForm struct {
-	TaskId int      `json:"task_id"`
 	Number []string `json:"number"`
 }
 
@@ -75,10 +63,4 @@ type OutboundTaskAddOrderForm struct {
 }
 
 type OrderOutboundRecordForm struct {
-}
-
-type RevokeLimitForm struct {
-	TaskId int    `json:"task_id" form:"task_id" binding:"required"`
-	Sku    string `json:"sku" form:"sku" binding:"required"`
-	Number string `json:"number" form:"number" binding:"required"`
 }

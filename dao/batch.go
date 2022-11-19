@@ -153,9 +153,8 @@ func PrePickLogic(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 	}
 
 	//预拣池数量
-	prePickNum := len(prePicks)
 
-	if prePickNum == 0 {
+	if len(prePicks) == 0 {
 		return ecode.NoOrderFound, nil, nil
 	}
 
@@ -253,10 +252,12 @@ func PrePickLogic(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 		return err, nil, nil
 	}
 
-	//预拣池商品
-	err = model.PrePickRemarkBatchSave(db, prePickRemark)
-	if err != nil {
-		return err, nil, nil
+	//预拣池商品备注，可能没有备注
+	if len(prePickRemark) > 0 {
+		err = model.PrePickRemarkBatchSave(db, prePickRemark)
+		if err != nil {
+			return err, nil, nil
+		}
 	}
 
 	return nil, orderGoodsIds, outboundGoods

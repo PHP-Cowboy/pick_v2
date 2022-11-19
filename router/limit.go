@@ -16,6 +16,8 @@ func LimitRoute(g *gin.RouterGroup) {
 		limitGroup.POST("/taskLimit", handler.TaskLimit)
 		//撤销限发
 		limitGroup.POST("/revokeLimit", handler.RevokeLimit)
+		//限发列表
+		limitGroup.GET("/list", handler.LimitShipmentList)
 	}
 
 }

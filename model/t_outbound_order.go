@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"time"
@@ -65,4 +66,8 @@ func OutboundOrderReplaceSave(db *gorm.DB, list []OutboundOrder, values []string
 		Save(&list)
 
 	return result.Error
+}
+
+func GetOutboundNumber(taskId int, number string) string {
+	return fmt.Sprintf("%v%s", taskId, number)
 }

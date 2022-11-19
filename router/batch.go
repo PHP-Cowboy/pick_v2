@@ -17,7 +17,7 @@ func BatchRoute(g *gin.RouterGroup) {
 	{
 		//列表
 		batchGroup.GET("/list", handler.GetBatchList)
-		//
+		//新创建批次
 		batchGroup.POST("/newBatch", handler.NewBatch)
 		//创建批次
 		batchGroup.POST("/create", handler.CreateBatch)

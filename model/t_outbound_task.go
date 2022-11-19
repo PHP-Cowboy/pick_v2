@@ -12,6 +12,8 @@ type OutboundTask struct {
 	PayEndTime        *MyTime `gorm:"type:datetime;comment:结束时间"`
 	Status            int     `gorm:"type:tinyint;default:1;comment:状态:1:进行中,2:已结束"`
 	IsPush            int     `gorm:"type:tinyint;default:1;comment:推送状态:1:未推送,2:已推送"`
+	Sku               string  `gorm:"type:varchar(255);comment:筛选sku"`
+	GoodsName         string  `gorm:"type:varchar(255);comment:筛选商品名称"`
 	Creator
 }
 
@@ -22,6 +24,6 @@ const (
 )
 
 func OutboundTaskSave(db *gorm.DB, task *OutboundTask) error {
-	result := db.Model(&OutboundOrder{}).Save(&task)
+	result := db.Model(&OutboundTask{}).Save(task)
 	return result.Error
 }

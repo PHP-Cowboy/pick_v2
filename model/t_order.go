@@ -2,6 +2,7 @@ package model
 
 import (
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"time"
 )
 
@@ -45,15 +46,19 @@ const (
 	CloseOrderType   //已关闭
 )
 
-func UpdateOrder(db *gorm.DB, list []Order) error {
+func UpdateOrder(db *gorm.DB, list []Order, values []string) error {
+
 	result := db.Model(&Order{}).
-		Omit("id,create_time").
-		Select("shop_id,shop_name,shop_type,shop_code,house_code,line").
-		Save(&list)
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"shop_id,shop_name,shop_type,shop_code,house_code,line"}),
+		}).Save(&list)
 
-	if result.Error != nil {
-		return result.Error
-	}
+	return result.Error
+}
 
-	return nil
+func UpdateOrderByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
+	result := db.Model(&Order{}).Where("id in (?)", ids).Updates(mp)
+
+	return result.Error
 }

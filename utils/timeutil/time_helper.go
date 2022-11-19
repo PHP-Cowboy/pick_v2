@@ -163,3 +163,17 @@ func GetDiffDateTime(t time.Time) string {
 
 	return diffStr
 }
+
+func DateStrToTime(dateStr string) (*time.Time, error) {
+	if dateStr == "" {
+		return nil, nil
+	}
+
+	t, err := time.ParseInLocation(TimeFormat, dateStr, time.Local)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &t, nil
+}

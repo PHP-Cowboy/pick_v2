@@ -10,7 +10,7 @@ func ConfigRoute(g *gin.RouterGroup) {
 
 	configGroup := g.Group("/config", middlewares.JWTAuth(), middlewares.IsAdminAuth())
 	{
-		//订单批量限发
+		//配送方式明细
 		configGroup.GET("/deliveryMethodInfo", handler.DeliveryMethodInfo)
 		//修改配送方式
 		configGroup.POST("/changeDeliveryMethod", handler.ChangeDeliveryMethod)

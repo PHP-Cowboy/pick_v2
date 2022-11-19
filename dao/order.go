@@ -6,15 +6,15 @@ import (
 )
 
 // 变更订单类型&&商品状态
-func UpdateOrderAndGoods(db *gorm.DB, order []model.Order, orderGoods []model.OrderGoods) error {
+func UpdateOrderAndGoods(db *gorm.DB, orderIds []int, orderGoodsIds []int) error {
 
-	err := model.UpdateOrder(db, order)
+	err := model.UpdateOrderByIds(db, orderIds, map[string]interface{}{"order_type": model.PickingOrderType})
 
 	if err != nil {
 		return err
 	}
 
-	err = model.UpdateOrderGoodsStatus(db, orderGoods, []string{"status"})
+	err = model.UpdateOrderGoodsByIds(db, orderGoodsIds, map[string]interface{}{"status": model.OrderGoodsProcessingStatus})
 
 	if err != nil {
 		return err
