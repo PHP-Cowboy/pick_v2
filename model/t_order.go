@@ -3,6 +3,7 @@ package model
 import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"pick_v2/forms/rsp"
 	"time"
 )
 
@@ -46,6 +47,16 @@ const (
 	CloseOrderType   //已关闭
 )
 
+func OrderSave(db *gorm.DB, order *Order) error {
+	result := db.Model(&Order{}).Save(order)
+	return result.Error
+}
+
+func OrderBatchSave(db *gorm.DB, list []Order) error {
+	result := db.Model(&Order{}).Save(&list)
+	return result.Error
+}
+
 func UpdateOrder(db *gorm.DB, list []Order, values []string) error {
 
 	result := db.Model(&Order{}).
@@ -61,4 +72,35 @@ func UpdateOrderByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
 	result := db.Model(&Order{}).Where("id in (?)", ids).Updates(mp)
 
 	return result.Error
+}
+
+func OrderOrCompleteOrderExist(db *gorm.DB, ids []int, info rsp.OrderInfo) (err error, exist bool) {
+	var (
+		order         []Order
+		completeOrder []CompleteOrder
+	)
+
+	// 查询是否已存在 存在的过滤掉
+	result := db.Where("id in (?)", ids).Find(&order)
+
+	if result.Error != nil {
+		return result.Error, false
+	}
+
+	if len(order) > 0 {
+		return nil, true
+	}
+
+	//查看完成订单里有没有
+	result = db.Where("number = ?", info.Number).Find(&completeOrder)
+
+	if result.Error != nil {
+		return result.Error, false
+	}
+
+	if len(completeOrder) > 0 {
+		return nil, true
+	}
+
+	return nil, false
 }

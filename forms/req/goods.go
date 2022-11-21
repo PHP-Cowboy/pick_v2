@@ -1,5 +1,10 @@
 package req
 
+// MQ 采购订单
+type PurchaseOrderForm struct {
+	OrderId []int `json:"order_id"`
+}
+
 type GoodsListForm struct {
 	Paging
 	OrderType        int    `json:"order_type" form:"order_type" binding:"oneof=0 1 2 3"`

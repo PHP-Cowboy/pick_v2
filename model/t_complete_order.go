@@ -1,5 +1,7 @@
 package model
 
+import "gorm.io/gorm"
+
 // 完成订单表
 type CompleteOrder struct {
 	Base
@@ -19,4 +21,10 @@ type CompleteOrder struct {
 	District       string  `gorm:"type:varchar(64);comment:区"`
 	PickTime       *MyTime `gorm:"type:datetime;default: null;comment:最近拣货时间"`
 	PayAt          MyTime  `gorm:"type:datetime;comment:支付时间"`
+}
+
+func CompleteOrderSave(db *gorm.DB, list *CompleteOrder) error {
+	result := db.Model(&CompleteOrder{}).Save(list)
+
+	return result.Error
 }

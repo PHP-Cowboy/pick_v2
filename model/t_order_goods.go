@@ -86,6 +86,13 @@ const (
 	OrderGoodsProcessingStatus //处理中
 )
 
+// 批量保存订单商品
+func OrderGoodsBatchSave(db *gorm.DB, list *[]OrderGoods) error {
+	result := db.Model(&OrderGoods{}).Save(list)
+
+	return result.Error
+}
+
 // 批量更新订单商品数据
 func UpdateOrderGoodsByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
 	result := db.Model(&OrderGoods{}).Where("id in (?)", ids).Updates(mp)

@@ -1,5 +1,7 @@
 package model
 
+import "gorm.io/gorm"
+
 // 完成订单明细表
 type CompleteOrderDetail struct {
 	Base
@@ -14,4 +16,10 @@ type CompleteOrderDetail struct {
 	ReviewCount     int      `gorm:"type:int;comment:出库数量"`
 	GoodsRemark     string   `gorm:"type:varchar(255);comment:商品备注"`
 	DeliveryOrderNo GormList `gorm:"type:varchar(16);comment:出库单号"`
+}
+
+func CompleteOrderDetailBatchSave(db *gorm.DB, list *[]CompleteOrderDetail) error {
+	result := db.Model(&CompleteOrderDetail{}).Save(list)
+
+	return result.Error
 }
