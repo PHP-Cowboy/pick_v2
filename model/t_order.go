@@ -3,7 +3,6 @@ package model
 import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"pick_v2/forms/rsp"
 	"time"
 )
 
@@ -74,7 +73,7 @@ func UpdateOrderByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
 	return result.Error
 }
 
-func OrderOrCompleteOrderExist(db *gorm.DB, ids []int, info rsp.OrderInfo) (err error, exist bool) {
+func OrderOrCompleteOrderExist(db *gorm.DB, ids []int, number string) (err error, exist bool) {
 	var (
 		order         []Order
 		completeOrder []CompleteOrder
@@ -92,7 +91,7 @@ func OrderOrCompleteOrderExist(db *gorm.DB, ids []int, info rsp.OrderInfo) (err 
 	}
 
 	//查看完成订单里有没有
-	result = db.Where("number = ?", info.Number).Find(&completeOrder)
+	result = db.Where("number = ?", number).Find(&completeOrder)
 
 	if result.Error != nil {
 		return result.Error, false

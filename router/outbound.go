@@ -14,8 +14,14 @@ func OutboundRoute(g *gin.RouterGroup) {
 		outboundGroup.POST("/createTask", handler.CreateOutboundTask)
 		//出库单任务列表
 		outboundGroup.GET("/taskList", handler.OutboundTaskList)
+		//简化版任务列表
+		outboundGroup.GET("/taskListSimple", handler.OutboundTaskListSimple)
+		//出库任务状态数量
+		outboundGroup.GET("/count", handler.OutboundTaskCount)
 		//出库单订单列表
 		outboundGroup.GET("/orderList", handler.OutboundOrderList)
+		//出库订单数量
+		outboundGroup.GET("/orderCount", handler.OutboundOrderCount)
 		//出库单订单详情
 		outboundGroup.GET("/orderDetail", handler.OutboundOrderDetail)
 		//结束任务

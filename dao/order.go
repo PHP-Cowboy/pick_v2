@@ -17,7 +17,7 @@ func Shipping(db *gorm.DB, form req.PurchaseOrderForm, info rsp.OrderInfo) (cons
 		orderGoods []model.OrderGoods
 	)
 
-	err, exist := model.OrderOrCompleteOrderExist(db, form.OrderId, info)
+	err, exist := model.OrderOrCompleteOrderExist(db, form.OrderId, info.Number)
 	//出现错误，消息消费重试
 	if err != nil {
 		return consumer.ConsumeRetryLater, err
@@ -107,8 +107,8 @@ func NoShipping(db *gorm.DB, form req.PurchaseOrderForm, info rsp.OrderInfo) (co
 	)
 
 	//查询订单和完成订单中是否已存在
-	//订单中也查询，避免因拣货的错误导致拣货系统也出现错误(极端情况，正常不可能出现)
-	err, exist := model.OrderOrCompleteOrderExist(db, form.OrderId, info)
+	//订单中也查询，避免因拣货的错误导致拣货系统也出现错误(极端情况，正常不可能出现,也处理一下，以防万一)
+	err, exist := model.OrderOrCompleteOrderExist(db, form.OrderId, info.Number)
 	//出现错误，消息消费重试
 	if err != nil {
 		return consumer.ConsumeRetryLater, err

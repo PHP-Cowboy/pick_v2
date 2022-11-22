@@ -17,6 +17,21 @@ type OutboundTaskList struct {
 	PayEndTime        *model.MyTime `json:"pay_end_time"`
 	Status            int           `json:"status"`
 	IsPush            int           `json:"is_push"`
+	Creator           string        `json:"creator"`
+	UpdateTime        string        `json:"update_time"`
+}
+
+type OutboundTaskCountRsp struct {
+	Ongoing int `json:"ongoing"`
+	Closed  int `json:"closed"`
+}
+
+type OutboundOrderCountRsp struct {
+	Total    int `json:"total"`
+	New      int `json:"new"`
+	Picking  int `json:"picking"`
+	Complete int `json:"complete"`
+	Close    int `json:"close"`
 }
 
 type OutboundOrderListRsp struct {
@@ -26,6 +41,7 @@ type OutboundOrderListRsp struct {
 
 type OutboundOrderList struct {
 	Number            string        `json:"number"`
+	OutboundNumber    string        `json:"outbound_number"`
 	PayAt             *model.MyTime `json:"pay_at"`
 	ShopName          string        `json:"shop_name"`
 	ShopType          string        `json:"shop_type"`

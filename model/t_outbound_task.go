@@ -17,6 +17,11 @@ type OutboundTask struct {
 	Creator
 }
 
+type OutboundTaskCountStatus struct {
+	Status int `json:"status"`
+	Count  int `json:"count"`
+}
+
 const (
 	OutboundTaskStatus        = iota
 	OutboundTaskStatusOngoing //进行中
@@ -26,4 +31,27 @@ const (
 func OutboundTaskSave(db *gorm.DB, task *OutboundTask) error {
 	result := db.Model(&OutboundTask{}).Save(task)
 	return result.Error
+}
+
+// 根据status分组统计任务条数
+func OutboundTaskCountGroupStatus(db *gorm.DB) (err error, count []OutboundTaskCountStatus) {
+
+	result := db.Model(&OutboundTask{}).
+		Select("count(1) as count, status").
+		Group("status").
+		Find(&count)
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	return nil, count
+}
+
+func GetOutboundTaskStatusOngoingList(db *gorm.DB) (err error, list []OutboundTask) {
+	result := db.Model(&OutboundTask{}).
+		Where("status = ?", OutboundTaskStatusOngoing).
+		Find(&list)
+
+	return result.Error, list
 }

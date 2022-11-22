@@ -19,5 +19,7 @@ type RevokeLimitForm struct {
 }
 
 type LimitShipmentListForm struct {
-	TaskId int `json:"task_id" form:"task_id" binding:"required"`
+	Paging
+	TaskId int    `json:"task_id" form:"task_id" binding:"required"`
+	Number string `json:"number" form:"number"`
 }

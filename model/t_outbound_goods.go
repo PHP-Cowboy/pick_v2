@@ -159,5 +159,18 @@ func OutboundGoodsNumsStatisticalByTaskIdAndNumbers(db *gorm.DB, taskId int, num
 		mp[n.Number] = n
 	}
 
+	for _, s := range number {
+		num, ok := mp[s]
+		//订单统计没有数据时赋值为0
+		if !ok {
+			num.LimitNum = 0
+			num.OutCount = 0
+			num.PayCount = 0
+			num.CloseCount = 0
+
+			mp[s] = num
+		}
+	}
+
 	return err, mp
 }

@@ -75,6 +75,32 @@ func OutboundTaskList(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
+// 简化版任务列表
+func OutboundTaskListSimple(c *gin.Context) {
+
+	err, res := dao.OutboundTaskListSimple(global.DB)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.SucJson(c, res)
+}
+
+// 出库任务状态数量
+func OutboundTaskCount(c *gin.Context) {
+
+	err, res := dao.OutboundTaskCount(global.DB)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.SucJson(c, res)
+}
+
 // 出库单订单列表
 func OutboundOrderList(c *gin.Context) {
 	var form req.OutboundOrderListForm
@@ -91,6 +117,25 @@ func OutboundOrderList(c *gin.Context) {
 	}
 
 	xsq_net.SucJson(c, rsp)
+}
+
+// 出库订单数量
+func OutboundOrderCount(c *gin.Context) {
+	var form req.OutboundOrderCountForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err, res := dao.OutboundOrderCount(global.DB, form)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.SucJson(c, res)
 }
 
 // 出库单订单详情

@@ -13,14 +13,14 @@ type CreateOutboundForm struct {
 
 type OutboundTaskListForm struct {
 	Paging
-	ShopId           int    `json:"shop_id"`
-	Sku              string `json:"sku"`
-	Number           string `json:"number"`
-	Line             string `json:"line"`
-	DistributionType int    `json:"distribution_type"`
-	Status           int    `json:"status" binding:"required"`
-	StartTime        string `json:"start_time"`
-	EndTime          string `json:"end_time"`
+	ShopId           int    `json:"shop_id" form:"shop_id"`
+	Sku              string `json:"sku" form:"sku"`
+	Number           string `json:"number" form:"number"`
+	Line             string `json:"line" form:"line"`
+	DistributionType int    `json:"distribution_type" form:"distribution_type"`
+	Status           int    `json:"status" form:"status" binding:"required"`
+	StartTime        string `json:"start_time" form:"start_time"`
+	EndTime          string `json:"end_time" form:"end_time"`
 }
 
 type OutboundOrderListForm struct {
@@ -37,6 +37,10 @@ type OutboundOrderListForm struct {
 	District         string `json:"district" form:"district" `
 	HasRemark        *int   `json:"has_remark" form:"has_remark" `
 	OrderType        int    `json:"order_type" form:"order_type" `
+}
+
+type OutboundOrderCountForm struct {
+	TaskId int `json:"task_id" form:"task_id" binding:"required"`
 }
 
 type OutboundOrderDetailForm struct {

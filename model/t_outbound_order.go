@@ -36,6 +36,11 @@ type OutboundOrder struct {
 	OrderRemark       string    `gorm:"type:varchar(512);comment:订单备注"`
 }
 
+type OutboundOrderTypeCount struct {
+	OrderType int `json:"order_type"`
+	Count     int `json:"count"`
+}
+
 const (
 	OutboundOrderType         = iota
 	OutboundOrderTypeNew      //新订单
@@ -70,4 +75,20 @@ func OutboundOrderReplaceSave(db *gorm.DB, list []OutboundOrder, values []string
 
 func GetOutboundNumber(taskId int, number string) string {
 	return fmt.Sprintf("%v%s", taskId, number)
+}
+
+// 根据status分组统计任务条数
+func OutboundOrderOrderTypeCount(db *gorm.DB, taskId int) (err error, count []OutboundOrderTypeCount) {
+
+	result := db.Model(&OutboundOrder{}).
+		Select("count(1) as count, order_type").
+		Where("task_id = ? and order_type != ?", taskId, OutboundOrderTypeClose).
+		Group("order_type").
+		Find(&count)
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	return nil, count
 }

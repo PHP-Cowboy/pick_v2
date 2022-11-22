@@ -217,7 +217,7 @@ func RevokeLimit(db *gorm.DB, form req.RevokeLimitForm) error {
 
 // 限发列表
 func LimitShipmentList(db *gorm.DB, form req.LimitShipmentListForm) (error, []rsp.LimitShipmentList) {
-	err, limitShipmentList := model.GetLimitShipmentListByTaskId(db, form.TaskId)
+	err, limitShipmentList := model.GetLimitShipmentListByTaskIdAndNumber(db, form.TaskId, form.Number)
 	if err != nil {
 		return err, nil
 	}

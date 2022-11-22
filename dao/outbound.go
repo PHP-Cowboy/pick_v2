@@ -105,10 +105,54 @@ func OutboundTaskList(db *gorm.DB, form req.OutboundTaskListForm) (err error, re
 			PayEndTime:        task.PayEndTime,
 			Status:            task.Status,
 			IsPush:            task.IsPush,
+			Creator:           task.Creator.Creator,
+			UpdateTime:        timeutil.FormatToDateTime(task.UpdateTime),
 		})
 	}
 
 	res.List = list
+
+	return nil, res
+}
+
+func OutboundTaskListSimple(db *gorm.DB) (error, []rsp.OutboundTaskList) {
+	err, dataList := model.GetOutboundTaskStatusOngoingList(db)
+
+	if err != nil {
+		return err, nil
+	}
+
+	list := make([]rsp.OutboundTaskList, 0, len(dataList))
+
+	for _, d := range dataList {
+		list = append(list, rsp.OutboundTaskList{
+			Id:       d.Id,
+			TaskName: d.TaskName,
+		})
+	}
+
+	return nil, list
+}
+
+func OutboundTaskCount(db *gorm.DB) (error, rsp.OutboundTaskCountRsp) {
+
+	err, count := model.OutboundTaskCountGroupStatus(db)
+	if err != nil {
+		return err, rsp.OutboundTaskCountRsp{}
+	}
+
+	var res rsp.OutboundTaskCountRsp
+
+	for _, ct := range count {
+		switch ct.Status {
+		case model.OutboundTaskStatusOngoing:
+			res.Ongoing += ct.Count
+			break
+		case model.OutboundTaskStatusClosed:
+			res.Closed += ct.Count
+			break
+		}
+	}
 
 	return nil, res
 }
@@ -156,6 +200,36 @@ func OutboundTaskSave(db *gorm.DB, form req.CreateOutboundForm, userInfo *middle
 	}
 
 	return task.Id, nil
+}
+
+func OutboundOrderCount(db *gorm.DB, form req.OutboundOrderCountForm) (error, rsp.OutboundOrderCountRsp) {
+
+	err, count := model.OutboundOrderOrderTypeCount(db, form.TaskId)
+	if err != nil {
+		return err, rsp.OutboundOrderCountRsp{}
+	}
+
+	var res rsp.OutboundOrderCountRsp
+
+	for _, ct := range count {
+		switch ct.OrderType {
+		case model.OutboundOrderTypeNew:
+			res.New += ct.Count
+			break
+		case model.OutboundOrderTypePicking:
+			res.Picking += ct.Count
+			break
+		case model.OutboundOrderTypeComplete:
+			res.Complete += ct.Count
+			break
+		case model.OutboundOrderTypeClose:
+			res.Close += ct.Count
+			break
+		}
+		res.Total += ct.Count
+	}
+
+	return nil, res
 }
 
 // 出库订单相关保存
@@ -343,8 +417,14 @@ func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, 
 		Province:         form.Province,
 		City:             form.City,
 		District:         form.District,
-		OrderType:        form.OrderType,
 	})
+
+	if form.OrderType > 0 {
+		localDb.Where("order_type = ?", form.OrderType)
+	} else {
+		//全部订单不显示已关闭的
+		localDb.Where("order_type != ?", model.OutboundOrderTypeClose)
+	}
 
 	if form.HasRemark != nil {
 		localDb.Where("has_remark = ?", *form.HasRemark)
@@ -388,6 +468,7 @@ func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, 
 
 		list = append(list, rsp.OutboundOrderList{
 			Number:            order.Number,
+			OutboundNumber:    model.GetOutboundNumber(order.TaskId, order.Number),
 			PayAt:             order.PayAt,
 			ShopName:          order.ShopName,
 			ShopType:          order.ShopType,
