@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 	"math"
 	"pick_v2/common/constant"
+	"pick_v2/dao"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
@@ -769,6 +770,26 @@ func ChangeReviewNum(c *gin.Context) {
 	}
 
 	tx.Commit()
+
+	xsq_net.Success(c)
+}
+
+// 取消拣货
+func CancelPick(c *gin.Context) {
+	var form req.CancelPickForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err := dao.CancelPick(global.DB, form)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
 
 	xsq_net.Success(c)
 }

@@ -55,3 +55,11 @@ func GetOutboundTaskStatusOngoingList(db *gorm.DB) (err error, list []OutboundTa
 
 	return result.Error, list
 }
+
+func UpdateOutboundTaskStatusById(db *gorm.DB, taskId int) error {
+	result := db.Model(&OutboundTask{}).
+		Where("id = ?", taskId).
+		Update("status", OutboundTaskStatusClosed)
+
+	return result.Error
+}

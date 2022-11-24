@@ -86,7 +86,7 @@ const (
 
 func OutboundGoodsBatchSave(db *gorm.DB, list []OutboundGoods) error {
 
-	result := db.Model(&OutboundGoods{}).Save(list)
+	result := db.Model(&OutboundGoods{}).CreateInBatches(&list, BatchSize)
 
 	return result.Error
 }
@@ -147,6 +147,7 @@ func OutboundGoodsNumsStatisticalByTaskIdAndNumbers(db *gorm.DB, taskId int, num
 	result := db.Model(&OutboundGoods{}).
 		Select("number,sum(pay_count) as pay_count,sum(close_count) as close_count,sum(out_count) as out_count,sum(limit_num) as limit_num").
 		Where("task_id = ? and number in (?)", taskId, number).
+		Group("number").
 		Find(&nums)
 
 	if result.Error != nil {
@@ -173,4 +174,13 @@ func OutboundGoodsNumsStatisticalByTaskIdAndNumbers(db *gorm.DB, taskId int, num
 	}
 
 	return err, mp
+}
+
+func OutboundOrderDistinctGoodsList(db *gorm.DB, taskId int) (err error, list []OutboundGoods) {
+	result := db.Model(&OutboundGoods{}).
+		Select("DISTINCT(`sku`),goods_name").
+		Where("task_id = ?", taskId).
+		Find(&list)
+
+	return result.Error, list
 }

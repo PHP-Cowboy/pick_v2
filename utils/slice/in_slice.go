@@ -40,3 +40,19 @@ func InArray(val interface{}, array interface{}) (exists bool, index int) {
 
 	return
 }
+
+// 判断某一个值是否含在切片之中,并返回找到的第一个值的索引
+func inArray[T comparable](val T, array []T) (exists bool, index int) {
+	exists = false
+	index = -1
+
+	for i, t := range array {
+		if t == val {
+			exists = true
+			index = i
+			break
+		}
+	}
+
+	return
+}

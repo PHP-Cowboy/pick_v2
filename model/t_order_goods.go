@@ -32,6 +32,7 @@ type OrderGoods struct {
 	DeliveryOrderNo GormList  `gorm:"type:varchar(255);comment:出库单号"`
 }
 
+// 订单&&商品连表
 type OrderJoinGoods struct {
 	OrderId           int      `json:"order_id"`
 	ShopId            int      `json:"shop_id"` //order表
@@ -79,16 +80,25 @@ type OrderJoinGoods struct {
 	DeliveryOrderNo   GormList `gorm:"type:varchar(255);comment:出库单号"`
 }
 
+// 商品相关数量统计
+type OrderGoodsNumsStatistical struct {
+	Number     string `json:"number"`
+	PayCount   int    `json:"pay_count"`
+	CloseCount int    `json:"close_count"`
+	OutCount   int    `json:"out_count"`
+	LackCount  int    `json:"lack_count"`
+}
+
 // 状态
 const (
 	OrderGoodsDefaultStatus    = iota
-	OrderGoodsUnhandledStatus  //未处理
+	OrderGoodsUnhandledStatus  //未处理(商品中不区分是欠货还是新订单，订单表中能区分，未完成的统一定义为未处理)
 	OrderGoodsProcessingStatus //处理中
 )
 
 // 批量保存订单商品
 func OrderGoodsBatchSave(db *gorm.DB, list *[]OrderGoods) error {
-	result := db.Model(&OrderGoods{}).Save(list)
+	result := db.Model(&OrderGoods{}).CreateInBatches(list, BatchSize)
 
 	return result.Error
 }
@@ -100,6 +110,60 @@ func UpdateOrderGoodsByIds(db *gorm.DB, ids []int, mp map[string]interface{}) er
 	return result.Error
 }
 
+// 批量更新订单商品数据
+func UpdateOrderGoodsByNumbers(db *gorm.DB, numbers []string, mp map[string]interface{}) error {
+	result := db.Model(&OrderGoods{}).Where("number in (?)", numbers).Updates(mp)
+
+	return result.Error
+}
+
+// 通过ids变更订单类型&&商品状态
+func UpdateOrderAndGoodsByIds(db *gorm.DB, orderIds []int, orderGoodsIds []int, orderType, status int) error {
+
+	err := UpdateOrderByIds(db, orderIds, map[string]interface{}{"order_type": orderType})
+
+	if err != nil {
+		return err
+	}
+
+	err = UpdateOrderGoodsByIds(db, orderGoodsIds, map[string]interface{}{"status": status})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// 通过numbers变更订单类型&&商品状态
+func UpdateOrderAndGoodsByNumbers(db *gorm.DB, numbers []string, orderType, status int) error {
+
+	err := UpdateOrderByNumbers(db, numbers, map[string]interface{}{"order_type": orderType})
+
+	if err != nil {
+		return err
+	}
+
+	err = UpdateOrderGoodsByNumbers(db, numbers, map[string]interface{}{"status": status})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// 变更订单商品状态
+func UpdateOrderGoodsStatus(db *gorm.DB, list []OrderGoods, values []string) error {
+	result := db.Model(&OrderGoods{}).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns(values),
+	}).Save(&list)
+
+	return result.Error
+}
+
+// 临时加单
 // 订单&&商品信息
 func GetOrderJoinGoodsList(db *gorm.DB, number []string) (err error, list []OrderJoinGoods) {
 	result := db.Table("t_order_goods og").
@@ -115,11 +179,38 @@ func GetOrderJoinGoodsList(db *gorm.DB, number []string) (err error, list []Orde
 	return nil, list
 }
 
-func UpdateOrderGoodsStatus(db *gorm.DB, list []OrderGoods, values []string) error {
-	result := db.Model(&OrderGoods{}).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns(values),
-	}).Save(&list)
+// 获取出库任务订单 商品相关数量
+func OrderGoodsNumsStatisticalByNumbers(db *gorm.DB, number []string) (err error, mp map[string]OrderGoodsNumsStatistical) {
+	var nums []OrderGoodsNumsStatistical
 
-	return result.Error
+	result := db.Model(&OrderGoods{}).
+		Select("number,sum(pay_count) as pay_count,sum(close_count) as close_count,sum(out_count) as out_count,sum(lack_count) as lack_count").
+		Where("number in (?)", number).
+		Group("number").
+		Find(&nums)
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	mp = make(map[string]OrderGoodsNumsStatistical, 0)
+
+	for _, n := range nums {
+		mp[n.Number] = n
+	}
+
+	for _, s := range number {
+		num, ok := mp[s]
+		//订单统计没有数据时赋值为0
+		if !ok {
+			num.LackCount = 0
+			num.OutCount = 0
+			num.PayCount = 0
+			num.CloseCount = 0
+
+			mp[s] = num
+		}
+	}
+
+	return err, mp
 }

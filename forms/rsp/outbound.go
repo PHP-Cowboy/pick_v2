@@ -57,6 +57,11 @@ type OutboundOrderList struct {
 	OrderType         int           `json:"order_type"`
 }
 
+type OutboundOrderGoodsList struct {
+	Sku  string `json:"sku"`
+	Name string `json:"name"`
+}
+
 type OutboundOrderDetailRsp struct {
 }
 

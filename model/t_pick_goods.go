@@ -30,3 +30,9 @@ func GetPickGoodsByNumber(db *gorm.DB, numbers []string) (err error, list []Pick
 
 	return result.Error, list
 }
+
+func GetPickGoodsByPickIds(db *gorm.DB, pickIds []int) (err error, list []PickGoods) {
+	result := db.Model(&PickGoods{}).Where("pick_id in (?)", pickIds).Find(&list)
+
+	return result.Error, list
+}

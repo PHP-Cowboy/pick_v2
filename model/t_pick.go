@@ -1,5 +1,7 @@
 package model
 
+import "gorm.io/gorm"
+
 // 拣货列表
 type Pick struct {
 	Base
@@ -41,4 +43,11 @@ type PickAndGoods struct {
 	Status   int    `json:"status"`
 	Number   string `json:"number"`
 	PickUser string `json:"pick_user"`
+}
+
+func GetPickListByIds(db *gorm.DB, ids []int) (err error, list []Pick) {
+
+	result := db.Model(&Pick{}).Where("id in (?)", ids).Find(&list)
+
+	return result.Error, list
 }

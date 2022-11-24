@@ -156,6 +156,24 @@ func OutboundOrderDetail(c *gin.Context) {
 	xsq_net.SucJson(c, rsp)
 }
 
+// 出库任务商品列表
+func OutboundOrderGoodsList(c *gin.Context) {
+	var form req.OutboundOrderGoodsListForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err, rsp := dao.OutboundOrderGoodsList(global.DB, form)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.SucJson(c, rsp)
+}
+
 // 结束任务
 func EndOutboundTask(c *gin.Context) {
 	var form req.EndOutboundTaskForm

@@ -4,20 +4,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+
 	"pick_v2/common/constant"
+	"pick_v2/forms/req"
+	"pick_v2/forms/rsp"
 	"pick_v2/global"
 	"pick_v2/model"
 	"pick_v2/utils/cache"
-	"pick_v2/utils/slice"
-	"pick_v2/utils/timeutil"
-	"time"
-
-	"pick_v2/forms/req"
-	"pick_v2/forms/rsp"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/request"
+	"pick_v2/utils/slice"
+	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 )
 
@@ -102,9 +103,28 @@ func GetGoodsList(c *gin.Context) {
 		return
 	}
 
+	if len(numbers) == 0 {
+		for _, o := range orders {
+			numbers = append(numbers, o.Number)
+		}
+	}
+
+	err, numsMp := model.OrderGoodsNumsStatisticalByNumbers(db, numbers)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
 	list := make([]rsp.Order, 0, form.Size)
 
 	for _, o := range orders {
+
+		nums, numsOk := numsMp[o.Number]
+
+		if !numsOk {
+			xsq_net.ErrorJSON(c, errors.New("订单统计数量不存在"))
+			return
+		}
 
 		list = append(list, rsp.Order{
 			Number:            o.Number,
@@ -113,10 +133,10 @@ func GetGoodsList(c *gin.Context) {
 			ShopName:          o.ShopName,
 			ShopType:          o.ShopType,
 			DistributionType:  o.DistributionType,
-			PayCount:          o.PayTotal,
-			Picked:            o.Picked,
-			UnPicked:          o.UnPicked,
-			CloseNum:          o.CloseNum,
+			PayCount:          nums.PayCount,
+			Picked:            nums.OutCount,
+			UnPicked:          nums.LackCount,
+			CloseNum:          nums.CloseCount,
 			Line:              o.Line,
 			Region:            o.Province + o.City + o.District,
 			OrderRemark:       o.OrderRemark,

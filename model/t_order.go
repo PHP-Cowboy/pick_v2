@@ -73,6 +73,12 @@ func UpdateOrderByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
 	return result.Error
 }
 
+func UpdateOrderByNumbers(db *gorm.DB, numbers []string, mp map[string]interface{}) error {
+	result := db.Model(&Order{}).Where("number in (?)", numbers).Updates(mp)
+
+	return result.Error
+}
+
 func OrderOrCompleteOrderExist(db *gorm.DB, ids []int, number string) (err error, exist bool) {
 	var (
 		order         []Order

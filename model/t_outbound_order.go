@@ -51,7 +51,7 @@ const (
 
 func OutboundOrderBatchSave(db *gorm.DB, data []OutboundOrder) error {
 
-	result := db.Save(&data)
+	result := db.Model(&OutboundOrder{}).CreateInBatches(&data, BatchSize)
 
 	return result.Error
 }

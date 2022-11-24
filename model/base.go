@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+const BatchSize = 100
+
 const TableOptions string = "gorm:table_options"
 
 func GetOptions(tableName string) string {

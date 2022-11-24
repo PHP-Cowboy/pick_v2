@@ -18,6 +18,25 @@ func UniqueStringSlice(arr []string) []string {
 	return ret
 }
 
+// 泛型版 slice 去重
+func UniqueSlice[T comparable](arr []T) []T {
+	ret := make([]T, 0)
+
+	mp := make(map[T]struct{}, 0)
+
+	for _, t := range arr {
+		_, ok := mp[t]
+		if ok {
+			continue
+		}
+
+		mp[t] = struct{}{}
+		ret = append(ret, t)
+	}
+
+	return ret
+}
+
 // 在 a 不在 b 中的
 // a := []string{"5", "2", "3", "4"}
 // b := []string{"0", "1", "2", "3"}

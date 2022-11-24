@@ -42,3 +42,7 @@ type SkuReview struct {
 	Sku string `json:"sku" binding:"required"`
 	Num *int   `json:"num" binding:"required"`
 }
+
+type CancelPickForm struct {
+	Ids []int `json:"ids" form:"ids"`
+}

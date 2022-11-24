@@ -98,10 +98,9 @@ func OrderLimit(db *gorm.DB, form req.OrderLimitForm) error {
 // 更新出库单商品的限发数量
 func UpdateOutboundGoodsLimit(db *gorm.DB, list []model.OutboundGoods) error {
 	result := db.Model(&model.OutboundGoods{}).
-		Select("task_id,number,sku,limit_num").
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "task_id,number,sku"}},
-			DoUpdates: clause.AssignmentColumns([]string{"task_id", "number", "sku", "limit_num"}),
+			DoUpdates: clause.AssignmentColumns([]string{"limit_num"}),
 		}).
 		Save(&list)
 
@@ -123,6 +122,10 @@ func TaskLimit(db *gorm.DB, form req.TaskLimitForm) error {
 
 	if result.Error != nil {
 		return result.Error
+	}
+
+	if len(outboundGoodsJoinOrder) == 0 {
+		return errors.New("任务中没有所选sku请重试")
 	}
 
 	var (
@@ -216,17 +219,23 @@ func RevokeLimit(db *gorm.DB, form req.RevokeLimitForm) error {
 }
 
 // 限发列表
-func LimitShipmentList(db *gorm.DB, form req.LimitShipmentListForm) (error, []rsp.LimitShipmentList) {
-	err, limitShipmentList := model.GetLimitShipmentListByTaskIdAndNumber(db, form.TaskId, form.Number)
+func LimitShipmentList(db *gorm.DB, form req.LimitShipmentListForm) (error, rsp.LimitShipmentListRsp) {
+	var res rsp.LimitShipmentListRsp
+
+	err, total, limitShipmentList := model.GetLimitShipmentPageListByTaskIdAndNumber(db, form.TaskId, form.Number, form.Page, form.Size)
 	if err != nil {
-		return err, nil
+		return err, res
 	}
+
+	res.Total = total
 
 	list := make([]rsp.LimitShipmentList, 0, len(limitShipmentList))
 
 	for _, shipment := range limitShipmentList {
 		list = append(list, rsp.LimitShipmentList{
 			OutboundNumber: model.GetOutboundNumber(shipment.TaskId, shipment.Number),
+			Number:         shipment.Number,
+			Sku:            shipment.Sku,
 			ShopName:       shipment.ShopName,
 			GoodsName:      shipment.GoodsName,
 			GoodsSpe:       shipment.GoodsSpe,
@@ -235,5 +244,7 @@ func LimitShipmentList(db *gorm.DB, form req.LimitShipmentListForm) (error, []rs
 		})
 	}
 
-	return nil, list
+	res.List = list
+
+	return nil, res
 }

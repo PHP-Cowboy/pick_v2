@@ -48,6 +48,10 @@ type OutboundOrderDetailForm struct {
 	Number string `json:"number" form:"number" binding:"required"`
 }
 
+type OutboundOrderGoodsListForm struct {
+	TaskId int `json:"task_id" form:"task_id" binding:"required"`
+}
+
 type OrderLimit struct {
 	Sku      string `json:"sku" binding:"required"`
 	LimitNum int    `json:"limit_num" binding:"required"`
