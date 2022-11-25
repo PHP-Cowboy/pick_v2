@@ -26,7 +26,7 @@ type Pick struct {
 	ReviewTime      *MyTime  `gorm:"type:datetime;default:null;comment:复核时间"`
 	Sort            int      `gorm:"type:int(11) unsigned;comment:排序"`
 	Version         int      `gorm:"type:int;default:0;comment:版本"`
-	Status          int      `gorm:"type:tinyint;comment:状态:0:待拣货,1:待复核,2:复核完成,3:停止拣货,4:终止拣货"`
+	Status          int      `gorm:"type:tinyint;comment:状态:0:待拣货,1:待复核,2:复核完成,3:停止拣货,4:终止拣货,5:返回预拣池"`
 	DeliveryNo      string   `gorm:"type:varchar(255);index:delivery_no_idx;comment:出库单号"`
 }
 
@@ -36,6 +36,7 @@ const (
 	ReviewCompletedStatus           //复核完成
 	StopPickingStatus               //停止拣货
 	TerminationPickingStatus        //终止拣货
+	ReturnPrePickStatus             //返回预拣池
 )
 
 type PickAndGoods struct {
@@ -50,4 +51,10 @@ func GetPickListByIds(db *gorm.DB, ids []int) (err error, list []Pick) {
 	result := db.Model(&Pick{}).Where("id in (?)", ids).Find(&list)
 
 	return result.Error, list
+}
+
+func UpdatePickByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
+	result := db.Model(&Pick{}).Where("id in (?)", ids).Updates(mp)
+
+	return result.Error
 }

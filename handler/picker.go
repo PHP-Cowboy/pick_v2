@@ -253,6 +253,8 @@ func CompletePick(c *gin.Context) {
 			return
 		}
 
+		//todo 更新拣货数量(PickGoods.CompleteNum)为0
+
 		err := UpdateBatchPickNums(tx, pick.BatchId)
 
 		if err != nil {

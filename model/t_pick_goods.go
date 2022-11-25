@@ -1,6 +1,9 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"errors"
+	"gorm.io/gorm"
+)
 
 // 拣货商品明细
 type PickGoods struct {
@@ -20,7 +23,7 @@ type PickGoods struct {
 	Shelves          string `gorm:"type:varchar(64);comment:货架"`
 	DiscountPrice    int    `gorm:"comment:折扣价"`
 	NeedNum          int    `gorm:"type:int;not null;comment:需拣数量"`
-	CompleteNum      int    `gorm:"type:int;default:0;comment:已拣数量"`
+	CompleteNum      int    `gorm:"type:int;default:null;comment:已拣数量"` //默认为null，无需拣货或者拣货数量为0时更新为0
 	ReviewNum        int    `gorm:"type:int;default:0;comment:复核数量"`
 	Unit             string `gorm:"type:varchar(64);comment:单位"`
 }
@@ -31,8 +34,34 @@ func GetPickGoodsByNumber(db *gorm.DB, numbers []string) (err error, list []Pick
 	return result.Error, list
 }
 
+// 根据id查拣货池商品数据
 func GetPickGoodsByPickIds(db *gorm.DB, pickIds []int) (err error, list []PickGoods) {
 	result := db.Model(&PickGoods{}).Where("pick_id in (?)", pickIds).Find(&list)
 
 	return result.Error, list
+}
+
+// 查询拣货池商品订单是否有已拣的
+func GetFirstPickGoodsByNumbers(db *gorm.DB, numbers []string) (err error, exist bool) {
+
+	var pickGoods PickGoods
+
+	//
+	result := db.Model(&PickGoods{}).Where("number in (?) and complete_num >= 0", numbers).First(&pickGoods)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, false
+		}
+
+		return result.Error, true
+	}
+
+	return nil, false
+}
+
+func UpdatePickGoodsByPickIds(db *gorm.DB, pickIds []int, mp map[string]interface{}) error {
+	result := db.Model(&Pick{}).Where("pick_id in (?)", pickIds).Updates(mp)
+
+	return result.Error
 }

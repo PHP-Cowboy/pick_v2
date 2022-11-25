@@ -37,3 +37,15 @@ func UpdatePrePickStatusByIds(db *gorm.DB, ids []int, status int) error {
 
 	return nil
 }
+
+func UpdatePrePickByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
+	result := db.Model(&PrePick{}).
+		Where("id in (?)", ids).
+		Updates(mp)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
+}

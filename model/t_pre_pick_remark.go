@@ -18,8 +18,25 @@ type PrePickRemark struct {
 	Status       int    `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:已进入拣货池"`
 }
 
+const (
+	PrePickRemarkStatusUnhandled  = iota //未处理
+	PrePickRemarkStatusProcessing        //处理中(已进入拣货池)
+)
+
 func PrePickRemarkBatchSave(db *gorm.DB, list []PrePickRemark) (err error) {
 	result := db.Model(&PrePickRemark{}).Save(&list)
 
 	return result.Error
+}
+
+func UpdatePrePickRemarkByPrePickIds(db *gorm.DB, prePickIds []int, mp map[string]interface{}) error {
+	result := db.Model(&PrePickRemark{}).
+		Where("pre_pick_id in (?)", prePickIds).
+		Updates(mp)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
 }
