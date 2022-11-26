@@ -28,6 +28,7 @@ type Pick struct {
 	Version         int      `gorm:"type:int;default:0;comment:版本"`
 	Status          int      `gorm:"type:tinyint;comment:状态:0:待拣货,1:待复核,2:复核完成,3:停止拣货,4:终止拣货,5:返回预拣池"`
 	DeliveryNo      string   `gorm:"type:varchar(255);index:delivery_no_idx;comment:出库单号"`
+	Typ             int      `gorm:"type:tinyint;default:1;comment:批次类型:1:常规批次,2:快递批次"`
 }
 
 const (
@@ -46,15 +47,20 @@ type PickAndGoods struct {
 	PickUser string `json:"pick_user"`
 }
 
-func GetPickListByIds(db *gorm.DB, ids []int) (err error, list []Pick) {
-
-	result := db.Model(&Pick{}).Where("id in (?)", ids).Find(&list)
-
-	return result.Error, list
+func PickSave(db *gorm.DB, picks *[]Pick) error {
+	result := db.Model(&Pick{}).Save(picks)
+	return result.Error
 }
 
 func UpdatePickByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
 	result := db.Model(&Pick{}).Where("id in (?)", ids).Updates(mp)
 
 	return result.Error
+}
+
+func GetPickListByIds(db *gorm.DB, ids []int) (err error, list []Pick) {
+
+	result := db.Model(&Pick{}).Where("id in (?)", ids).Find(&list)
+
+	return result.Error, list
 }

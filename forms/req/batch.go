@@ -4,6 +4,7 @@ type NewCreateBatchForm struct {
 	TaskId    int      `json:"task_id" binding:"required"`
 	Number    []string `json:"number" binding:"required"`
 	BatchName string   `json:"batch_name" binding:"required"`
+	Typ       int      `json:"typ" binding:"required"` //1:常规批次,2:快递批次
 }
 
 type CreateBatchForm struct {
@@ -15,6 +16,9 @@ type CreateBatchForm struct {
 	PayTime           string   `json:"pay_time"  form:"pay_time" binding:"required"`                  //支付时间
 	Sku               []string `json:"sku" form:"sku"`
 	GoodsName         []string `json:"goods_name" form:"goods_name"`
+}
+
+type CentralizedPickListForm struct {
 }
 
 type StopPickForm struct {

@@ -24,6 +24,7 @@ type Batch struct {
 	Sort              int     `gorm:"type:int(11) unsigned;comment:排序"`
 	PayEndTime        *MyTime `gorm:"type:datetime;comment:支付截止时间"`
 	Version           int     `gorm:"type:int;default:0;comment:版本"`
+	Typ               int     `gorm:"type:tinyint;default:1;comment:批次类型:1:常规批次,2:快递批次"`
 }
 
 const (

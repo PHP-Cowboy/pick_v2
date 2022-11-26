@@ -30,6 +30,21 @@ type Batch struct {
 	RecheckSheetNum   int           `json:"recheck_sheet_num"`
 }
 
+type CentralizedPickListRsp struct {
+	Total int64                  `json:"total"`
+	List  []*CentralizedPickList `json:"list"`
+}
+
+type CentralizedPickList struct {
+	TaskName  string `json:"task_name"`
+	GoodsName string `json:"goods_name"`
+	GoodsSpe  string `json:"goods_spe"`
+	NeedNum   int    `json:"need_num"`
+	PickNum   int    `json:"pick_num"`
+	PickUser  string `json:"pick_user"`
+	HasRemark int    `json:"has_remark"`
+}
+
 type GetPrePickListRsp struct {
 	Total int64      `json:"total"`
 	List  []*PrePick `json:"list"`

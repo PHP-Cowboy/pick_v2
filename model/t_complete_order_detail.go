@@ -15,7 +15,7 @@ type CompleteOrderDetail struct {
 	CloseCount      int      `gorm:"type:int;comment:关闭数量"`
 	ReviewCount     int      `gorm:"type:int;comment:出库数量"`
 	GoodsRemark     string   `gorm:"type:varchar(255);comment:商品备注"`
-	DeliveryOrderNo GormList `gorm:"type:varchar(16);comment:出库单号"`
+	DeliveryOrderNo GormList `gorm:"type:varchar(255);comment:出库单号"`
 }
 
 func CompleteOrderDetailBatchSave(db *gorm.DB, list *[]CompleteOrderDetail) error {

@@ -56,6 +56,54 @@ func NewBatch(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
+// 创建快递批次
+func CourierBatch(c *gin.Context) {
+	var form req.NewCreateBatchForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	claims := GetUserInfo(c)
+
+	if claims == nil {
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
+		return
+	}
+
+	err := dao.CourierBatch(global.DB, form, claims)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+
+}
+
+// 集中拣货列表
+func CentralizedPickList(c *gin.Context) {
+
+	var form req.CentralizedPickListForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err, list := dao.CentralizedPickList(global.DB)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.SucJson(c, list)
+}
+
 // 生成拣货批次
 func CreateBatch(c *gin.Context) {
 	var form req.CreateBatchForm

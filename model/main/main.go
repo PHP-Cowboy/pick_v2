@@ -50,6 +50,8 @@ func main() {
 
 	_ = db.Set(model.TableOptions, model.GetOptions("批次表")).AutoMigrate(&model.Batch{})
 
+	_ = db.Set(model.TableOptions, model.GetOptions("集中拣货")).AutoMigrate(&model.CentralizedPick{})
+
 	_ = db.Set(model.TableOptions, model.GetOptions("预拣货列表")).AutoMigrate(&model.PrePick{})
 
 	_ = db.Set(model.TableOptions, model.GetOptions("预拣货商品明细表")).AutoMigrate(&model.PrePickGoods{})

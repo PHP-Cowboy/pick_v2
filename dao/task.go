@@ -111,6 +111,7 @@ func PickReturnPrePick(db *gorm.DB, pickList []model.Pick) error {
 	return nil
 }
 
+// 更新预拣池状态
 func ChangePrePickStatus(db *gorm.DB, prePickIds []int) error {
 	//更新预拣池商品状态
 	err := model.UpdatePrePickGoodsByPrePickIds(db, prePickIds, map[string]interface{}{"status": model.PrePickGoodsStatusProcessing})
@@ -133,6 +134,7 @@ func ChangePrePickStatus(db *gorm.DB, prePickIds []int) error {
 	return nil
 }
 
+// 更新拣货池状态
 func ChangePickStatus(db *gorm.DB, pickIds []int) error {
 	//拣货池商品和备注表没有状态
 	err := model.UpdatePickByIds(db, pickIds, map[string]interface{}{"status": model.ReturnPrePickStatus})

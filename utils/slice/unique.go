@@ -37,6 +37,22 @@ func UniqueSlice[T comparable](arr []T) []T {
 	return ret
 }
 
+// slice 转 map
+func SliceToMap[T comparable](arr []T) (mp map[T]struct{}) {
+	for _, t := range arr {
+		mp[t] = struct{}{}
+	}
+	return mp
+}
+
+// map 转 slice
+func MapToSlice[T comparable](mp map[T]struct{}) (arr []T) {
+	for id, _ := range mp {
+		arr = append(arr, id)
+	}
+	return arr
+}
+
 // 在 a 不在 b 中的
 // a := []string{"5", "2", "3", "4"}
 // b := []string{"0", "1", "2", "3"}

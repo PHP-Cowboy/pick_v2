@@ -12,6 +12,7 @@ type PrePick struct {
 	ShopName    string `gorm:"type:varchar(64);not null;comment:店铺名称"`
 	Line        string `gorm:"type:varchar(255);not null;comment:线路"`
 	Status      int    `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:已进入拣货池,2:关闭"`
+	Typ         int    `gorm:"type:tinyint;default:1;comment:批次类型:1:常规批次,2:快递批次"`
 }
 
 const (

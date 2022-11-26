@@ -23,7 +23,8 @@ type PrePickGoods struct {
 	CloseNum         int    `gorm:"type:int;not null;comment:关闭数量"`
 	OutCount         int    `gorm:"type:int;comment:出库数量"`
 	NeedOutNum       int    `gorm:"type:int;comment:需出库数量"`
-	Status           int    `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:已进入拣货池"`
+	Status           int    `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:已进入拣货池,2:关闭"`
+	Typ              int    `gorm:"type:tinyint;default:1;comment:批次类型:1:常规批次,2:快递批次"`
 }
 
 type PrePickGoodsJoinPrePick struct {
@@ -65,17 +66,12 @@ func PrePickGoodsBatchSave(db *gorm.DB, list []PrePickGoods) (err error) {
 	return result.Error
 }
 
-func GetPrePickGoodsJoinPrePickListByNumber(db *gorm.DB, numbers []string) (err error, list []PrePickGoodsJoinPrePick) {
-	result := db.Table("t_pre_pick_goods pg").
-		Select("pg.id as pre_pick_goods_id,pg.*,pp.*").
-		Joins("left join t_pre_pick pp on pg.pre_pick_id = pp.id").
-		Find(&list)
+func UpdatePrePickGoodsByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
+	result := db.Model(&PrePickGoods{}).
+		Where("id in (?)", ids).
+		Updates(mp)
 
-	if result.Error != nil {
-		return result.Error, list
-	}
-
-	return result.Error, list
+	return result.Error
 }
 
 func UpdatePrePickGoodsStatusByIds(db *gorm.DB, ids []int, status int) error {
@@ -100,4 +96,39 @@ func UpdatePrePickGoodsByPrePickIds(db *gorm.DB, prePickIds []int, mp map[string
 	}
 
 	return nil
+}
+
+func GetPrePickGoodsJoinPrePickListByNumber(db *gorm.DB, numbers []string) (err error, list []PrePickGoodsJoinPrePick) {
+	result := db.Table("t_pre_pick_goods pg").
+		Select("pg.id as pre_pick_goods_id,pg.*,pp.*").
+		Joins("left join t_pre_pick pp on pg.pre_pick_id = pp.id").
+		Where("pg.number in (?)", numbers).
+		Find(&list)
+
+	if result.Error != nil {
+		return result.Error, list
+	}
+
+	return result.Error, list
+}
+
+// 按分类或商品获取未进入拣货池的商品数据
+func GetPrePickGoodsByTypeParam(db *gorm.DB, ids []int, t int, typeParam []string) (err error, prePickGoods []PrePickGoods) {
+
+	local := db.Where("pre_pick_id in (?) and status = 0", ids)
+
+	//默认全单
+	if t == 2 { //按分类
+		local.Where("goods_type in (?)", typeParam)
+	} else if t == 3 { //按商品
+		local.Where("sku in (?)", typeParam)
+	}
+
+	result := local.Find(&prePickGoods)
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	return nil, prePickGoods
 }
