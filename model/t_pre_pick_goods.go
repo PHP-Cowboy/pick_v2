@@ -6,7 +6,7 @@ import "gorm.io/gorm"
 type PrePickGoods struct {
 	Base
 	WarehouseId      int    `gorm:"type:int(11);comment:仓库"`
-	BatchId          int    `gorm:"type:int(11) unsigned;comment:批次表id"`
+	BatchId          int    `gorm:"type:int(11) unsigned;index;comment:批次表id"`
 	OrderGoodsId     int    `gorm:"type:int(11) unsigned;comment:订单商品表ID"` //t_pick_order_goods 表 id
 	Number           string `gorm:"type:varchar(32);comment:订单编号"`
 	ShopId           int    `gorm:"type:int(11);comment:店铺id"`
@@ -52,6 +52,14 @@ type PrePickGoodsJoinPrePick struct {
 	ShopName         string `gorm:"type:varchar(64);not null;comment:店铺名称"`
 	Line             string `gorm:"type:varchar(255);not null;comment:线路"`
 	PrePickStatus    int    `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:已进入拣货池,2:关闭"`
+}
+
+type PrePickGoodsJoinPrePickRemark struct {
+	Number      string `gorm:"type:varchar(32);comment:订单编号"`
+	Sku         string `gorm:"type:varchar(64);comment:sku"`
+	NeedNum     int    `gorm:"type:int;not null;comment:需拣数量"`
+	GoodsRemark string `gorm:"type:varchar(255);comment:商品备注"`
+	Unit        string `json:"unit"`
 }
 
 const (
@@ -112,6 +120,19 @@ func GetPrePickGoodsJoinPrePickListByNumber(db *gorm.DB, numbers []string) (err 
 	return result.Error, list
 }
 
+func GetPrePickGoodsJoinPrePickListByBatchId(db *gorm.DB, batchId int) (err error, list []PrePickGoodsJoinPrePick) {
+	result := db.Table("t_pre_pick_goods pg").
+		Joins("left join t_pre_pick pp on pg.pre_pick_id = pp.id").
+		Where("pg.batch_id = ?", batchId).
+		Find(&list)
+
+	if result.Error != nil {
+		return result.Error, list
+	}
+
+	return result.Error, list
+}
+
 // 按分类或商品获取未进入拣货池的商品数据
 func GetPrePickGoodsByTypeParam(db *gorm.DB, ids []int, t int, typeParam []string) (err error, prePickGoods []PrePickGoods) {
 
@@ -131,4 +152,24 @@ func GetPrePickGoodsByTypeParam(db *gorm.DB, ids []int, t int, typeParam []strin
 	}
 
 	return nil, prePickGoods
+}
+
+func GetPrePickGoodsList(db *gorm.DB, cond *PrePickGoods) (err error, list []PrePickGoods) {
+	result := db.Model(&PrePickGoods{}).Where(cond).Find(&list)
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	return nil, list
+}
+
+func GetPrePickGoodsAndRemark(db *gorm.DB, prePickId int, sku string) (err error, list []PrePickGoodsJoinPrePickRemark) {
+	result := db.Table("t_pre_pick_goods pg").
+		Select("pg.number,pg.sku,pg.need_num,pg.unit,pr.goods_remark").
+		Joins("left join t_pre_pick_remark pr on pg.pre_pick_id = pr.pre_pick_id and pg.order_goods_id = pr.order_goods_id").
+		Where("pg.pre_pick_id = ? and pg.sku = ?", prePickId, sku).
+		Find(&list)
+
+	return result.Error, list
 }

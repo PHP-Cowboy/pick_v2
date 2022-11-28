@@ -20,5 +20,7 @@ func ExportRoute(g *gin.RouterGroup) {
 		exportGroup.GET("/batchShopMaterial", handler.BatchShopMaterial)
 		//拣货任务导出
 		exportGroup.GET("/batchTask", handler.BatchTask)
+		//货品汇总单
+		exportGroup.GET("/goodsSummaryList", handler.GoodsSummaryList)
 	}
 }

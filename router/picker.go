@@ -11,10 +11,14 @@ func PickerRoute(g *gin.RouterGroup) {
 	{
 		//接单拣货
 		pickerGroup.GET("/receiving_orders", handler.ReceivingOrders)
+		//集中拣货接单
+		pickerGroup.GET("/concentratedPickReceivingOrders", handler.ConcentratedPickReceivingOrders)
 		//完成拣货
 		pickerGroup.POST("/complete", handler.CompletePick)
 		//剩余数量
 		pickerGroup.GET("/remaining_quantity", handler.RemainingQuantity)
+		//集中拣货剩余数量
+		pickerGroup.GET("/centralizedPickRemainingQuantity", handler.CentralizedPickRemainingQuantity)
 		//拣货记录
 		pickerGroup.GET("/record", handler.PickingRecord)
 		//拣货记录明细

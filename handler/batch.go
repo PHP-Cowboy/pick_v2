@@ -95,7 +95,25 @@ func CentralizedPickList(c *gin.Context) {
 		return
 	}
 
-	err, list := dao.CentralizedPickList(global.DB)
+	err, list := dao.CentralizedPickList(global.DB, form)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.SucJson(c, list)
+}
+
+// 集中拣货详情
+func CentralizedPickDetail(c *gin.Context) {
+	var form req.CentralizedPickDetailForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err, list := dao.CentralizedPickDetail(global.DB, form)
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return

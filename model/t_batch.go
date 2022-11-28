@@ -33,6 +33,12 @@ const (
 	BatchSuspendStatus        //暂停
 )
 
+const (
+	_                       = iota
+	RegularBatchTyp         //常规批次
+	ExpressDeliveryBatchTyp //快递批次
+)
+
 func GetDeliveryMethod(method int) string {
 	var methodMp = map[int]string{1: "公司配送", 2: "用户自提", 3: "三方物流", 4: "快递配送", 5: "首批物料|设备单"}
 
@@ -55,6 +61,13 @@ func BatchSave(db *gorm.DB, list Batch) (err error, b Batch) {
 func GetBatchListByTaskId(db *gorm.DB, taskId int) (err error, list []Batch) {
 
 	result := db.Model(&Batch{}).Where(&Batch{TaskId: taskId}).Find(&list)
+
+	return result.Error, list
+}
+
+// 快递批次进行中或暂停的单数量
+func GetBatchListByTyp(db *gorm.DB, typ int) (err error, list []Batch) {
+	result := db.Model(&Batch{}).Where("typ = ? and ( status = 0 or status = 2 )", typ).Find(&list)
 
 	return result.Error, list
 }

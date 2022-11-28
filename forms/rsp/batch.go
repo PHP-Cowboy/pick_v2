@@ -36,13 +36,29 @@ type CentralizedPickListRsp struct {
 }
 
 type CentralizedPickList struct {
-	TaskName  string `json:"task_name"`
-	GoodsName string `json:"goods_name"`
-	GoodsSpe  string `json:"goods_spe"`
-	NeedNum   int    `json:"need_num"`
-	PickNum   int    `json:"pick_num"`
-	PickUser  string `json:"pick_user"`
-	HasRemark int    `json:"has_remark"`
+	TaskName    string `json:"task_name"`
+	GoodsName   string `json:"goods_name"`
+	GoodsSpe    string `json:"goods_spe"`
+	NeedNum     int    `json:"need_num"`
+	PickNum     int    `json:"pick_num"`
+	PickUser    string `json:"pick_user"`
+	GoodsRemark string `json:"has_remark"`
+}
+
+type CentralizedPickDetailGoodsInfo struct {
+	NeedNum     int    `json:"need_num"`
+	GoodsRemark string `json:"goods_remark"`
+	GoodsUnit   string `json:"goods_unit"`
+}
+
+type CentralizedPickDetailList struct {
+	ShopName    string `json:"shop_name"`
+	ShopCode    string `json:"shop_code"`
+	Line        string `json:"line"`
+	NeedNum     int    `json:"need_num"`
+	GoodsUnit   string `json:"goods_unit"`
+	GoodsRemark string `json:"goods_remark"`
+	OrderRemark string `json:"order_remark"`
 }
 
 type GetPrePickListRsp struct {

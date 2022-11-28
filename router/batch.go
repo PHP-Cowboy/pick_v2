@@ -19,6 +19,12 @@ func BatchRoute(g *gin.RouterGroup) {
 		batchGroup.GET("/list", handler.GetBatchList)
 		//新创建批次
 		batchGroup.POST("/newBatch", handler.NewBatch)
+		//创建快递批次
+		batchGroup.POST("/courierBatch", handler.CourierBatch)
+		//集中拣货列表
+		batchGroup.GET("/centralizedPickList", handler.CentralizedPickList)
+		//集中拣货详情
+		batchGroup.GET("/centralizedPickDetail", handler.CentralizedPickDetail)
 		//创建批次
 		batchGroup.POST("/create", handler.CreateBatch)
 		//根据订单生成批次

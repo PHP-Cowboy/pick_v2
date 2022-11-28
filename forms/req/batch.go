@@ -19,6 +19,15 @@ type CreateBatchForm struct {
 }
 
 type CentralizedPickListForm struct {
+	Paging
+	GoodsName string `json:"goods_name" form:"goods_name"`
+	GoodsType string `json:"goods_type" form:"goods_type"`
+	IsRemark  int    `json:"is_remark" form:"is_remark"`
+}
+
+type CentralizedPickDetailForm struct {
+	BatchId int    `json:"batch_id" form:"batch_id" binding:"required"`
+	Sku     string `json:"sku" form:"sku" binding:"required"`
 }
 
 type StopPickForm struct {

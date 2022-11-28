@@ -15,6 +15,10 @@ type CompletePickForm struct {
 	Type         int                  `json:"type" form:"type" binding:"required,oneof=1 2"` //1正常拣货 2无需拣货
 }
 
+type RemainingQuantityForm struct {
+	Typ int `json:"typ"`
+}
+
 type CompletePickDetail struct {
 	Sku         string     `json:"sku"`
 	ParamsId    []ParamsId `json:"params_id"`

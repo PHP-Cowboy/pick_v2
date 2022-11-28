@@ -109,3 +109,9 @@ func OrderOrCompleteOrderExist(db *gorm.DB, ids []int, number string) (err error
 
 	return nil, false
 }
+
+func GetOrderListByNumbers(db *gorm.DB, numbers []string) (err error, list []Order) {
+	result := db.Model(&Order{}).Where("number in (?)", numbers).Find(&list)
+
+	return result.Error, list
+}

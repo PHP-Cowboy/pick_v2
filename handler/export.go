@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"gorm.io/gorm"
 	"io"
+	"pick_v2/dao"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
@@ -699,6 +700,58 @@ func BatchTask(c *gin.Context) {
 	}
 
 	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{pick.TaskName + "拣货单导出"})
+
+	var buffer bytes.Buffer
+	_ = xFile.Write(&buffer)
+	content := bytes.NewReader(buffer.Bytes())
+	data, _ := io.ReadAll(content)
+	date := time.Now().Format("20060102")
+	c.Writer.Header().Add("Content-Type", "application/octet-stream;charset=utf-8")
+	c.Writer.Header().Add("Access-Control-Expose-Headers", "Content-Disposition")
+	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s.xlsx", date)+"\"")
+	c.Writer.Write(data)
+}
+
+// 货品汇总单
+func GoodsSummaryList(c *gin.Context) {
+	err, mp, column, shopCodes := dao.GoodsSummaryList(global.DB, 1)
+	if err != nil {
+		return
+	}
+
+	xFile := excelize.NewFile()
+	sheet := xFile.NewSheet("sheet1")
+
+	xFile.MergeCell("Sheet1", "A1", GetKey(len(column))+"1")
+	for i, cn := range column {
+		xFile.SetCellValue("Sheet1", GetKey(i)+"2", cn)
+	}
+
+	xFile.SetActiveSheet(sheet)
+	//设置指定行高 指定列宽
+	xFile.SetRowHeight("Sheet1", 1, 30)
+	xFile.SetColWidth("Sheet1", "C", "C", 30)
+
+	startCount := 2
+
+	i := 0
+
+	for _, val := range mp {
+		i++
+		item := make([]interface{}, 0)
+		item = append(item, val["商品名称"])
+		item = append(item, val["规格"])
+		item = append(item, val["单位"])
+		item = append(item, val["总计"])
+
+		for _, code := range shopCodes {
+			item = append(item, val[code])
+		}
+
+		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+i), &item)
+	}
+
+	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{"货品汇总单"})
 
 	var buffer bytes.Buffer
 	_ = xFile.Write(&buffer)

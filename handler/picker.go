@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"gorm.io/gorm"
+	"pick_v2/dao"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
@@ -189,6 +190,11 @@ func ReceivingOrders(c *gin.Context) {
 		xsq_net.ErrorJSON(c, errors.New("暂无拣货单"))
 		return
 	}
+}
+
+// 集中拣货接单
+func ConcentratedPickReceivingOrders(c *gin.Context) {
+
 }
 
 // 完成拣货
@@ -398,15 +404,21 @@ func CompletePick(c *gin.Context) {
 func RemainingQuantity(c *gin.Context) {
 
 	var (
+		form     req.RemainingQuantityForm
 		count    int64
 		batches  []model.Batch
 		batchIds []int
 	)
 
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
 	db := global.DB
 
 	//批次进行中或暂停的单数量
-	result := db.Where("status = 0 or status = 2").Find(&batches)
+	result := db.Where("typ = ? and ( status = 0 or status = 2 )", form.Typ).Find(&batches)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -425,12 +437,40 @@ func RemainingQuantity(c *gin.Context) {
 	}
 
 	if len(batchIds) > 0 {
-		result = db.Model(&model.Pick{}).Where("batch_id in (?) and status = ? and (pick_user = '' or pick_user = ?)", batchIds, model.ToBePickedStatus, userInfo.Name).Count(&count)
+		result = db.Model(&model.Pick{}).
+			Where(
+				"batch_id in (?) and status = ? and typ = ? and (pick_user = '' or pick_user = ?)",
+				batchIds,
+				model.ToBePickedStatus,
+				form.Typ,
+				userInfo.Name,
+			).
+			Count(&count)
 
 		if result.Error != nil {
 			xsq_net.ErrorJSON(c, result.Error)
 			return
 		}
+	}
+
+	xsq_net.SucJson(c, gin.H{"count": count})
+}
+
+// 集中拣货剩余数量
+func CentralizedPickRemainingQuantity(c *gin.Context) {
+
+	userInfo := GetUserInfo(c)
+
+	if userInfo == nil {
+		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
+		return
+	}
+
+	//集中拣货剩余数量统计
+	err, count := dao.CentralizedPickRemainingQuantity(global.DB, userInfo.Name)
+
+	if err != nil {
+		return
 	}
 
 	xsq_net.SucJson(c, gin.H{"count": count})
