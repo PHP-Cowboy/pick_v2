@@ -46,3 +46,7 @@ type SkuReview struct {
 type CancelPickForm struct {
 	Ids []int `json:"ids" form:"ids"`
 }
+
+type CentralizedPickDetailPDAForm struct {
+	Id int `json:"id" form:"id" binding:"required"`
+}

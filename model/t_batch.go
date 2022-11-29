@@ -39,6 +39,7 @@ const (
 	ExpressDeliveryBatchTyp //快递批次
 )
 
+// 获取配送方式
 func GetDeliveryMethod(method int) string {
 	var methodMp = map[int]string{1: "公司配送", 2: "用户自提", 3: "三方物流", 4: "快递配送", 5: "首批物料|设备单"}
 
@@ -58,6 +59,7 @@ func BatchSave(db *gorm.DB, list Batch) (err error, b Batch) {
 	return result.Error, list
 }
 
+// 根据出库任务获取批次列表
 func GetBatchListByTaskId(db *gorm.DB, taskId int) (err error, list []Batch) {
 
 	result := db.Model(&Batch{}).Where(&Batch{TaskId: taskId}).Find(&list)
@@ -68,6 +70,25 @@ func GetBatchListByTaskId(db *gorm.DB, taskId int) (err error, list []Batch) {
 // 快递批次进行中或暂停的单数量
 func GetBatchListByTyp(db *gorm.DB, typ int) (err error, list []Batch) {
 	result := db.Model(&Batch{}).Where("typ = ? and ( status = 0 or status = 2 )", typ).Find(&list)
+
+	return result.Error, list
+}
+
+// 获取进行中或已被当前用户接取但为拣货完成的批次
+func GetPendingOrUserReceivedNotPickCompleteBatchList(db *gorm.DB, userName string) {
+	//db.Table("t_batch b").
+	//	Select("").
+	//	Joins("").Where("").Find()
+}
+
+func GetBatchList(db *gorm.DB, cond Batch) (err error, list []Batch) {
+	result := db.Model(&Batch{}).Where(&cond).Find(&list)
+
+	return result.Error, list
+}
+
+func GetBatchListByIdsOrPending(db *gorm.DB, ids []int) (err error, list []Batch) {
+	result := db.Model(&Batch{}).Where("id in (?) or status = ? and typ = ?", ids, BatchOngoingStatus, ExpressDeliveryBatchTyp).Find(&list)
 
 	return result.Error, list
 }

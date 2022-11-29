@@ -46,6 +46,15 @@ const (
 	CloseOrderType   //已关闭
 )
 
+const (
+	DistributionType           = iota //配送方式
+	DistributionTypeCompany           // 1:公司配送
+	DistributionTypeUser              // 2:用户自提
+	DistributionTypeThreeParty        // 3:三方物流
+	DistributionTypeCourier           // 4:快递配送
+	DistributionTypeFirst             // 5:首批物料|设备单
+)
+
 func OrderSave(db *gorm.DB, order *Order) error {
 	result := db.Model(&Order{}).Save(order)
 	return result.Error

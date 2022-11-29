@@ -42,4 +42,6 @@ var (
 	InvTaskNotGoing    = New(3000, "盘点任务不在进行中")
 	InvTaskAlreadyBind = New(3001, "盘点任务已被绑定")
 	UnBindTaskNotAllow = New(3002, "未绑定盘点任务的不允许复盘")
+
+	RegularOrExpressDeliveryBatchInvalid = New(4000, "订单创建常规或快递批次选择不正确")
 )

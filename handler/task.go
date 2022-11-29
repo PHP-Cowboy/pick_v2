@@ -156,6 +156,25 @@ func PickList(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
+// 快递拣货列表
+func CentralizedAndSecondaryList(c *gin.Context) {
+
+	userInfo := GetUserInfo(c)
+
+	if userInfo == nil {
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
+		return
+	}
+
+	err, list := dao.CentralizedAndSecondaryList(global.DB, userInfo.Name)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.SucJson(c, gin.H{"list": list})
+}
+
 // 拣货明细
 func GetPickDetail(c *gin.Context) {
 	var (
@@ -283,6 +302,23 @@ func GetPickDetail(c *gin.Context) {
 	}
 
 	res.RemarkList = list
+
+	xsq_net.SucJson(c, res)
+}
+
+// 集中拣货明细
+func CentralizedPickDetailPDA(c *gin.Context) {
+	var form req.CentralizedPickDetailPDAForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	err, res := dao.CentralizedPickDetailPDA(global.DB, form)
+	if err != nil {
+		return
+	}
 
 	xsq_net.SucJson(c, res)
 }

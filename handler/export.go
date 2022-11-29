@@ -712,10 +712,20 @@ func BatchTask(c *gin.Context) {
 	c.Writer.Write(data)
 }
 
-// 货品汇总单
+// 货品汇总单导出
 func GoodsSummaryList(c *gin.Context) {
-	err, mp, column, shopCodes := dao.GoodsSummaryList(global.DB, 1)
+
+	var form req.GoodsSummaryListForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err, mp, column, shopCodes := dao.GoodsSummaryList(global.DB, form.BatchId)
+
 	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 

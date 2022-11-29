@@ -560,7 +560,7 @@ func InvCount(c *gin.Context) {
 	userInfo := GetUserInfo(c)
 
 	if userInfo == nil {
-		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
 		return
 	}
 
@@ -592,7 +592,7 @@ func NotInvCount(c *gin.Context) {
 	userInfo := GetUserInfo(c)
 
 	if userInfo == nil {
-		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
 		return
 	}
 
@@ -698,7 +698,7 @@ func UserInventoryRecordList(c *gin.Context) {
 	userInfo := GetUserInfo(c)
 
 	if userInfo == nil {
-		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
 		return
 	}
 
@@ -851,7 +851,7 @@ func BatchCreate(c *gin.Context) {
 	userInfo := GetUserInfo(c)
 
 	if userInfo == nil {
-		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
 		return
 	}
 

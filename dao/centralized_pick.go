@@ -5,9 +5,9 @@ import (
 	"gorm.io/gorm"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
-	"pick_v2/global"
 	"pick_v2/model"
 	"pick_v2/utils/ecode"
+	"pick_v2/utils/timeutil"
 	"time"
 )
 
@@ -31,6 +31,7 @@ func CreateCentralizedPick(db *gorm.DB, outboundGoodsJoinOrder []model.OutboundG
 				TakeOrdersTime: nil,
 				GoodsRemark:    order.GoodsRemark,
 				GoodsUnit:      order.GoodsUnit,
+				Shelves:        order.Shelves,
 			}
 		}
 
@@ -58,15 +59,8 @@ func CreateCentralizedPick(db *gorm.DB, outboundGoodsJoinOrder []model.OutboundG
 
 // 集中拣货列表
 func CentralizedPickList(db *gorm.DB, form req.CentralizedPickListForm) (err error, res rsp.CentralizedPickListRsp) {
-	query := "goods_name = ? and goods_type = ? "
 
-	if form.IsRemark == 0 {
-		query += " goods_remark = ''"
-	} else if form.IsRemark == 1 {
-		query += " goods_remark != ''"
-	}
-
-	err, total, centralizedPickList := model.GetCentralizedPickList(db, form.Page, form.Size, query, form.GoodsName, form.GoodsType)
+	err, total, centralizedPickList := model.GetCentralizedPickPageList(db, form.Page, form.Size, form.IsRemark, form.GoodsName, form.GoodsType)
 	if err != nil {
 		return err, res
 	}
@@ -171,12 +165,11 @@ func CentralizedPickRemainingQuantity(db *gorm.DB, userName string) (error, int6
 	return nil, count
 }
 
-func ConcentratedPickReceivingOrders(db *gorm.DB, userName string) error {
+// 集中拣货接单
+func ConcentratedPickReceivingOrders(db *gorm.DB, userName string) (err error, res rsp.ReceivingOrdersRsp) {
 
 	var (
-		res     rsp.ReceivingOrdersRsp
-		pick    []model.Pick
-		err     error
+		pick    []model.CentralizedPick
 		batches []model.Batch
 	)
 
@@ -184,27 +177,26 @@ func ConcentratedPickReceivingOrders(db *gorm.DB, userName string) error {
 	result := db.Model(&model.CentralizedPick{}).Where("pick_user = ? and status = 0", userName).Find(&pick)
 
 	if result.Error != nil {
-		return result.Error
+		return result.Error, res
 	}
 
 	now := time.Now()
 
 	//有分配的拣货任务
 	if result.RowsAffected > 0 {
-		res, err = getPick(pick)
+		res, err = ConcentratedPick(db, pick)
 		if err != nil {
-			return err
+			return err, res
 		}
 		//后台分配的单没有接单时间,更新接单时间
 		if res.TakeOrdersTime == nil {
 			result = db.Model(&model.Pick{}).Where("id = ?", res.Id).Update("take_orders_time", &now)
 
 			if result.Error != nil {
-				return result.Error
+				return result.Error, res
 			}
 		}
-		//xsq_net.SucJson(c, res)
-		return nil
+		return nil, res
 	}
 
 	//进行中的批次
@@ -217,28 +209,28 @@ func ConcentratedPickReceivingOrders(db *gorm.DB, userName string) error {
 	}
 
 	if len(batchIds) == 0 {
-		return errors.New("没有进行中的批次,无法接单")
+		return errors.New("没有进行中的批次,无法接单"), res
 	}
 
 	//查询未被接单的拣货池数据
-	result = db.Model(&model.Pick{}).Where("batch_id in (?) and pick_user = '' and status = 0", batchIds).Find(&pick)
+	result = db.Model(&model.CentralizedPick{}).Where("batch_id in (?) and pick_user = '' and status = 0", batchIds).Find(&pick)
 
 	if result.Error != nil {
-		return result.Error
+		return result.Error, res
 	}
 
 	//拣货池有未接单的数据
 	if result.RowsAffected > 0 {
 
-		res, err = getPick(pick)
+		res, err = ConcentratedPick(db, pick)
 		if err != nil {
-			return err
+			return err, res
 		}
 
 		tx := db.Begin()
 
 		//更新拣货池 + version 防并发
-		result = tx.Model(&model.Pick{}).
+		result = tx.Model(&model.CentralizedPick{}).
 			Where("id = ? and version = ?", res.Id, res.Version).
 			Updates(map[string]interface{}{
 				"pick_user":        userName,
@@ -248,34 +240,33 @@ func ConcentratedPickReceivingOrders(db *gorm.DB, userName string) error {
 
 		if result.Error != nil {
 			tx.Rollback()
-			return ecode.DataSaveError
+			return ecode.DataSaveError, res
 		}
 
 		tx.Commit()
 
-		//xsq_net.SucJson(c, res)
-		return nil
+		return nil, res
 	} else {
-		return errors.New("暂无拣货单")
+		return errors.New("暂无拣货单"), res
 	}
 
 }
 
-func getPick(pick []model.Pick) (res rsp.ReceivingOrdersRsp, err error) {
-
-	db := global.DB
+// 拣货员拣货单接单分配逻辑
+func ConcentratedPick(db *gorm.DB, pick []model.CentralizedPick) (res rsp.ReceivingOrdersRsp, err error) {
 
 	if len(pick) == 1 { //只查到一条
 		res.Id = pick[0].Id
 		res.BatchId = pick[0].BatchId
 		res.Version = pick[0].Version
 		res.TakeOrdersTime = pick[0].TakeOrdersTime
+		res.Sku = pick[0].Sku
 	} else { //查到多条
 		//排序
 		var (
 			batchIds []int
 			batchMp  = make(map[int]struct{}, 0)
-			pickMp   = make(map[int][]model.Pick, 0)
+			pickMp   = make(map[int][]model.CentralizedPick, 0)
 		)
 
 		//去重，构造批次id切片
@@ -321,9 +312,173 @@ func getPick(pick []model.Pick) (res rsp.ReceivingOrdersRsp, err error) {
 				res.Id = pm.Id
 				res.Version = pm.Version
 				res.TakeOrdersTime = pm.TakeOrdersTime
+				res.Sku = pm.Sku
 			}
 		}
 	}
 
 	return res, nil
+}
+
+// 快递拣货列表
+func CentralizedAndSecondaryList(db *gorm.DB, userName string) (err error, list []rsp.CentralizedAndSecondary) {
+	//1.获取用户已接单但未完成的批次id
+	err, pickList := model.GetPickListByPickUserAndNotReviewCompleted(db, userName)
+	if err != nil {
+		return
+	}
+
+	var batchIds []int
+
+	for _, pick := range pickList {
+		batchIds = append(batchIds, pick.BatchId)
+	}
+
+	//2.获取进行中的批次 或 用户已接单但未完成的批次
+
+	err, batchList := model.GetBatchListByIdsOrPending(db, batchIds)
+	if err != nil {
+		return
+	}
+
+	//重置batchIds
+	batchIds = []int{}
+
+	for _, batch := range batchList {
+		batchIds = append(batchIds, batch.Id)
+	}
+
+	//统计集中拣货相关数量
+	err, countCentralizedPickNums := model.CountCentralizedPickByBatch(db, batchIds)
+
+	if err != nil {
+		return
+	}
+
+	//统计二次分拣相关数量
+	err, CountPickNums := model.CountPickByBatch(db, batchIds)
+	if err != nil {
+		return
+	}
+
+	var (
+		countCentralizedPickMp = make(map[int]model.CountPickNums, 0)
+		countPickMp            = make(map[int]model.CountPickNums, 0)
+	)
+
+	for _, num := range countCentralizedPickNums {
+		countCentralizedPickMp[num.BatchId] = num
+	}
+
+	for _, num := range CountPickNums {
+		countPickMp[num.BatchId] = num
+	}
+
+	list = make([]rsp.CentralizedAndSecondary, 0, len(batchList))
+
+	for _, batch := range batchList {
+
+		countCentralizedPick, countCentralizedPickOk := countCentralizedPickMp[batch.Id]
+
+		if !countCentralizedPickOk {
+			countCentralizedPick.SumNeedNum = 0
+			countCentralizedPick.SumPickNum = 0
+			countCentralizedPick.CountNeedNum = 0
+			countCentralizedPick.CountPickNum = 0
+		}
+
+		countPick, countPickOk := countPickMp[batch.Id]
+
+		if !countPickOk {
+			countPick.SumNeedNum = 0
+			countPick.SumCompleteNum = 0
+			countPick.CountPickNum = 0
+			countPick.CountCompleteNum = 0
+		}
+
+		centralized := rsp.Centralized{
+			SumNeedNum:   countCentralizedPick.SumNeedNum,
+			SumPickNum:   countCentralizedPick.SumPickNum,
+			CountNeedNum: countCentralizedPick.CountNeedNum,
+			CountPickNum: countCentralizedPick.CountPickNum,
+		}
+
+		secondary := rsp.Secondary{
+			SumNeedNum:       countPick.SumNeedNum,
+			SumCompleteNum:   countPick.SumCompleteNum,
+			CountNeedNum:     countPick.CountPickNum,
+			CountCompleteNum: countPick.CountCompleteNum,
+		}
+
+		list = append(list, rsp.CentralizedAndSecondary{
+			BatchId:     batch.Id,
+			BatchName:   batch.BatchName,
+			CreateTime:  timeutil.FormatToDateTimeMinute(batch.CreateTime),
+			Centralized: centralized,
+			Secondary:   secondary,
+		})
+	}
+
+	return
+}
+
+// 集中拣货详情-PDA 拣货使用
+func CentralizedPickDetailPDA(db *gorm.DB, form req.CentralizedPickDetailPDAForm) (err error, res rsp.CentralizedPickDetailPDARsp) {
+	err, first := model.GetCentralizedPickById(db, form.Id)
+
+	if err != nil {
+		return err, rsp.CentralizedPickDetailPDARsp{}
+	}
+
+	err, prePickGoodsList := model.GetPrePickGoodsAndRemark(db, first.BatchId, first.Sku)
+
+	if err != nil {
+		return err, res
+	}
+
+	var (
+		numbers []string
+	)
+
+	for _, l := range prePickGoodsList {
+		numbers = append(numbers, l.Number)
+	}
+
+	err, orderList := model.GetOrderListByNumbers(db, numbers)
+
+	if err != nil {
+		return err, res
+	}
+
+	numberList := make([]rsp.NumberList, 0, len(orderList))
+
+	for _, ol := range orderList {
+
+		if ol.OrderRemark == "" {
+			continue
+		}
+
+		numberList = append(numberList, rsp.NumberList{
+			Number: ol.Number,
+			Remark: ol.OrderRemark,
+		})
+	}
+
+	res = rsp.CentralizedPickDetailPDARsp{
+		Id:         first.Id,
+		Shelves:    first.Shelves,
+		GoodsSpe:   first.GoodsSpe,
+		NeedNum:    first.NeedNum,
+		GoodsUnit:  first.GoodsUnit,
+		PickNum:    first.PickNum,
+		NumberList: numberList,
+	}
+
+	return err, res
+}
+
+func CompleteConcentratedPick(db *gorm.DB, form req.CompleteConcentratedPickForm) (err error) {
+	//更新集中拣货状态为已完成，拣货数，类型
+	err = model.UpdateCentralizedPickById(db, form.Id, map[string]interface{}{"status": model.CentralizedPickStatusCompleted, "pick_num": form.PickNum, "pick_type": form.Typ})
+	return err
 }

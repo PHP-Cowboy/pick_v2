@@ -26,7 +26,7 @@ func CreateBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.C
 	}
 
 	//预拣池逻辑
-	err, orderGoodsIds, outboundGoods, _ = CreatePrePickLogic(tx, form, claims, batch.Id)
+	err, orderGoodsIds, outboundGoods, _, _ = CreatePrePickLogic(tx, form, claims, batch.Id)
 
 	if err != nil {
 		tx.Rollback()
@@ -97,6 +97,7 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 		orderGoodsIds          []int
 		outboundGoods          []model.OutboundGoods
 		outboundGoodsJoinOrder []model.OutboundGoodsJoinOrder
+		//prePickIds             []int
 	)
 
 	tx := db.Begin()
@@ -113,7 +114,7 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 	//todo 在快递批次时直接把状态设置成已进入拣货池？
 	//todo 拣货池逻辑中就可以不修改状态了，但是后续是否会快递批次被改成先集中拣货完成再到二次分拣？
 	//TODO 个人觉得集中拣货和二次分拣同时进行在实际业务中是有问题的
-	err, orderGoodsIds, outboundGoods, outboundGoodsJoinOrder = CreatePrePickLogic(tx, form, claims, batch.Id)
+	err, orderGoodsIds, outboundGoods, outboundGoodsJoinOrder, _ = CreatePrePickLogic(tx, form, claims, batch.Id)
 
 	if err != nil {
 		tx.Rollback()
@@ -140,19 +141,20 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 		return err
 	}
 
-	pick := req.BatchPickForm{
-		BatchId:     batch.Id,
-		Ids:         nil,
-		Type:        1,
-		TypeParam:   []string{},
-		WarehouseId: claims.WarehouseId,
-	}
-
-	//生成拣货池
-	err = BatchPickByParams(db, pick, 2)
-	if err != nil {
-		return err
-	}
+	//pick := req.BatchPickForm{
+	//	BatchId:     batch.Id,
+	//	Ids:         prePickIds,
+	//	Type:        1,
+	//	TypeParam:   []string{},
+	//	WarehouseId: claims.WarehouseId,
+	//}
+	//
+	////生成拣货池
+	//err = BatchPickByParams(db, pick, 2)
+	//if err != nil {
+	//	tx.Rollback()
+	//	return err
+	//}
 
 	tx.Commit()
 

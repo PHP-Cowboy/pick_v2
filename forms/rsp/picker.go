@@ -9,6 +9,7 @@ type ReceivingOrdersRsp struct {
 	BatchId        int           `json:"batch_id"`
 	Version        int           `json:"version"`
 	TakeOrdersTime *model.MyTime `json:"take_orders_time"`
+	Sku            string        `json:"sku"`
 }
 
 type PickingRecordDetailRsp struct {

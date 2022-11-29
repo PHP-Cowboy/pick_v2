@@ -45,6 +45,28 @@ type CentralizedPickList struct {
 	GoodsRemark string `json:"has_remark"`
 }
 
+type CentralizedAndSecondary struct {
+	BatchId     int         `json:"batch_id"`
+	BatchName   string      `json:"batch_name"`
+	CreateTime  string      `json:"create_time"`
+	Centralized Centralized `json:"centralized"`
+	Secondary   Secondary   `json:"secondary"`
+}
+
+type Centralized struct {
+	SumNeedNum   int `json:"sum_need_num"`
+	SumPickNum   int `json:"sum_pick_num"`
+	CountNeedNum int `json:"count_need_num"`
+	CountPickNum int `json:"count_pick_num"`
+}
+
+type Secondary struct {
+	SumNeedNum       int `json:"sum_need_num"`
+	SumCompleteNum   int `json:"sum_complete_num"`
+	CountNeedNum     int `json:"count_need_num"`
+	CountCompleteNum int `json:"count_complete_num"`
+}
+
 type CentralizedPickDetailGoodsInfo struct {
 	NeedNum     int    `json:"need_num"`
 	GoodsRemark string `json:"goods_remark"`
@@ -59,6 +81,21 @@ type CentralizedPickDetailList struct {
 	GoodsUnit   string `json:"goods_unit"`
 	GoodsRemark string `json:"goods_remark"`
 	OrderRemark string `json:"order_remark"`
+}
+
+type CentralizedPickDetailPDARsp struct {
+	Id         int          `json:"id"`
+	Shelves    string       `json:"shelves"`
+	GoodsSpe   string       `json:"goods_spe"`
+	NeedNum    int          `json:"need_num"`
+	GoodsUnit  string       `json:"goods_unit"`
+	PickNum    int          `json:"pick_num"`
+	NumberList []NumberList `json:"number_list"`
+}
+
+type NumberList struct {
+	Number string `json:"number"`
+	Remark string `json:"remark"`
 }
 
 type GetPrePickListRsp struct {

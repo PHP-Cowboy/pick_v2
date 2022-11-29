@@ -39,14 +39,16 @@ func NewBatch(c *gin.Context) {
 		return
 	}
 
-	claims := GetUserInfo(c)
+	userInfo := GetUserInfo(c)
 
-	if claims == nil {
+	if userInfo == nil {
 		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
 		return
 	}
 
-	err := dao.CreateBatch(global.DB, form, claims)
+	form.Typ = 1 // 常规批次
+
+	err := dao.CreateBatch(global.DB, form, userInfo)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
@@ -67,14 +69,16 @@ func CourierBatch(c *gin.Context) {
 		return
 	}
 
-	claims := GetUserInfo(c)
+	userInfo := GetUserInfo(c)
 
-	if claims == nil {
+	if userInfo == nil {
 		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
 		return
 	}
 
-	err := dao.CourierBatch(global.DB, form, claims)
+	form.Typ = 2 //快递批次
+
+	err := dao.CourierBatch(global.DB, form, userInfo)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
@@ -109,7 +113,7 @@ func CentralizedPickDetail(c *gin.Context) {
 	var form req.CentralizedPickDetailForm
 
 	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
@@ -119,7 +123,7 @@ func CentralizedPickDetail(c *gin.Context) {
 		return
 	}
 
-	xsq_net.SucJson(c, list)
+	xsq_net.SucJson(c, gin.H{"list": list})
 }
 
 // 生成拣货批次
@@ -138,7 +142,7 @@ func CreateBatch(c *gin.Context) {
 	userInfo := GetUserInfo(c)
 
 	if userInfo == nil {
-		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
 		return
 	}
 
@@ -231,7 +235,7 @@ func CreateByOrder(c *gin.Context) {
 	userInfo := GetUserInfo(c)
 
 	if userInfo == nil {
-		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
 		return
 	}
 

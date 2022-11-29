@@ -87,26 +87,33 @@ func getPick(pick []model.Pick) (res rsp.ReceivingOrdersRsp, err error) {
 
 // 接单拣货
 func ReceivingOrders(c *gin.Context) {
+
 	var (
+		form    req.ReceivingOrdersForm
 		res     rsp.ReceivingOrdersRsp
 		pick    []model.Pick
 		err     error
 		batches []model.Batch
 	)
 
-	db := global.DB
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
 
-	claims, ok := c.Get("claims")
-
-	if !ok {
-		xsq_net.ErrorJSON(c, errors.New("claims 获取失败"))
+	if err = c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
 
-	userInfo := claims.(*middlewares.CustomClaims)
+	db := global.DB
+
+	userInfo := GetUserInfo(c)
+
+	if userInfo == nil {
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
+		return
+	}
 
 	// 先查询是否有当前拣货员被分配的任务或已经接单且未完成拣货的数据,如果被分配多条，第一按批次优先级，第二按拣货池优先级 优先拣货
-	result := db.Model(&model.Pick{}).Where("pick_user = ? and status = 0", userInfo.Name).Find(&pick)
+	result := db.Model(&model.Pick{}).Where("pick_user = ? and status = 0 and typ = ?", userInfo.Name, form.Typ).Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -136,7 +143,7 @@ func ReceivingOrders(c *gin.Context) {
 	}
 
 	//进行中的批次
-	result = db.Where("status = 0").Find(&batches)
+	result = db.Model(&model.Batch{}).Where("status = 0 and typ = ?", form.Typ).Find(&batches)
 
 	batchIds := make([]int, 0)
 
@@ -150,7 +157,7 @@ func ReceivingOrders(c *gin.Context) {
 	}
 
 	//查询未被接单的拣货池数据
-	result = db.Model(&model.Pick{}).Where("batch_id in (?) and pick_user = '' and status = 0", batchIds).Find(&pick)
+	result = db.Model(&model.Pick{}).Where("batch_id in (?) and pick_user = '' and status = 0 and typ = ?", batchIds, form.Typ).Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -194,7 +201,21 @@ func ReceivingOrders(c *gin.Context) {
 
 // 集中拣货接单
 func ConcentratedPickReceivingOrders(c *gin.Context) {
+	userInfo := GetUserInfo(c)
 
+	if userInfo == nil {
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
+		return
+	}
+
+	err, res := dao.ConcentratedPickReceivingOrders(global.DB, userInfo.Name)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.SucJson(c, res)
 }
 
 // 完成拣货
@@ -400,6 +421,27 @@ func CompletePick(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
+// 完成集中拣货
+func CompleteConcentratedPick(c *gin.Context) {
+	var form req.CompleteConcentratedPickForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err := dao.CompleteConcentratedPick(global.DB, form)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+}
+
 // 剩余数量 放拣货池那边
 func RemainingQuantity(c *gin.Context) {
 
@@ -428,7 +470,7 @@ func RemainingQuantity(c *gin.Context) {
 	userInfo := GetUserInfo(c)
 
 	if userInfo == nil {
-		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
 		return
 	}
 
@@ -462,7 +504,7 @@ func CentralizedPickRemainingQuantity(c *gin.Context) {
 	userInfo := GetUserInfo(c)
 
 	if userInfo == nil {
-		xsq_net.ErrorJSON(c, errors.New("获取上下文用户数据失败"))
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
 		return
 	}
 

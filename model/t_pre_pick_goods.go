@@ -122,6 +122,7 @@ func GetPrePickGoodsJoinPrePickListByNumber(db *gorm.DB, numbers []string) (err 
 
 func GetPrePickGoodsJoinPrePickListByBatchId(db *gorm.DB, batchId int) (err error, list []PrePickGoodsJoinPrePick) {
 	result := db.Table("t_pre_pick_goods pg").
+		Select("pg.id as pre_pick_goods_id,pg.*,pp.*").
 		Joins("left join t_pre_pick pp on pg.pre_pick_id = pp.id").
 		Where("pg.batch_id = ?", batchId).
 		Find(&list)
@@ -134,24 +135,20 @@ func GetPrePickGoodsJoinPrePickListByBatchId(db *gorm.DB, batchId int) (err erro
 }
 
 // 按分类或商品获取未进入拣货池的商品数据
-func GetPrePickGoodsByTypeParam(db *gorm.DB, ids []int, t int, typeParam []string) (err error, prePickGoods []PrePickGoods) {
+func GetPrePickGoodsByTypeParam(db *gorm.DB, ids []int, formType int, typeParam []string) (err error, prePickGoods []PrePickGoods) {
 
-	local := db.Where("pre_pick_id in (?) and status = 0", ids)
+	local := db.Model(&PrePickGoods{}).Where("pre_pick_id in (?) and `status` = 0", ids)
 
 	//默认全单
-	if t == 2 { //按分类
+	if formType == 2 { //按分类
 		local.Where("goods_type in (?)", typeParam)
-	} else if t == 3 { //按商品
+	} else if formType == 3 { //按商品
 		local.Where("sku in (?)", typeParam)
 	}
 
 	result := local.Find(&prePickGoods)
 
-	if result.Error != nil {
-		return result.Error, nil
-	}
-
-	return nil, prePickGoods
+	return result.Error, prePickGoods
 }
 
 func GetPrePickGoodsList(db *gorm.DB, cond *PrePickGoods) (err error, list []PrePickGoods) {
@@ -164,11 +161,11 @@ func GetPrePickGoodsList(db *gorm.DB, cond *PrePickGoods) (err error, list []Pre
 	return nil, list
 }
 
-func GetPrePickGoodsAndRemark(db *gorm.DB, prePickId int, sku string) (err error, list []PrePickGoodsJoinPrePickRemark) {
+func GetPrePickGoodsAndRemark(db *gorm.DB, batchId int, sku string) (err error, list []PrePickGoodsJoinPrePickRemark) {
 	result := db.Table("t_pre_pick_goods pg").
 		Select("pg.number,pg.sku,pg.need_num,pg.unit,pr.goods_remark").
 		Joins("left join t_pre_pick_remark pr on pg.pre_pick_id = pr.pre_pick_id and pg.order_goods_id = pr.order_goods_id").
-		Where("pg.pre_pick_id = ? and pg.sku = ?", prePickId, sku).
+		Where("pg.batch_id = ? and pg.sku = ?", batchId, sku).
 		Find(&list)
 
 	return result.Error, list

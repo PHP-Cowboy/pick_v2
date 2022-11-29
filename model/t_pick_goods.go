@@ -65,3 +65,15 @@ func UpdatePickGoodsByPickIds(db *gorm.DB, pickIds []int, mp map[string]interfac
 
 	return result.Error
 }
+
+// 统计集中拣货相关数量
+func CountPickByBatch(db *gorm.DB, batchIds []int) (err error, countCentralizedPick []CountPickNums) {
+
+	result := db.Model(&PickGoods{}).
+		Select("batch_id,sum(need_num) as sum_need_num,sum(complete_num) as sum_complete_num,count(need_num) as count_need_num,count(complete_num) as count_complete_num").
+		Where("batch_id in (?)", batchIds).
+		Group("batch_id").
+		Find(&countCentralizedPick)
+
+	return result.Error, countCentralizedPick
+}

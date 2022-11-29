@@ -64,3 +64,20 @@ func GetPickListByIds(db *gorm.DB, ids []int) (err error, list []Pick) {
 
 	return result.Error, list
 }
+
+// 根据条件获取拣货列表
+func GetPickList(db *gorm.DB, cond Pick) (err error, list []Pick) {
+
+	result := db.Model(&Pick{}).Where(cond).Find(&list)
+
+	return result.Error, list
+}
+
+// 获取当前用户已接单但未复核完成的批次
+func GetPickListByPickUserAndNotReviewCompleted(db *gorm.DB, userName string) (err error, list []Pick) {
+	result := db.Model(&Pick{}).
+		Where("pick_user = ? and status in (?)", userName, []int{ToBePickedStatus, ToBeReviewedStatus}).
+		Find(&list)
+
+	return result.Error, list
+}

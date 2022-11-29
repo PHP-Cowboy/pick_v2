@@ -1,7 +1,7 @@
 package req
 
 type ReceivingOrdersForm struct {
-	Paging
+	Typ int `json:"typ" binding:"required"`
 }
 
 type PickingRecordForm struct {
@@ -13,6 +13,12 @@ type CompletePickForm struct {
 	PickId       int                  `json:"pick_id" form:"pick_id"`
 	CompletePick []CompletePickDetail `json:"complete_pick"`
 	Type         int                  `json:"type" form:"type" binding:"required,oneof=1 2"` //1正常拣货 2无需拣货
+}
+
+type CompleteConcentratedPickForm struct {
+	Id      int `json:"id" binding:"required"`
+	PickNum int `json:"pick_num" binding:"required"`
+	Typ     int `json:"typ" binding:"required"`
 }
 
 type RemainingQuantityForm struct {

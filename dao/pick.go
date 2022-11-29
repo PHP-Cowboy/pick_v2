@@ -20,7 +20,7 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, batchType int) error
 	)
 
 	//0:未处理,1:已进入拣货池
-	result := db.Where("id in (?) and status = 0", form.Ids).Find(&prePick)
+	result := db.Model(&model.PrePick{}).Where("id in (?) and status = 0", form.Ids).Find(&prePick)
 
 	if result.Error != nil {
 		return result.Error
@@ -28,6 +28,7 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, batchType int) error
 
 	//按分类或商品获取未进入拣货池的商品数据
 	err, prePickGoods := model.GetPrePickGoodsByTypeParam(db, form.Ids, form.Type, form.TypeParam)
+
 	if err != nil {
 		return err
 	}

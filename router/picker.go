@@ -9,12 +9,18 @@ import (
 func PickerRoute(g *gin.RouterGroup) {
 	pickerGroup := g.Group("/picker", middlewares.JWTAuth(), middlewares.IsPickerAuth())
 	{
+		//快递拣货列表
+		pickerGroup.GET("/centralizedAndSecondaryList", handler.CentralizedAndSecondaryList)
+		//集中拣货明细
+		pickerGroup.GET("/centralizedPickDetailPDA", handler.CentralizedPickDetailPDA)
 		//接单拣货
 		pickerGroup.GET("/receiving_orders", handler.ReceivingOrders)
 		//集中拣货接单
-		pickerGroup.GET("/concentratedPickReceivingOrders", handler.ConcentratedPickReceivingOrders)
+		pickerGroup.POST("/concentratedPickReceivingOrders", handler.ConcentratedPickReceivingOrders)
 		//完成拣货
 		pickerGroup.POST("/complete", handler.CompletePick)
+		//完成集中拣货
+		pickerGroup.POST("/completeConcentratedPick", handler.CompleteConcentratedPick)
 		//剩余数量
 		pickerGroup.GET("/remaining_quantity", handler.RemainingQuantity)
 		//集中拣货剩余数量
