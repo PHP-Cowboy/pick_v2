@@ -304,9 +304,6 @@ func OutboundOrderBatchSaveLogic(db *gorm.DB, taskId int, orderJoinGoods []model
 				ShopCode:          goods.ShopCode,
 				HouseCode:         goods.HouseCode,
 				DistributionType:  goods.DistributionType,
-				GoodsNum:          goods.PayCount,
-				LimitNum:          0,
-				CloseNum:          goods.CloseNum,
 				Line:              goods.Line,
 				Province:          goods.Province,
 				City:              goods.City,
@@ -810,5 +807,12 @@ func OutboundTaskAddOrder(db *gorm.DB, form req.OutboundTaskAddOrderForm) error 
 
 // 订单出库记录
 func OrderOutboundRecord(db *gorm.DB, form req.OrderOutboundRecordForm) (err error, list rsp.OrderOutboundRecordList) {
+	return
+}
+
+// 获取任务某个商品的发货数量
+func GetTaskSkuNum(db *gorm.DB, form req.GetTaskSkuNumForm) (err error, num int) {
+	err, num = model.GetOutboundGoods(db, form.TaskId, form.Sku)
+
 	return
 }

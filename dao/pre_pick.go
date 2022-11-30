@@ -149,6 +149,7 @@ func CreatePrePickLogic(
 			needNum = og.LimitNum
 		}
 
+		//构造预拣池数据
 		prePickGoods = append(prePickGoods, model.PrePickGoods{
 			WarehouseId:      claims.WarehouseId,
 			BatchId:          batchId,
@@ -171,6 +172,7 @@ func CreatePrePickLogic(
 			Typ:              form.Typ,
 		})
 
+		//如果有备注，构造预拣池备注数据
 		if og.GoodsRemark != "" || og.OrderRemark != "" {
 			prePickRemark = append(prePickRemark, model.PrePickRemark{
 				WarehouseId:  claims.WarehouseId,
@@ -187,6 +189,7 @@ func CreatePrePickLogic(
 			})
 		}
 
+		//构造 更新 t_outbound_goods 表 status 状态 为拣货中
 		outboundGoods = append(outboundGoods, model.OutboundGoods{
 			TaskId: og.TaskId,
 			Number: og.Number,

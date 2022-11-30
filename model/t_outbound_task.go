@@ -33,6 +33,14 @@ func OutboundTaskSave(db *gorm.DB, task *OutboundTask) error {
 	return result.Error
 }
 
+func UpdateOutboundTaskStatusById(db *gorm.DB, taskId int) error {
+	result := db.Model(&OutboundTask{}).
+		Where("id = ?", taskId).
+		Update("status", OutboundTaskStatusClosed)
+
+	return result.Error
+}
+
 // 根据status分组统计任务条数
 func OutboundTaskCountGroupStatus(db *gorm.DB) (err error, count []OutboundTaskCountStatus) {
 
@@ -56,10 +64,9 @@ func GetOutboundTaskStatusOngoingList(db *gorm.DB) (err error, list []OutboundTa
 	return result.Error, list
 }
 
-func UpdateOutboundTaskStatusById(db *gorm.DB, taskId int) error {
-	result := db.Model(&OutboundTask{}).
-		Where("id = ?", taskId).
-		Update("status", OutboundTaskStatusClosed)
+// 根据ID查找出库任务数据
+func GetOutboundTaskById(db *gorm.DB, id int) (err error, task OutboundTask) {
+	result := db.Model(&OutboundTask{}).First(&task, id)
 
-	return result.Error
+	return result.Error, task
 }

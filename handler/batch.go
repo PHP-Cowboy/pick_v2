@@ -19,7 +19,6 @@ import (
 	"pick_v2/model"
 	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
-	"pick_v2/utils/helper"
 	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
@@ -27,6 +26,36 @@ import (
 	"strings"
 	"time"
 )
+
+// 全量拣货 -按任务创建批次
+func CreateBatchByTask(c *gin.Context) {
+	var form req.CreateBatchByTaskForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	userInfo := GetUserInfo(c)
+
+	if userInfo == nil {
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
+		return
+	}
+
+	form.Typ = 1 // 常规批次
+
+	err := dao.CreateBatchByTask(global.DB, form, userInfo)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+}
 
 // 创建批次
 func NewBatch(c *gin.Context) {
@@ -1259,123 +1288,17 @@ func ChangeBatch(c *gin.Context) {
 
 // 获取批次列表
 func GetBatchList(c *gin.Context) {
-	var (
-		form req.GetBatchListForm
-		res  rsp.GetBatchListRsp
-	)
+	var form req.GetBatchListForm
 
 	if err := c.ShouldBind(&form); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
 
-	var (
-		batches      []model.Batch
-		batchIdSlice []int
-	)
-
-	db := global.DB
-
-	//子表数据
-	if form.Sku != "" || form.Number != "" || form.ShopId > 0 {
-
-		var prePickGoods []model.PrePickGoods
-
-		preGoodsRes := global.DB.Model(&model.PrePickGoods{}).
-			Where(model.PrePickGoods{
-				Sku:    form.Sku,
-				Number: form.Number,
-				ShopId: form.ShopId,
-			}).
-			Select("batch_id").
-			Find(&prePickGoods)
-
-		if preGoodsRes.Error != nil {
-			xsq_net.ErrorJSON(c, preGoodsRes.Error)
-			return
-		}
-
-		//未找到，直接返回
-		if preGoodsRes.RowsAffected == 0 {
-			xsq_net.SucJson(c, res)
-			return
-		}
-
-		//利用map键唯一，去重
-		uMap := make(map[int]struct{}, 0)
-		for _, b := range prePickGoods {
-			_, ok := uMap[b.BatchId]
-			if ok {
-				continue
-			}
-			uMap[b.BatchId] = struct{}{}
-			batchIdSlice = append(batchIdSlice, b.BatchId)
-		}
-
-		db = db.Where("id in (?)", batchIdSlice)
-	}
-
-	if form.Line != "" {
-		db = db.Where("line like ?", form.Line+"%")
-	}
-
-	if form.CreateTime != "" {
-		db = db.Where("create_time <= ?", form.CreateTime)
-	}
-
-	if form.EndTime != "" {
-		db = db.Where("end_time <= ?", form.EndTime)
-	}
-
-	if *form.Status == 0 {
-		db = db.Where("status in (0,2)")
-	} else {
-		db = db.Where("status = 1")
-	}
-
-	db.Where(&model.Batch{DeliveryMethod: form.DeliveryMethod})
-
-	result := db.Find(&batches)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
+	err, res := dao.BatchList(global.DB, form)
+	if err != nil {
 		return
 	}
-
-	res.Total = result.RowsAffected
-
-	result = db.Scopes(model.Paginate(form.Page, form.Size)).Order("sort desc, id desc").Find(&batches)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	list := make([]*rsp.Batch, 0, len(batches))
-	for _, b := range batches {
-
-		list = append(list, &rsp.Batch{
-			Id:                b.Id,
-			CreateTime:        b.CreateTime.Format(timeutil.MinuteFormat),
-			UpdateTime:        b.UpdateTime.Format(timeutil.MinuteFormat),
-			BatchName:         b.BatchName + helper.GetDeliveryMethod(b.DeliveryMethod),
-			DeliveryStartTime: b.DeliveryStartTime,
-			DeliveryEndTime:   b.DeliveryEndTime,
-			ShopNum:           b.ShopNum,
-			OrderNum:          b.OrderNum,
-			GoodsNum:          b.GoodsNum,
-			UserName:          b.UserName,
-			Line:              b.Line,
-			DeliveryMethod:    b.DeliveryMethod,
-			EndTime:           b.EndTime,
-			Status:            b.Status,
-			PrePickNum:        b.PrePickNum,
-			PickNum:           b.PickNum,
-			RecheckSheetNum:   b.RecheckSheetNum,
-		})
-	}
-
-	res.List = list
 
 	xsq_net.SucJson(c, res)
 }

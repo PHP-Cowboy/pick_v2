@@ -22,6 +22,8 @@ func OutboundRoute(g *gin.RouterGroup) {
 		outboundGroup.GET("/orderList", handler.OutboundOrderList)
 		//出库订单数量
 		outboundGroup.GET("/orderCount", handler.OutboundOrderCount)
+		//获取任务某个商品的发货数量
+		outboundGroup.GET("/getTaskSkuNum", handler.GetTaskSkuNum)
 		//出库单订单详情
 		outboundGroup.GET("/orderDetail", handler.OutboundOrderDetail)
 		//出库任务商品列表

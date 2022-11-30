@@ -184,3 +184,15 @@ func OutboundOrderDistinctGoodsList(db *gorm.DB, taskId int) (err error, list []
 
 	return result.Error, list
 }
+
+func GetOutboundGoods(db *gorm.DB, taskId int, sku string) (err error, sum int) {
+
+	result := db.Model(&OutboundGoods{}).
+		Select("IFNULL(sum(lack_count),0) as sum").
+		Where("task_id = ? and sku = ? and status = ?", taskId, sku, OutboundGoodsStatusUnhandled).
+		Scan(&sum)
+
+	err = result.Error
+
+	return
+}

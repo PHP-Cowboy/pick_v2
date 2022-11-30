@@ -39,25 +39,26 @@ func GetLimitShipmentListByTaskIdAndNumbers(db *gorm.DB, taskId int, number []st
 
 // 查询 订单
 func GetLimitShipmentPageListByTaskIdAndNumber(db *gorm.DB, taskId int, number string, page, size int) (err error, total int64, list []LimitShipment) {
+	local := db.Model(&LimitShipment{}).
+		Where(&LimitShipment{
+			TaskId: taskId,
+			Number: number,
+			Status: LimitShipmentStatusNormal,
+		})
 
-	result := db.Model(&LimitShipment{}).
-		Where(&LimitShipment{TaskId: taskId, Number: number}).
-		Find(&list)
+	result := local.Find(&list)
 
-	if result.Error != nil {
-		return result.Error, total, list
+	err = result.Error
+
+	if err != nil {
+		return
 	}
 
 	total = result.RowsAffected
 
-	result = db.Model(&LimitShipment{}).
-		Where(&LimitShipment{TaskId: taskId, Number: number}).
-		Scopes(Paginate(page, size)).
-		Find(&list)
+	result = local.Scopes(Paginate(page, size)).Find(&list)
 
-	if result.Error != nil {
-		return result.Error, total, list
-	}
+	err = result.Error
 
-	return nil, total, list
+	return
 }

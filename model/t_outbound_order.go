@@ -20,9 +20,6 @@ type OutboundOrder struct {
 	ShopCode          string    `gorm:"type:varchar(255);not null;comment:店铺编号"`
 	HouseCode         string    `gorm:"type:varchar(64);not null;comment:仓库编码"`
 	DistributionType  int       `gorm:"type:tinyint;comment:配送方式"`
-	GoodsNum          int       `gorm:"type:int;default:0;comment:下单商品总数"`
-	LimitNum          int       `gorm:"type:int;default:0;comment:限发数量"`
-	CloseNum          int       `gorm:"type:int;default:0;comment:关闭数量"`
 	Line              string    `gorm:"type:varchar(255);not null;comment:线路"`
 	Province          string    `gorm:"type:varchar(64);comment:省"`
 	City              string    `gorm:"type:varchar(64);comment:市"`
@@ -65,7 +62,7 @@ func OutboundOrderBatchUpdate(db *gorm.DB, where OutboundOrder, mp map[string]in
 func OutboundOrderReplaceSave(db *gorm.DB, list []OutboundOrder, values []string) error {
 	result := db.Model(&OutboundOrder{}).
 		Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "task_id,number,sku"}},
+			Columns:   []clause.Column{{Name: "task_id,number"}},
 			DoUpdates: clause.AssignmentColumns(values),
 		}).
 		Save(&list)
@@ -91,4 +88,11 @@ func OutboundOrderOrderTypeCount(db *gorm.DB, taskId int) (err error, count []Ou
 	}
 
 	return nil, count
+}
+
+// 根据任务ID查询出库任务订单新订单类型数据
+func GetOutboundOrderByTaskId(db *gorm.DB, taskId int) (err error, list []OutboundOrder) {
+	result := db.Model(&OutboundOrder{}).Where("task_id = ? and order_type = ?", taskId, OutboundOrderTypeNew).Find(&list)
+
+	return result.Error, list
 }

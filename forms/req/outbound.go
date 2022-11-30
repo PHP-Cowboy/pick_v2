@@ -43,6 +43,11 @@ type OutboundOrderCountForm struct {
 	TaskId int `json:"task_id" form:"task_id" binding:"required"`
 }
 
+type GetTaskSkuNumForm struct {
+	TaskId int    `json:"task_id" form:"task_id" binding:"required"`
+	Sku    string `json:"sku" form:"sku" binding:"required"`
+}
+
 type OutboundOrderDetailForm struct {
 	TaskId int    `json:"task_id" form:"task_id" binding:"required"`
 	Number string `json:"number" form:"number" binding:"required"`

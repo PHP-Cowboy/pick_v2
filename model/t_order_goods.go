@@ -28,7 +28,7 @@ type OrderGoods struct {
 	OutCount        int       `gorm:"type:int;comment:出库数量"`
 	GoodsRemark     string    `gorm:"type:varchar(255);comment:商品备注"`
 	BatchId         int       `gorm:"type:int(11);index;comment:批次id"`
-	Status          int       `gorm:"type:tinyint;default:0;comment:状态:1:未处理,2:处理中"`
+	Status          int       `gorm:"type:tinyint;default:1;comment:状态:1:未处理,2:处理中"`
 	DeliveryOrderNo GormList  `gorm:"type:varchar(255);comment:出库单号"`
 }
 

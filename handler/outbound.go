@@ -137,6 +137,25 @@ func OutboundOrderCount(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
+// 获取任务某个商品的发货数量
+func GetTaskSkuNum(c *gin.Context) {
+
+	var form req.GetTaskSkuNumForm
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	//获取任务某个商品的发货数量
+	err, num := dao.GetTaskSkuNum(global.DB, form)
+	if err != nil {
+		return
+	}
+
+	xsq_net.SucJson(c, gin.H{"num": num})
+}
+
 // 出库单订单详情
 func OutboundOrderDetail(c *gin.Context) {
 	var form req.OutboundOrderDetailForm

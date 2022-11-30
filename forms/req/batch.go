@@ -1,5 +1,11 @@
 package req
 
+type CreateBatchByTaskForm struct {
+	TaskId   int    `json:"task_id" binding:"required"`
+	TaskName string `json:"task_name" binding:"required"`
+	Typ      int    `json:"typ"` //1:常规批次,2:快递批次
+}
+
 type NewCreateBatchForm struct {
 	TaskId    int      `json:"task_id" binding:"required"`
 	Number    []string `json:"number" binding:"required"`
