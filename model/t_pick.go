@@ -47,7 +47,12 @@ type PickAndGoods struct {
 	PickUser string `json:"pick_user"`
 }
 
-func PickSave(db *gorm.DB, picks *[]Pick) error {
+func PickBatchSave(db *gorm.DB, picks *[]Pick) error {
+	result := db.Model(&Pick{}).Save(picks)
+	return result.Error
+}
+
+func PickSave(db *gorm.DB, picks *Pick) error {
 	result := db.Model(&Pick{}).Save(picks)
 	return result.Error
 }
@@ -56,6 +61,11 @@ func UpdatePickByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
 	result := db.Model(&Pick{}).Where("id in (?)", ids).Updates(mp)
 
 	return result.Error
+}
+
+func GetPickByPk(db *gorm.DB, id int) (err error, pick Pick) {
+	result := db.Model(&Pick{}).First(&pick, id)
+	return result.Error, pick
 }
 
 func GetPickListByIds(db *gorm.DB, ids []int) (err error, list []Pick) {

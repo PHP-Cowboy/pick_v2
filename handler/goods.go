@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
-	"pick_v2/common/constant"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
@@ -678,74 +677,74 @@ func CreatePickOrder(c *gin.Context) {
 		pickOrderGoods = make([]model.PickOrderGoods, 0)
 	)
 
-	for _, o := range order {
-
-		pickNumber, err := cache.GetIncrNumberByKey(constant.PICK_ORDER_NO, 4)
-
-		if err != nil {
-			xsq_net.ErrorJSON(c, errors.New("拣货单号生成失败"))
-			return
-		}
-
-		total := o.PayTotal - o.Picked
-
-		pickOrder = append(pickOrder, model.PickOrder{
-			OrderId:           o.Id,
-			ShopId:            o.ShopId,
-			ShopName:          o.ShopName,
-			ShopType:          o.ShopType,
-			ShopCode:          o.ShopCode,
-			Number:            o.Number,
-			PickNumber:        "JHD" + pickNumber,
-			HouseCode:         o.HouseCode,
-			Line:              o.Line,
-			DistributionType:  o.DistributionType,
-			OrderRemark:       o.OrderRemark,
-			PayAt:             o.PayAt,
-			ShipmentsNum:      total,
-			LimitNum:          total, //限发总数 默认等于应发总数
-			CloseNum:          o.CloseNum,
-			DeliveryAt:        o.DeliveryAt,
-			Province:          o.Province,
-			City:              o.City,
-			District:          o.District,
-			Address:           o.Address,
-			ConsigneeName:     o.ConsigneeName,
-			ConsigneeTel:      o.ConsigneeTel,
-			OrderType:         1, //重新进入时，改为新订单
-			HasRemark:         o.HasRemark,
-			LatestPickingTime: o.LatestPickingTime,
-		})
-	}
-
-	for _, og := range orderGoods {
-
-		if og.LackCount <= 0 {
-			continue
-		}
-
-		pickOrderGoods = append(pickOrderGoods, model.PickOrderGoods{
-			OrderGoodsId:    og.Id,
-			Number:          og.Number,
-			GoodsName:       og.GoodsName,
-			Sku:             og.Sku,
-			GoodsType:       og.GoodsType,
-			GoodsSpe:        og.GoodsSpe,
-			Shelves:         og.Shelves,
-			DiscountPrice:   og.DiscountPrice,
-			GoodsUnit:       og.GoodsUnit,
-			SaleUnit:        og.SaleUnit,
-			SaleCode:        og.SaleCode,
-			PayCount:        og.PayCount,
-			CloseCount:      og.CloseCount,
-			LackCount:       og.LackCount,
-			OutCount:        og.OutCount,
-			LimitNum:        og.LackCount,
-			GoodsRemark:     og.GoodsRemark,
-			BatchId:         0,
-			DeliveryOrderNo: og.DeliveryOrderNo,
-		})
-	}
+	//for _, o := range order {
+	//
+	//	pickNumber, err := cache.GetIncrNumberByKey(constant.PICK_ORDER_NO, 4)
+	//
+	//	if err != nil {
+	//		xsq_net.ErrorJSON(c, errors.New("拣货单号生成失败"))
+	//		return
+	//	}
+	//
+	//	total := o.PayTotal - o.Picked
+	//
+	//	pickOrder = append(pickOrder, model.PickOrder{
+	//		OrderId:           o.Id,
+	//		ShopId:            o.ShopId,
+	//		ShopName:          o.ShopName,
+	//		ShopType:          o.ShopType,
+	//		ShopCode:          o.ShopCode,
+	//		Number:            o.Number,
+	//		PickNumber:        "JHD" + pickNumber,
+	//		HouseCode:         o.HouseCode,
+	//		Line:              o.Line,
+	//		DistributionType:  o.DistributionType,
+	//		OrderRemark:       o.OrderRemark,
+	//		PayAt:             o.PayAt,
+	//		ShipmentsNum:      total,
+	//		LimitNum:          total, //限发总数 默认等于应发总数
+	//		CloseNum:          o.CloseNum,
+	//		DeliveryAt:        o.DeliveryAt,
+	//		Province:          o.Province,
+	//		City:              o.City,
+	//		District:          o.District,
+	//		Address:           o.Address,
+	//		ConsigneeName:     o.ConsigneeName,
+	//		ConsigneeTel:      o.ConsigneeTel,
+	//		OrderType:         1, //重新进入时，改为新订单
+	//		HasRemark:         o.HasRemark,
+	//		LatestPickingTime: o.LatestPickingTime,
+	//	})
+	//}
+	//
+	//for _, og := range orderGoods {
+	//
+	//	if og.LackCount <= 0 {
+	//		continue
+	//	}
+	//
+	//	pickOrderGoods = append(pickOrderGoods, model.PickOrderGoods{
+	//		OrderGoodsId:    og.Id,
+	//		Number:          og.Number,
+	//		GoodsName:       og.GoodsName,
+	//		Sku:             og.Sku,
+	//		GoodsType:       og.GoodsType,
+	//		GoodsSpe:        og.GoodsSpe,
+	//		Shelves:         og.Shelves,
+	//		DiscountPrice:   og.DiscountPrice,
+	//		GoodsUnit:       og.GoodsUnit,
+	//		SaleUnit:        og.SaleUnit,
+	//		SaleCode:        og.SaleCode,
+	//		PayCount:        og.PayCount,
+	//		CloseCount:      og.CloseCount,
+	//		LackCount:       og.LackCount,
+	//		OutCount:        og.OutCount,
+	//		LimitNum:        og.LackCount,
+	//		GoodsRemark:     og.GoodsRemark,
+	//		BatchId:         0,
+	//		DeliveryOrderNo: og.DeliveryOrderNo,
+	//	})
+	//}
 
 	tx := db.Begin()
 

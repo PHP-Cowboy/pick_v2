@@ -60,7 +60,7 @@ func CreateCentralizedPick(db *gorm.DB, outboundGoodsJoinOrder []model.OutboundG
 // 集中拣货列表
 func CentralizedPickList(db *gorm.DB, form req.CentralizedPickListForm) (err error, res rsp.CentralizedPickListRsp) {
 
-	err, total, centralizedPickList := model.GetCentralizedPickPageList(db, form.Page, form.Size, form.IsRemark, form.GoodsName, form.GoodsType)
+	err, total, centralizedPickList := model.GetCentralizedPickPageList(db, form.BatchId, form.Page, form.Size, form.IsRemark, form.GoodsName, form.GoodsType)
 	if err != nil {
 		return err, res
 	}

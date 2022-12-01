@@ -50,3 +50,11 @@ func UpdatePrePickByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error
 
 	return nil
 }
+
+// 根据id和status状态获取拣货池数据
+func GetPrePickByIdsAndStatus(db *gorm.DB, ids []int, status int) (err error, prePick []PrePick) {
+	//status 0:未处理,1:已进入拣货池
+	result := db.Model(&PrePick{}).Where("id in (?) and status = ?", ids, status).Find(&prePick)
+
+	return result.Error, prePick
+}

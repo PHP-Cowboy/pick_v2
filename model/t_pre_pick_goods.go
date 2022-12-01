@@ -137,7 +137,7 @@ func GetPrePickGoodsJoinPrePickListByBatchId(db *gorm.DB, batchId int) (err erro
 // 按分类或商品获取未进入拣货池的商品数据
 func GetPrePickGoodsByTypeParam(db *gorm.DB, ids []int, formType int, typeParam []string) (err error, prePickGoods []PrePickGoods) {
 
-	local := db.Model(&PrePickGoods{}).Where("pre_pick_id in (?) and `status` = 0", ids)
+	local := db.Model(&PrePickGoods{}).Where("pre_pick_id in (?) and `status` = ?", ids, PrePickGoodsStatusUnhandled)
 
 	//默认全单
 	if formType == 2 { //按分类
@@ -166,6 +166,14 @@ func GetPrePickGoodsAndRemark(db *gorm.DB, batchId int, sku string) (err error, 
 		Select("pg.number,pg.sku,pg.need_num,pg.unit,pr.goods_remark").
 		Joins("left join t_pre_pick_remark pr on pg.pre_pick_id = pr.pre_pick_id and pg.order_goods_id = pr.order_goods_id").
 		Where("pg.batch_id = ? and pg.sku = ?", batchId, sku).
+		Find(&list)
+
+	return result.Error, list
+}
+
+func GetPrePickGoodsByPrePickIdAndStatus(db *gorm.DB, ids []int, status int) (err error, list []PrePickGoods) {
+	result := db.Model(&PrePickGoods{}).
+		Where("pre_pick_id in (?) and status = ?", ids, status).
 		Find(&list)
 
 	return result.Error, list

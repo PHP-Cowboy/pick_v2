@@ -115,6 +115,12 @@ func PickList(c *gin.Context) {
 		return
 	}
 
+	err, numsMp := model.CountPickPoolNumsByPickIds(db, pickIds)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
 	//构建pickId 对应的订单 是否有备注map
 	remarkMp := make(map[int]struct{}, 0) //key 存在即为有
 	for _, remark := range pickRemark {
@@ -130,13 +136,20 @@ func PickList(c *gin.Context) {
 			isRemark = true
 		}
 
+		nums, numsOk := numsMp[p.Id]
+
+		if !numsOk {
+			err = errors.New("拣货相关数量统计有误")
+			return
+		}
+
 		list = append(list, rsp.Pick{
 			Id:             p.Id,
 			ShopCode:       p.ShopCode,
 			ShopName:       p.ShopName,
-			ShopNum:        p.ShopNum,
-			OrderNum:       p.OrderNum,
-			NeedNum:        p.NeedNum,
+			ShopNum:        nums.ShopNum,
+			OrderNum:       nums.OrderNum,
+			NeedNum:        nums.NeedNum,
 			PickUser:       p.PickUser,
 			TakeOrdersTime: p.TakeOrdersTime,
 			IsRemark:       isRemark,
@@ -202,13 +215,22 @@ func GetPickDetail(c *gin.Context) {
 		return
 	}
 
+	err, numsMp := model.CountPickPoolNumsByPickIds(db, []int{form.PickId})
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	nums, _ := numsMp[form.PickId]
+
 	res.BatchId = pick.BatchId
 	res.PickId = pick.Id
 	res.TaskName = pick.TaskName
 	res.ShopCode = pick.ShopCode
-	res.ShopNum = pick.ShopNum
-	res.OrderNum = pick.OrderNum
-	res.GoodsNum = pick.NeedNum
+	res.ShopNum = nums.ShopNum
+	res.OrderNum = nums.OrderNum
+	res.GoodsNum = nums.NeedNum
 	res.PickUser = pick.PickUser
 	res.TakeOrdersTime = pick.TakeOrdersTime
 
@@ -747,16 +769,16 @@ func ChangeReviewNum(c *gin.Context) {
 		return
 	}
 
-	for i, o := range order {
-		consumeNum, consumeOk := numberConsumeMp[o.Number]
-
-		if !consumeOk {
-			continue
-		}
-
-		order[i].Picked += consumeNum
-		order[i].UnPicked -= consumeNum
-	}
+	//for i, o := range order {
+	//	consumeNum, consumeOk := numberConsumeMp[o.Number]
+	//
+	//	if !consumeOk {
+	//		continue
+	//	}
+	//
+	//	order[i].Picked += consumeNum
+	//	order[i].UnPicked -= consumeNum
+	//}
 
 	tx := db.Begin()
 

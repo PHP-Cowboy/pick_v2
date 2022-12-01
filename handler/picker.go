@@ -229,194 +229,21 @@ func CompletePick(c *gin.Context) {
 		return
 	}
 
-	// 这里是否需要做并发处理
-	var (
-		pick       model.Pick
-		pickGoods  []model.PickGoods
-		orderGoods []model.OrderGoods
-	)
+	userInfo := GetUserInfo(c)
 
-	db := global.DB
-
-	result := db.First(&pick, form.PickId)
-
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			xsq_net.ErrorJSON(c, ecode.DataNotExist)
-			return
-		}
-		xsq_net.ErrorJSON(c, result.Error)
+	if userInfo == nil {
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
 		return
 	}
 
-	if pick.Status == 1 {
-		xsq_net.ErrorJSON(c, ecode.OrderPickingCompleted)
-		return
-	}
+	form.UserName = userInfo.Name
 
-	claims, ok := c.Get("claims")
-
-	if !ok {
-		xsq_net.ErrorJSON(c, errors.New("claims 获取失败"))
-		return
-	}
-
-	userInfo := claims.(*middlewares.CustomClaims)
-
-	if pick.PickUser != userInfo.Name {
-		xsq_net.ErrorJSON(c, errors.New("请确认拣货单是否被分配给其他拣货员"))
-		return
-	}
-
-	tx := db.Begin()
-
-	//****************************** 无需拣货 ******************************//
-	if form.Type == 2 {
-		//更新主表 无需拣货直接更新为复核完成
-		result = tx.Model(&model.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 2})
-		if result.Error != nil {
-			tx.Rollback()
-			xsq_net.ErrorJSON(c, result.Error)
-			return
-		}
-
-		//todo 更新拣货数量(PickGoods.CompleteNum)为0
-
-		err := UpdateBatchPickNums(tx, pick.BatchId)
-
-		if err != nil {
-			tx.Rollback()
-			xsq_net.ErrorJSON(c, result.Error)
-			return
-		}
-
-		tx.Commit()
-
-		xsq_net.Success(c)
-		return
-	}
-	//****************************** 无需拣货逻辑完成 ******************************//
-
-	//****************************** 正常拣货逻辑 ******************************//
-	//step:处理前端传递的拣货数据，构造[订单表id切片,订单表id和拣货商品表id map,sku完成数量 map]
-	//step: 根据 订单表id切片 查出订单数据 根据支付时间升序
-	//step: 构造 拣货商品表 id, 完成数量 并扣减 sku 完成数量
-	//step: 更新拣货商品表
-
-	var (
-		orderGoodsIds      []int
-		orderPickGoodsIdMp = make(map[int]int, 0)
-		skuCompleteNumMp   = make(map[string]int, 0)
-		totalNum           int //更新拣货池拣货数量
-	)
-
-	//step:处理前端传递的拣货数据，构造[订单表id切片,订单表id和拣货商品表id映射,sku完成数量映射]
-	for _, cp := range form.CompletePick {
-		//全部订单数据id
-		for _, ids := range cp.ParamsId {
-			orderGoodsIds = append(orderGoodsIds, ids.OrderGoodsId)
-			//map[订单表id]拣货商品表id
-			orderPickGoodsIdMp[ids.OrderGoodsId] = ids.PickGoodsId
-		}
-		//sku完成数量
-		skuCompleteNumMp[cp.Sku] = cp.CompleteNum
-		totalNum += cp.CompleteNum //总拣货数量
-	}
-
-	//step: 根据 订单表id切片 查出订单数据 根据支付时间升序
-	result = db.Table("t_pick_order_goods og").
-		Select("og.*").
-		Joins("left join t_pick_order o on og.pick_order_id = o.id").
-		Where("og.id in (?)", orderGoodsIds).
-		Order("pay_at ASC").
-		Find(&orderGoods)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	//拣货表 id 和 拣货数量
-	mp := make(map[int]int, 0)
-
-	var pickGoodsIds []int
-
-	//step: 构造 拣货商品表 id, 完成数量 并扣减 sku 完成数量
-	for _, info := range orderGoods {
-		//完成数量
-		completeNum, completeOk := skuCompleteNumMp[info.Sku]
-
-		if !completeOk {
-			continue
-		}
-
-		pickGoodsId, mpOk := orderPickGoodsIdMp[info.Id]
-
-		if !mpOk {
-			continue
-		}
-
-		pickCompleteNum := 0
-
-		if completeNum >= info.LackCount { //完成数量大于等于需拣数量
-			pickCompleteNum = info.LackCount
-			skuCompleteNumMp[info.Sku] = completeNum - info.LackCount //减
-		} else {
-			//按下单时间拣货少于需拣时
-			pickCompleteNum = completeNum
-			skuCompleteNumMp[info.Sku] = 0
-		}
-		pickGoodsIds = append(pickGoodsIds, pickGoodsId)
-		mp[pickGoodsId] = pickCompleteNum
-
-	}
-
-	//查出拣货商品数据
-	result = tx.Where("id in (?)", pickGoodsIds).Find(&pickGoods)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	//更新拣货数量数据
-	for i, good := range pickGoods {
-		completeNum, mpOk := mp[good.Id]
-
-		if !mpOk {
-			continue
-		}
-
-		pickGoods[i].CompleteNum = completeNum
-	}
-
-	//正常拣货 更新拣货数量
-	result = tx.Save(&pickGoods)
-
-	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	//更新主表
-	result = tx.Model(&model.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": 1, "pick_num": totalNum})
-
-	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	err := UpdateBatchPickNums(tx, pick.BatchId)
+	err := dao.CompletePick(global.DB, form)
 
 	if err != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
-
-	tx.Commit()
 
 	xsq_net.Success(c)
 }

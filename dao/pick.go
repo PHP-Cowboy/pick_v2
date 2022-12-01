@@ -4,6 +4,7 @@ import (
 	"errors"
 	"pick_v2/utils/slice"
 	"strconv"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -11,30 +12,50 @@ import (
 	"pick_v2/model"
 )
 
+func BatchPick(db *gorm.DB, form req.BatchPickForm) (err error) {
+	var batch model.Batch
+
+	err, batch = model.GetBatchByPk(db, form.BatchId)
+
+	if err != nil {
+		return
+	}
+
+	if batch.Status == 1 { //状态:0:进行中,1:已结束,2:暂停
+		err = errors.New("请先开启拣货")
+		return
+	}
+
+	err = BatchPickByParams(db, form)
+
+	return
+}
+
 // 批量拣货 - 根据参数类型
-func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, batchType int) error {
+func BatchPickByParams(db *gorm.DB, form req.BatchPickForm) (err error) {
 
 	var (
 		prePick        []model.PrePick
+		prePickGoods   []model.PrePickGoods
 		prePickRemarks []model.PrePickRemark
 	)
 
-	//0:未处理,1:已进入拣货池
-	result := db.Model(&model.PrePick{}).Where("id in (?) and status = 0", form.Ids).Find(&prePick)
+	err, prePick = model.GetPrePickByIdsAndStatus(db, form.Ids, model.PrePickStatusUnhandled)
 
-	if result.Error != nil {
-		return result.Error
+	if err != nil {
+		return
 	}
 
 	//按分类或商品获取未进入拣货池的商品数据
-	err, prePickGoods := model.GetPrePickGoodsByTypeParam(db, form.Ids, form.Type, form.TypeParam)
+	err, prePickGoods = model.GetPrePickGoodsByTypeParam(db, form.Ids, form.Type, form.TypeParam)
 
 	if err != nil {
-		return err
+		return
 	}
 
 	if len(prePickGoods) == 0 {
-		return errors.New("对应的拣货池商品不存在")
+		err = errors.New("对应的拣货池商品不存在")
+		return
 	}
 
 	var (
@@ -62,11 +83,11 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, batchType int) error
 			TakeOrdersTime: nil,
 			Sort:           0,
 			Version:        0,
-			Typ:            batchType,
+			Typ:            form.Typ,
 		})
 	}
 
-	err = model.PickSave(db, &picks)
+	err = model.PickBatchSave(db, &picks)
 
 	if err != nil {
 		return err
@@ -121,7 +142,7 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, batchType int) error
 		})
 	}
 
-	result = db.Where("order_goods_id in (?)", orderGoodsIds).Find(&prePickRemarks)
+	result := db.Where("order_goods_id in (?)", orderGoodsIds).Find(&prePickRemarks)
 
 	if result.Error != nil {
 		return result.Error
@@ -219,37 +240,63 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, batchType int) error
 }
 
 // 合并拣货
-func MergePickByParams(db *gorm.DB, form req.MergePickForm) error {
+func MergePick(db *gorm.DB, form req.MergePickForm) (err error) {
+	var batch model.Batch
+
+	err, batch = model.GetBatchByPk(db, form.BatchId)
+
+	if err != nil {
+		return
+	}
+
+	if batch.Status == 1 {
+		err = errors.New("请先开启拣货")
+		return
+	}
+
+	err = MergePickByParams(db, form)
+
+	return
+}
+
+// 合并拣货 - 根据参数类型
+func MergePickByParams(db *gorm.DB, form req.MergePickForm) (err error) {
 	var (
 		prePickGoods   []model.PrePickGoods
 		prePickRemarks []model.PrePickRemark
 		pickGoods      []model.PickGoods
 		pickRemarks    []model.PickRemark
-	)
-
-	var (
-		prePickIds string
+		prePickIds     []string
 		prePickGoodsIds,
 		orderGoodsIds,
 		prePickRemarksIds []int
 	)
 
-	result := db.Where("pre_pick_id in (?) and status = 0", form.Ids).Find(&prePickGoods)
+	err, prePickGoods = model.GetPrePickGoodsByPrePickIdAndStatus(db, form.Ids, model.PrePickGoodsStatusUnhandled)
 
-	if result.Error != nil {
-		return result.Error
+	if err != nil {
+		return err
 	}
 
-	if result.RowsAffected == 0 {
-		return errors.New("商品数据未找到")
+	if len(prePickGoods) == 0 {
+		err = errors.New("商品数据未找到")
+		return
 	}
+
+	//构造 prePickIds
+	for _, good := range prePickGoods {
+		prePickIds = append(prePickIds, strconv.Itoa(good.PrePickId))
+	}
+
+	//去重
+	prePickIds = slice.UniqueSlice(prePickIds)
 
 	tx := db.Begin()
 
 	pick := model.Pick{
 		WarehouseId:    form.WarehouseId,
 		BatchId:        form.BatchId,
-		PrePickIds:     prePickIds,
+		PrePickIds:     strings.Join(prePickIds, ","),
 		TaskName:       form.TaskName,
 		ShopCode:       "",
 		ShopName:       form.TaskName,
@@ -261,11 +308,11 @@ func MergePickByParams(db *gorm.DB, form req.MergePickForm) error {
 		Version:        0,
 	}
 
-	result = tx.Save(&pick)
+	err = model.PickSave(tx, &pick)
 
-	if result.Error != nil {
+	if err != nil {
 		tx.Rollback()
-		return result.Error
+		return
 	}
 
 	for _, goods := range prePickGoods {
@@ -294,42 +341,37 @@ func MergePickByParams(db *gorm.DB, form req.MergePickForm) error {
 		})
 	}
 
-	result = tx.Save(&pickGoods)
+	err = model.PickGoodsSave(tx, &pickGoods)
 
-	if result.Error != nil {
+	if err != nil {
 		tx.Rollback()
-		return result.Error
+		return
 	}
 
 	//更新预拣货池商品相关数据状态
-	result = tx.Model(model.PrePickGoods{}).Where("id in (?)", prePickGoodsIds).Updates(map[string]interface{}{"status": 1})
+	err = model.UpdatePrePickGoodsStatusByIds(tx, prePickGoodsIds, model.PrePickGoodsStatusProcessing)
 
-	if result.Error != nil {
+	if err != nil {
 		tx.Rollback()
-		return result.Error
+		return
 	}
+
+	prePickIdSlice := []int{}
 
 	//预拣池内商品全部进入拣货池时 更新 对应的 预拣池状态
 	if form.Type == 1 { //全单拣货
-		result = tx.Model(model.PrePick{}).Where("id in (?)", form.Ids).Updates(map[string]interface{}{"status": 1})
-		if result.Error != nil {
-			tx.Rollback()
-			return result.Error
-		}
+		prePickIdSlice = form.Ids
 	} else {
 		//0:未处理,1:已进入拣货池
-		result = tx.Model(model.PrePickGoods{}).Where("pre_pick_id in (?) and status = 0", form.Ids).Find(&prePickGoods)
-		if result.Error != nil {
+		err, prePickGoods = model.GetPrePickGoodsByPrePickIdAndStatus(db, form.Ids, model.PrePickGoodsStatusUnhandled)
+
+		if err != nil {
 			tx.Rollback()
-			return result.Error
+			return
 		}
 
 		//将传过来的id转换成map
-		idsMp := make(map[int]struct{}, 0)
-
-		for _, id := range form.Ids {
-			idsMp[id] = struct{}{}
-		}
+		idsMp := slice.SliceToMap(form.Ids)
 
 		//去除未处理的预拣池id
 		for _, good := range prePickGoods {
@@ -337,25 +379,22 @@ func MergePickByParams(db *gorm.DB, form req.MergePickForm) error {
 		}
 
 		//将map转回切片
-		prePickIdSlice := []int{}
-		for id, _ := range idsMp {
-			prePickIdSlice = append(prePickIdSlice, id)
-		}
+		prePickIdSlice = slice.MapToSlice(idsMp)
+	}
 
-		if len(prePickIdSlice) > 0 {
-			result = tx.Model(model.PrePick{}).Where("id in (?)", prePickIdSlice).Updates(map[string]interface{}{"status": 1})
-			if result.Error != nil {
-				tx.Rollback()
-				return result.Error
-			}
+	if len(prePickIdSlice) > 0 {
+		err = model.UpdatePrePickStatusByIds(tx, prePickIdSlice, model.PrePickStatusProcessing)
+		if err != nil {
+			tx.Rollback()
+			return
 		}
 	}
 
-	result = db.Where("order_goods_id in (?)", orderGoodsIds).Find(&prePickRemarks)
+	err, prePickRemarks = model.GetPrePickRemarkByOrderGoodsIds(db, orderGoodsIds)
 
-	if result.Error != nil {
+	if err != nil {
 		tx.Rollback()
-		return result.Error
+		return
 	}
 
 	if len(prePickRemarks) > 0 {
@@ -377,19 +416,17 @@ func MergePickByParams(db *gorm.DB, form req.MergePickForm) error {
 			})
 		}
 
-		result = tx.Save(&pickRemarks)
+		err = model.PickRemarkBatchSave(tx, &pickRemarks)
 
-		if result.Error != nil {
+		if err != nil {
 			tx.Rollback()
-			return result.Error
+			return
 		}
 
 		//更新预拣货池备注相关数据状态
-		result = tx.Model(model.PrePickRemark{}).Where("id in (?)", prePickRemarksIds).Updates(map[string]interface{}{"status": 1})
-
-		if result.Error != nil {
-			tx.Rollback()
-			return result.Error
+		err = model.UpdatePrePickRemarkByIds(tx, prePickRemarksIds, map[string]interface{}{"status": model.PrePickRemarkStatusProcessing})
+		if err != nil {
+			return err
 		}
 	}
 

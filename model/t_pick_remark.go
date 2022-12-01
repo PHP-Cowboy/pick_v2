@@ -1,5 +1,7 @@
 package model
 
+import "gorm.io/gorm"
+
 // 拣货备注明细
 type PickRemark struct {
 	Base
@@ -13,4 +15,9 @@ type PickRemark struct {
 	GoodsRemark     string `gorm:"type:varchar(255);comment:商品备注"`
 	ShopName        string `gorm:"type:varchar(64);not null;comment:店铺名称"`
 	Line            string `gorm:"type:varchar(255);not null;comment:线路"`
+}
+
+func PickRemarkBatchSave(db *gorm.DB, list *[]PickRemark) (err error) {
+	result := db.Model(&PickRemark{}).Save(list)
+	return result.Error
 }

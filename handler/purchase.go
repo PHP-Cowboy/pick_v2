@@ -40,7 +40,7 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 
 	for _, info := range orderRsp.Data {
 
-		if info.DistributionType == 6 { //无需拣货
+		if info.DistributionType == 6 { //无需出库
 			return dao.NoShipping(db, form, info)
 		} else {
 			return dao.Shipping(db, form, info)

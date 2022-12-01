@@ -270,6 +270,10 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 		return result.Error
 	}
 
+	if len(orderJoinGoods) == 0 {
+		return errors.New("暂无相关订单")
+	}
+
 	err := OutboundOrderBatchSaveLogic(db, taskId, orderJoinGoods, mp)
 
 	if err != nil {
@@ -790,7 +794,7 @@ func OutboundTaskAddOrder(db *gorm.DB, form req.OutboundTaskAddOrderForm) error 
 	}
 
 	//订单信息
-	err, orderList = model.GetOrderJoinGoodsList(db, form.Number)
+	err, orderList = model.GetOrderJoinGoodsListByNumbers(db, form.Number)
 
 	if err != nil {
 		return err

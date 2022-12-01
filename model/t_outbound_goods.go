@@ -91,6 +91,17 @@ func OutboundGoodsBatchSave(db *gorm.DB, list []OutboundGoods) error {
 	return result.Error
 }
 
+func OutboundGoodsReplaceSave(db *gorm.DB, list []OutboundGoods, values []string) error {
+	result := db.Model(&OutboundGoods{}).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "task_id,number,sku"}},
+			DoUpdates: clause.AssignmentColumns(values),
+		}).
+		Save(&list)
+
+	return result.Error
+}
+
 func GetOutboundGoodsJoinOrderList(db *gorm.DB, taskId int, number []string) (err error, list []OutboundGoodsJoinOrder) {
 
 	result := db.Table("t_outbound_goods og").
@@ -119,17 +130,6 @@ func GetOutboundGoodsJoinOrderListByNumbers(db *gorm.DB, number []string) (err e
 	}
 
 	return nil, list
-}
-
-func OutboundGoodsReplaceSave(db *gorm.DB, list []OutboundGoods, values []string) error {
-	result := db.Model(&OutboundGoods{}).
-		Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "task_id,number,sku"}},
-			DoUpdates: clause.AssignmentColumns(values),
-		}).
-		Save(&list)
-
-	return result.Error
 }
 
 type OutboundGoodsGoodsNumsStatistical struct {

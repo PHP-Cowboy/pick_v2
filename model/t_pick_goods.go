@@ -28,6 +28,34 @@ type PickGoods struct {
 	Unit             string `gorm:"type:varchar(64);comment:单位"`
 }
 
+func PickGoodsSave(db *gorm.DB, list *[]PickGoods) error {
+	result := db.Model(&PickGoods{}).Save(list)
+	return result.Error
+}
+
+func UpdatePickGoodsByIds(db *gorm.DB, ids []int, mp map[string]interface{}) (err error) {
+	result := db.Model(&PickGoods{}).Where("id in (?)", ids).Updates(mp)
+	return result.Error
+}
+
+// 根据pickId更新拣货池商品数据
+func UpdatePickGoodsByPickId(db *gorm.DB, pickId int, mp map[string]interface{}) (err error) {
+	result := db.Model(&PickGoods{}).Where("pick_id = ?", pickId).Updates(mp)
+	return result.Error
+}
+
+func UpdatePickGoodsByPickIds(db *gorm.DB, pickIds []int, mp map[string]interface{}) error {
+	result := db.Model(&Pick{}).Where("pick_id in (?)", pickIds).Updates(mp)
+
+	return result.Error
+}
+
+func GetPickGoodsByIds(db *gorm.DB, ids []int) (err error, list []PickGoods) {
+	result := db.Model(&PickGoods{}).Where("id in (?)", ids).Find(&list)
+
+	return result.Error, list
+}
+
 func GetPickGoodsByNumber(db *gorm.DB, numbers []string) (err error, list []PickGoods) {
 	result := db.Model(&PickGoods{}).Where("number in (?)", numbers).Find(&list)
 
@@ -60,12 +88,6 @@ func GetFirstPickGoodsByNumbers(db *gorm.DB, numbers []string) (err error, exist
 	return nil, false
 }
 
-func UpdatePickGoodsByPickIds(db *gorm.DB, pickIds []int, mp map[string]interface{}) error {
-	result := db.Model(&Pick{}).Where("pick_id in (?)", pickIds).Updates(mp)
-
-	return result.Error
-}
-
 // 统计集中拣货相关数量
 func CountPickByBatch(db *gorm.DB, batchIds []int) (err error, countCentralizedPick []CountPickNums) {
 
@@ -76,4 +98,147 @@ func CountPickByBatch(db *gorm.DB, batchIds []int) (err error, countCentralizedP
 		Find(&countCentralizedPick)
 
 	return result.Error, countCentralizedPick
+}
+
+type CountBatchNums struct {
+	BatchId    int `json:"batch_id"`     //批次ID
+	ShopNum    int `json:"shop_num"`     //门店数
+	OrderNum   int `json:"order_num"`    //订单数
+	GoodsNum   int `json:"goods_num"`    //商品数
+	PrePickNum int `json:"pre_pick_num"` //预拣单数
+	PickNum    int `json:"pick_num"`     //拣货单数
+	ReviewNum  int `json:"review_num"`   //复核单数
+	Count      int `json:"count"`
+	Status     int `json:"status"`
+}
+
+// 统计批次 门店数量、预拣单数等
+func CountBatchNumsByBatchIds(db *gorm.DB, batchIds []int) (err error, mp map[int]CountBatchNums) {
+	var (
+		count        []CountBatchNums
+		pickCount    []CountBatchNums
+		prePickCount []CountBatchNums
+	)
+
+	mp = make(map[int]CountBatchNums, 0)
+
+	//预拣池商品表，统计各个批次 店铺数，订单数，商品数
+	result := db.Model(&PrePickGoods{}).
+		Select("batch_id,count(distinct(shop_id)) as shop_num,count(distinct(number)) as order_num,sum(need_num) as goods_num").
+		Where("batch_id in (?)", batchIds).
+		Group("batch_id").
+		Find(&count)
+
+	err = result.Error
+
+	if err != nil {
+		return
+	}
+
+	for _, n := range count {
+		mp[n.BatchId] = n
+	}
+
+	//统计预拣池任务数量
+	result = db.Model(&PrePick{}).
+		Select("batch_id,count(1) as pre_pick_num").
+		Where("batch_id in (?) and status = ?", batchIds, PrePickStatusUnhandled).
+		Group("batch_id").
+		Find(&pickCount)
+
+	err = result.Error
+
+	if err != nil {
+		return
+	}
+
+	for _, pc := range pickCount {
+		nums, ok := mp[pc.BatchId]
+
+		if !ok {
+			nums = pc
+			continue
+		}
+		//替换 预拣单数
+		nums.PrePickNum = pc.PrePickNum
+
+		mp[pc.BatchId] = nums
+	}
+
+	//统计拣货池 待拣货任务数 待复核任务数
+	result = db.Model(&Pick{}).
+		Select("batch_id,status,count(1) as count").
+		Where("batch_id in (?) and status in (?)", batchIds, []int{ToBePickedStatus, ToBeReviewedStatus}).
+		Group("batch_id,status").
+		Find(&prePickCount)
+
+	err = result.Error
+
+	if err != nil {
+		return
+	}
+
+	for _, ppc := range prePickCount {
+		nums, ok := mp[ppc.BatchId]
+
+		if !ok {
+			nums = ppc
+			continue
+		}
+
+		//替换 拣货单数 复核单数
+		switch ppc.Status {
+		case ToBePickedStatus: //拣货单数
+			nums.PickNum = ppc.Count
+			break
+		case ToBeReviewedStatus: //复核单数
+			nums.ReviewNum = ppc.Count
+			break
+		}
+
+		mp[ppc.BatchId] = nums
+	}
+
+	for _, id := range batchIds {
+		//新批次时 拣货池 复核池为空 对应的批次没有数据 给默认值
+		_, ok := mp[id]
+
+		if !ok {
+			mp[id] = CountBatchNums{}
+		}
+	}
+
+	return
+}
+
+type CountPickPoolNums struct {
+	PickId   int `json:"pick_id"`   //拣货id
+	ShopNum  int `json:"shop_num"`  //门店数
+	OrderNum int `json:"order_num"` //订单数
+	NeedNum  int `json:"need_num"`  //商品数
+}
+
+// 统计拣货 门店、订单、需拣数量
+func CountPickPoolNumsByPickIds(db *gorm.DB, pickIds []int) (err error, mp map[int]CountPickPoolNums) {
+	var count []CountPickPoolNums
+
+	mp = make(map[int]CountPickPoolNums, 0)
+
+	result := db.Model(&PickGoods{}).
+		Select("pick_id,count(distinct(shop_id)) as shop_num,count(distinct(number)) as order_num,sum(need_num) as need_num").
+		Where("pick_id in (?)", pickIds).
+		Group("pick_id").
+		Find(&count)
+
+	err = result.Error
+
+	if err != nil {
+		return
+	}
+
+	for _, n := range count {
+		mp[n.PickId] = n
+	}
+
+	return
 }

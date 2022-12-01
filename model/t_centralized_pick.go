@@ -47,9 +47,9 @@ func UpdateCentralizedPickById(db *gorm.DB, id int, mp map[string]interface{}) e
 }
 
 // 集中拣货分页列表
-func GetCentralizedPickPageList(db *gorm.DB, page, size, isRemark int, goodsName, goodsType string) (err error, total int64, list []CentralizedPick) {
+func GetCentralizedPickPageList(db *gorm.DB, batchId, page, size, isRemark int, goodsName, goodsType string) (err error, total int64, list []CentralizedPick) {
 
-	local := db.Model(&CentralizedPick{}).Where(&CentralizedPick{GoodsName: goodsName, GoodsType: goodsType})
+	local := db.Model(&CentralizedPick{}).Where(&CentralizedPick{BatchId: batchId, GoodsName: goodsName, GoodsType: goodsType})
 
 	if isRemark == 0 {
 		local.Where("goods_remark = ''")

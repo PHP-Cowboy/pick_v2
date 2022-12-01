@@ -209,6 +209,7 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 	//	Type:        1,
 	//	TypeParam:   []string{},
 	//	WarehouseId: claims.WarehouseId,
+	//	Typ:         2,
 	//}
 	//
 	////生成拣货池
@@ -227,7 +228,7 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 func GetBatchIdsFromPrePickGoods(db *gorm.DB, form req.GetBatchListForm) (err error, batchIds []int) {
 	var prePickGoods []model.PrePickGoods
 
-	preGoodsRes := global.DB.Model(&model.PrePickGoods{}).
+	result := global.DB.Model(&model.PrePickGoods{}).
 		Where(model.PrePickGoods{
 			Sku:    form.Sku,
 			Number: form.Number,
@@ -236,14 +237,14 @@ func GetBatchIdsFromPrePickGoods(db *gorm.DB, form req.GetBatchListForm) (err er
 		Select("batch_id").
 		Find(&prePickGoods)
 
-	err = preGoodsRes.Error
+	err = result.Error
 
 	if err != nil {
 		return
 	}
 
 	//未找到，直接返回
-	if preGoodsRes.RowsAffected == 0 {
+	if result.RowsAffected == 0 {
 		return
 	}
 
@@ -264,36 +265,38 @@ func BatchList(db *gorm.DB, form req.GetBatchListForm) (err error, res rsp.GetBa
 		batchIds []int
 	)
 
+	local := db.Model(&model.Batch{})
+
 	//子表数据
 	if form.Sku != "" || form.Number != "" || form.ShopId > 0 {
 		err, batchIds = GetBatchIdsFromPrePickGoods(db, form)
 		if err != nil {
-			return err, rsp.GetBatchListRsp{}
+			return
 		}
-		db = db.Where("id in (?)", batchIds)
+		local.Where("id in (?)", batchIds)
 	}
 
 	if form.Line != "" {
-		db = db.Where("line like ?", form.Line+"%")
+		local.Where("line like ?", form.Line+"%")
 	}
 
 	if form.CreateTime != "" {
-		db = db.Where("create_time <= ?", form.CreateTime)
+		local.Where("create_time <= ?", form.CreateTime)
 	}
 
 	if form.EndTime != "" {
-		db = db.Where("end_time <= ?", form.EndTime)
+		local.Where("end_time <= ?", form.EndTime)
 	}
 
 	if *form.Status == 0 {
-		db = db.Where("status in (?)", []int{model.BatchOngoingStatus, model.BatchSuspendStatus})
+		local.Where("status in (?)", []int{model.BatchOngoingStatus, model.BatchSuspendStatus})
 	} else {
-		db = db.Where("status = ?", model.BatchClosedStatus)
+		local.Where("status = ?", model.BatchClosedStatus)
 	}
 
-	db.Where(&model.Batch{DeliveryMethod: form.DeliveryMethod})
+	local.Where(&model.Batch{DeliveryMethod: form.DeliveryMethod})
 
-	result := db.Find(&batches)
+	result := local.Find(&batches)
 
 	err = result.Error
 
@@ -303,7 +306,9 @@ func BatchList(db *gorm.DB, form req.GetBatchListForm) (err error, res rsp.GetBa
 
 	res.Total = result.RowsAffected
 
-	result = db.Scopes(model.Paginate(form.Page, form.Size)).Order("sort desc, id desc").Find(&batches)
+	result = local.Scopes(model.Paginate(form.Page, form.Size)).
+		Order("sort desc, id desc").
+		Find(&batches)
 
 	err = result.Error
 
@@ -311,8 +316,28 @@ func BatchList(db *gorm.DB, form req.GetBatchListForm) (err error, res rsp.GetBa
 		return
 	}
 
+	//batchIds
+	if len(batchIds) == 0 {
+		for _, batch := range batches {
+			batchIds = append(batchIds, batch.Id)
+		}
+	}
+
+	// 统计批次 门店数量、预拣单数等
+	err, numsMp := model.CountBatchNumsByBatchIds(db, batchIds)
+	if err != nil {
+		return
+	}
+
 	list := make([]*rsp.Batch, 0, len(batches))
 	for _, b := range batches {
+
+		nums, numsOk := numsMp[b.Id]
+
+		if !numsOk {
+			err = errors.New("拣货池数据异常")
+			return
+		}
 
 		list = append(list, &rsp.Batch{
 			Id:                b.Id,
@@ -321,17 +346,17 @@ func BatchList(db *gorm.DB, form req.GetBatchListForm) (err error, res rsp.GetBa
 			BatchName:         b.BatchName + helper.GetDeliveryMethod(b.DeliveryMethod),
 			DeliveryStartTime: b.DeliveryStartTime,
 			DeliveryEndTime:   b.DeliveryEndTime,
-			ShopNum:           b.ShopNum,
-			OrderNum:          b.OrderNum,
-			GoodsNum:          b.GoodsNum,
+			ShopNum:           nums.ShopNum,
+			OrderNum:          nums.OrderNum,
+			GoodsNum:          nums.GoodsNum,
 			UserName:          b.UserName,
 			Line:              b.Line,
 			DeliveryMethod:    b.DeliveryMethod,
 			EndTime:           b.EndTime,
 			Status:            b.Status,
-			PrePickNum:        b.PrePickNum,
-			PickNum:           b.PickNum,
-			RecheckSheetNum:   b.RecheckSheetNum,
+			PrePickNum:        nums.PrePickNum,
+			PickNum:           nums.PickNum,
+			RecheckSheetNum:   nums.ReviewNum,
 		})
 	}
 

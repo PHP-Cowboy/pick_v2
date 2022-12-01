@@ -49,3 +49,8 @@ func UpdatePrePickRemarkByIds(db *gorm.DB, ids []int, mp map[string]interface{})
 
 	return result.Error
 }
+
+func GetPrePickRemarkByOrderGoodsIds(db *gorm.DB, orderGoodsIds []int) (err error, prePickRemarks []PrePickRemark) {
+	result := db.Model(&PrePickRemark{}).Where("order_goods_id in (?)", orderGoodsIds).Find(&prePickRemarks)
+	return result.Error, prePickRemarks
+}

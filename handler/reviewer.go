@@ -284,7 +284,7 @@ func ReviewDetail(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-// 确认出库
+// TODO 确认出库
 func ConfirmDelivery(c *gin.Context) {
 	var (
 		form req.ConfirmDeliveryReq
@@ -691,14 +691,15 @@ func ConfirmDelivery(c *gin.Context) {
 
 	//如果是批次结束时 还在拣货池中的单的出库，且拣货池中没有未复核的商品，要更新 order_type
 	for i, o := range order {
-		picked, ogMpOk := orderPickMp[o.Number]
+		//picked, ogMpOk := orderPickMp[o.Number]
+		_, ogMpOk := orderPickMp[o.Number]
 
 		if !ogMpOk {
 			continue
 		}
 
-		order[i].Picked = picked + o.Picked //订单被拆分成多个出，已拣累加
-		order[i].UnPicked = o.UnPicked - picked
+		//order[i].Picked = picked + o.Picked //订单被拆分成多个出，已拣累加
+		//order[i].UnPicked = o.UnPicked - picked
 
 		order[i].LatestPickingTime = (*model.MyTime)(&now)
 
@@ -709,30 +710,30 @@ func ConfirmDelivery(c *gin.Context) {
 		}
 
 		//之前的欠货数，减去本次订单拣货数 为0的 且 批次结束 改成 完成订单
-		if o.UnPicked-picked == 0 && batch.Status == model.BatchClosedStatus {
-
-			completeNumber = append(completeNumber, o.Number)
-
-			//完成订单
-			completeOrder = append(completeOrder, model.CompleteOrder{
-				Number:         o.Number,
-				OrderRemark:    o.OrderRemark,
-				ShopId:         o.ShopId,
-				ShopName:       o.ShopName,
-				ShopType:       o.ShopType,
-				ShopCode:       o.ShopCode,
-				Line:           o.Line,
-				DeliveryMethod: o.DistributionType,
-				PayCount:       o.PayTotal,
-				CloseCount:     o.CloseNum,
-				OutCount:       o.Picked,
-				Province:       o.Province,
-				City:           o.City,
-				District:       o.District,
-				PickTime:       o.LatestPickingTime,
-				PayAt:          o.PayAt,
-			})
-		}
+		//if o.UnPicked-picked == 0 && batch.Status == model.BatchClosedStatus {
+		//
+		//	completeNumber = append(completeNumber, o.Number)
+		//
+		//	//完成订单
+		//	completeOrder = append(completeOrder, model.CompleteOrder{
+		//		Number:         o.Number,
+		//		OrderRemark:    o.OrderRemark,
+		//		ShopId:         o.ShopId,
+		//		ShopName:       o.ShopName,
+		//		ShopType:       o.ShopType,
+		//		ShopCode:       o.ShopCode,
+		//		Line:           o.Line,
+		//		DeliveryMethod: o.DistributionType,
+		//		PayCount:       o.PayTotal,
+		//		CloseCount:     o.CloseNum,
+		//		OutCount:       o.Picked,
+		//		Province:       o.Province,
+		//		City:           o.City,
+		//		District:       o.District,
+		//		PickTime:       o.LatestPickingTime,
+		//		PayAt:          o.PayAt,
+		//	})
+		//}
 	}
 
 	//更新订单数据

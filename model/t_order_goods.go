@@ -165,7 +165,7 @@ func UpdateOrderGoodsStatus(db *gorm.DB, list []OrderGoods, values []string) err
 
 // 临时加单
 // 订单&&商品信息
-func GetOrderJoinGoodsList(db *gorm.DB, number []string) (err error, list []OrderJoinGoods) {
+func GetOrderJoinGoodsListByNumbers(db *gorm.DB, number []string) (err error, list []OrderJoinGoods) {
 	result := db.Table("t_order_goods og").
 		Select("o.*,o.id as order_id,og.*,og.id as order_goods_id").
 		Joins("left join t_order o on og.number = o.number").
@@ -177,6 +177,17 @@ func GetOrderJoinGoodsList(db *gorm.DB, number []string) (err error, list []Orde
 	}
 
 	return nil, list
+}
+
+func GetOrderGoodsListByIds(db *gorm.DB, ids []int) (err error, list []OrderGoods) {
+	result := db.Table("t_order_goods og").
+		Select("og.*").
+		Joins("left join t_order o on og.number = o.number").
+		Where("og.id in (?)", ids).
+		Order("pay_at ASC").
+		Find(&list)
+
+	return result.Error, list
 }
 
 // 获取出库任务订单 商品相关数量

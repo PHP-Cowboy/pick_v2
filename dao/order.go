@@ -23,7 +23,7 @@ func Shipping(db *gorm.DB, form req.PurchaseOrderForm, info rsp.OrderInfo) (cons
 		return consumer.ConsumeRetryLater, err
 	}
 
-	//以存在，消息消费成功
+	//已存在，消息消费成功
 	if exist {
 		return consumer.ConsumeSuccess, errors.New("此订单在订单或完成订单中已存在")
 	}

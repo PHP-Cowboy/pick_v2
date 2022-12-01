@@ -13,6 +13,7 @@ type CompletePickForm struct {
 	PickId       int                  `json:"pick_id" form:"pick_id"`
 	CompletePick []CompletePickDetail `json:"complete_pick"`
 	Type         int                  `json:"type" form:"type" binding:"required,oneof=1 2"` //1正常拣货 2无需拣货
+	UserName     string               `json:"user_name"`
 }
 
 type CompleteConcentratedPickForm struct {

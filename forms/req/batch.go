@@ -26,6 +26,7 @@ type CreateBatchForm struct {
 
 type CentralizedPickListForm struct {
 	Paging
+	BatchId   int    `json:"batch_id" form:"batch_id" binding:"required"`
 	GoodsName string `json:"goods_name" form:"goods_name"`
 	GoodsType string `json:"goods_type" form:"goods_type"`
 	IsRemark  int    `json:"is_remark" form:"is_remark"`
@@ -95,6 +96,7 @@ type BatchPickForm struct {
 	Type        int      `json:"type" binding:"required,oneof=1 2 3"`
 	TypeParam   []string `json:"type_param" binding:"required"`
 	WarehouseId int      `json:"warehouse_id"`
+	Typ         int      `json:"typ"` //类型：1:常规批次,2:快递批次;前端不需要传,程序里赋值
 }
 
 type MergePickForm struct {
@@ -104,6 +106,7 @@ type MergePickForm struct {
 	TypeParam   []string `json:"type_param" binding:"required"`
 	TaskName    string   `json:"task_name" binding:"required"`
 	WarehouseId int      `json:"warehouse_id"`
+	Typ         int      `json:"typ"` //类型：1:常规批次,2:快递批次;前端不需要传,程序里赋值
 }
 
 type PrintCallGetReq struct {
