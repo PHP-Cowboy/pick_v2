@@ -1,12 +1,8 @@
 package handler
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"github.com/apache/rocketmq-client-go/v2"
-	"github.com/apache/rocketmq-client-go/v2/primitive"
-	"github.com/apache/rocketmq-client-go/v2/producer"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"gorm.io/gorm"
@@ -948,50 +944,11 @@ func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
 
 	if isSendMQ {
 		//mq 存入 批次id
-		err := SyncBatch(batchId)
+		err := dao.SyncBatch(batchId)
 		if err != nil {
 			tx.Rollback()
 			return errors.New("写入mq失败")
 		}
-	}
-
-	return nil
-}
-
-func SyncBatch(batchId int) error {
-	p, _ := rocketmq.NewProducer(
-		producer.WithNsResolver(primitive.NewPassthroughResolver([]string{global.ServerConfig.RocketMQ})),
-		producer.WithRetry(2),
-	)
-
-	err := p.Start()
-
-	if err != nil {
-		global.Logger["err"].Infof("start producer error: %s", err.Error())
-		return err
-	}
-
-	topic := "pick_batch"
-
-	msg := &primitive.Message{
-		Topic: topic,
-		Body:  []byte(strconv.Itoa(batchId)),
-	}
-
-	res, err := p.SendSync(context.Background(), msg)
-
-	if err != nil {
-		global.Logger["err"].Infof("send message error: %s", err.Error())
-		return err
-	} else {
-		global.Logger["info"].Infof("send message success: result=%s", res.String())
-	}
-
-	err = p.Shutdown()
-
-	if err != nil {
-		global.Logger["err"].Infof("shutdown producer error: %s", err.Error())
-		return err
 	}
 
 	return nil
@@ -1030,7 +987,7 @@ func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderAndGoods []rsp.Or
 		mpOrderAndGoods[order.Id] = order
 	}
 
-	mpPgv := make(map[string]PickGoodsView, 0)
+	mpPgv := make(map[string]req.PickGoodsView, 0)
 
 	for _, good := range pickGoods {
 		order, ogOk := mpOrderAndGoods[good.OrderGoodsId]
@@ -1044,7 +1001,7 @@ func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderAndGoods []rsp.Or
 		pgv, ok := mpPgv[mpPgvKey]
 
 		if !ok {
-			pgv = PickGoodsView{}
+			pgv = req.PickGoodsView{}
 		}
 
 		pgv.PickId = good.PickId
@@ -1055,7 +1012,7 @@ func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderAndGoods []rsp.Or
 		pgv.Remark = order.OrderRemark
 		pgv.DeliveryType = order.DistributionType //配送方式
 		pgv.Line = order.Line
-		pgv.List = append(pgv.List, PickGoods{
+		pgv.List = append(pgv.List, req.PickGoods{
 			GoodsName:    good.GoodsName,
 			Sku:          good.Sku,
 			Price:        int64(order.DiscountPrice),
@@ -1074,7 +1031,7 @@ func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderAndGoods []rsp.Or
 
 	for _, view := range mpPgv {
 		//推送u8
-		xml := GenU8Xml(view, view.ShopId, view.ShopName, "05") //店铺属性中获 HouseCode
+		xml := dao.GenU8Xml(view, view.ShopId, view.ShopName, "05") //店铺属性中获 HouseCode
 
 		stockLogs = append(stockLogs, model.StockLog{
 			Number:      view.SaleNumber,
@@ -1094,7 +1051,7 @@ func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderAndGoods []rsp.Or
 		}
 
 		for _, log := range stockLogs {
-			YongYouProducer(log.Id)
+			dao.YongYouProducer(log.Id)
 		}
 	}
 
@@ -1801,7 +1758,7 @@ func PrintCallGet(c *gin.Context) {
 		return
 	}
 
-	printCh := GetPrintJobMap(form.HouseCode)
+	printCh := dao.GetPrintJobMap(form.HouseCode)
 
 	//通道中没有任务
 	if printCh == nil {

@@ -40,7 +40,7 @@ type CentralizedPickList struct {
 	GoodsName   string `json:"goods_name"`
 	GoodsSpe    string `json:"goods_spe"`
 	NeedNum     int    `json:"need_num"`
-	PickNum     int    `json:"pick_num"`
+	CompleteNum int    `json:"complete_num"`
 	PickUser    string `json:"pick_user"`
 	GoodsRemark string `json:"has_remark"`
 }
@@ -68,6 +68,7 @@ type Secondary struct {
 }
 
 type CentralizedPickDetailGoodsInfo struct {
+	GoodsName   string `json:"goods_name"`
 	NeedNum     int    `json:"need_num"`
 	GoodsRemark string `json:"goods_remark"`
 	GoodsUnit   string `json:"goods_unit"`
@@ -77,23 +78,26 @@ type CentralizedPickDetailList struct {
 	ShopName    string `json:"shop_name"`
 	ShopCode    string `json:"shop_code"`
 	Line        string `json:"line"`
-	NeedNum     int    `json:"need_num"`
+	GoodsName   string `json:"goods_name"`
 	GoodsUnit   string `json:"goods_unit"`
 	GoodsRemark string `json:"goods_remark"`
 	OrderRemark string `json:"order_remark"`
+	NeedNum     int    `json:"need_num"`
+	CompleteNum int    `json:"complete_num"`
 }
 
 type CentralizedPickDetailPDARsp struct {
-	Id         int          `json:"id"`
-	Shelves    string       `json:"shelves"`
-	GoodsSpe   string       `json:"goods_spe"`
-	NeedNum    int          `json:"need_num"`
-	GoodsUnit  string       `json:"goods_unit"`
-	PickNum    int          `json:"pick_num"`
-	NumberList []NumberList `json:"number_list"`
+	Id          int          `json:"id"`
+	Shelves     string       `json:"shelves"`
+	GoodsName   string       `json:"goods_name"`
+	GoodsSpe    string       `json:"goods_spe"`
+	NeedNum     int          `json:"need_num"`
+	GoodsUnit   string       `json:"goods_unit"`
+	CompleteNum int          `json:"complete_num"`
+	RemarkList  []RemarkList `json:"remark_list"`
 }
 
-type NumberList struct {
+type RemarkList struct {
 	Number string `json:"number"`
 	Remark string `json:"remark"`
 }
@@ -248,6 +252,7 @@ type MergePickNums struct {
 	NeedNum  int `json:"need_num"`  //需拣
 }
 
+// todo 待删除
 type OrderAndGoods struct {
 	Id                int        `json:"id"`
 	CreateTime        time.Time  `json:"create_time"`

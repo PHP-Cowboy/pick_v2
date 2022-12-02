@@ -6,6 +6,7 @@ import "gorm.io/gorm"
 type PrePick struct {
 	Base
 	WarehouseId int    `gorm:"type:int(11);comment:仓库"`
+	TaskId      int    `gorm:"type:int(11) unsigned;comment:出库任务id"`
 	BatchId     int    `gorm:"type:int(11) unsigned;index;comment:批次表id"`
 	ShopId      int    `gorm:"type:int(11);comment:店铺id"`
 	ShopCode    string `gorm:"type:varchar(255);not null;comment:店铺编号"`

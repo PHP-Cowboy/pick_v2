@@ -108,7 +108,9 @@ func GetGoodsList(c *gin.Context) {
 		}
 	}
 
-	err, numsMp := model.OrderGoodsNumsStatisticalByNumbers(db, numbers)
+	query := "number,sum(pay_count) as pay_count,sum(close_count) as close_count,sum(out_count) as out_count,sum(lack_count) as lack_count"
+
+	err, numsMp := model.OrderGoodsNumsStatisticalByNumbers(db, query, numbers)
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return

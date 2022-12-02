@@ -89,19 +89,11 @@ func getPick(pick []model.Pick) (res rsp.ReceivingOrdersRsp, err error) {
 func ReceivingOrders(c *gin.Context) {
 
 	var (
-		form    req.ReceivingOrdersForm
 		res     rsp.ReceivingOrdersRsp
 		pick    []model.Pick
 		err     error
 		batches []model.Batch
 	)
-
-	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
-
-	if err = c.ShouldBindBodyWith(&form, bindingBody); err != nil {
-		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
-		return
-	}
 
 	db := global.DB
 
@@ -113,7 +105,7 @@ func ReceivingOrders(c *gin.Context) {
 	}
 
 	// 先查询是否有当前拣货员被分配的任务或已经接单且未完成拣货的数据,如果被分配多条，第一按批次优先级，第二按拣货池优先级 优先拣货
-	result := db.Model(&model.Pick{}).Where("pick_user = ? and status = 0 and typ = ?", userInfo.Name, form.Typ).Find(&pick)
+	result := db.Model(&model.Pick{}).Where("pick_user = ? and status = 0 and typ = ?", userInfo.Name, 1).Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -143,7 +135,7 @@ func ReceivingOrders(c *gin.Context) {
 	}
 
 	//进行中的批次
-	result = db.Model(&model.Batch{}).Where("status = 0 and typ = ?", form.Typ).Find(&batches)
+	result = db.Model(&model.Batch{}).Where("status = 0 and typ = ?", 1).Find(&batches)
 
 	batchIds := make([]int, 0)
 
@@ -157,7 +149,7 @@ func ReceivingOrders(c *gin.Context) {
 	}
 
 	//查询未被接单的拣货池数据
-	result = db.Model(&model.Pick{}).Where("batch_id in (?) and pick_user = '' and status = 0 and typ = ?", batchIds, form.Typ).Find(&pick)
+	result = db.Model(&model.Pick{}).Where("batch_id in (?) and pick_user = '' and status = 0 and typ = ?", batchIds, 1).Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -201,6 +193,15 @@ func ReceivingOrders(c *gin.Context) {
 
 // 集中拣货接单
 func ConcentratedPickReceivingOrders(c *gin.Context) {
+	var form req.ConcentratedPickReceivingOrdersForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
 	userInfo := GetUserInfo(c)
 
 	if userInfo == nil {
@@ -208,7 +209,7 @@ func ConcentratedPickReceivingOrders(c *gin.Context) {
 		return
 	}
 
-	err, res := dao.ConcentratedPickReceivingOrders(global.DB, userInfo.Name)
+	err, res := dao.ConcentratedPickReceivingOrders(global.DB, form, userInfo.Name)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)

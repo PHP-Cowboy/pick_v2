@@ -72,6 +72,7 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm) (err error) {
 
 		picks = append(picks, model.Pick{
 			WarehouseId:    form.WarehouseId,
+			TaskId:         pre.TaskId,
 			BatchId:        pre.BatchId,
 			PrePickIds:     strconv.Itoa(pre.Id),
 			TaskName:       pre.ShopName,
@@ -254,13 +255,13 @@ func MergePick(db *gorm.DB, form req.MergePickForm) (err error) {
 		return
 	}
 
-	err = MergePickByParams(db, form)
+	err = MergePickByParams(db, form, batch.Id)
 
 	return
 }
 
 // 合并拣货 - 根据参数类型
-func MergePickByParams(db *gorm.DB, form req.MergePickForm) (err error) {
+func MergePickByParams(db *gorm.DB, form req.MergePickForm, taskId int) (err error) {
 	var (
 		prePickGoods   []model.PrePickGoods
 		prePickRemarks []model.PrePickRemark
@@ -295,6 +296,7 @@ func MergePickByParams(db *gorm.DB, form req.MergePickForm) (err error) {
 
 	pick := model.Pick{
 		WarehouseId:    form.WarehouseId,
+		TaskId:         taskId,
 		BatchId:        form.BatchId,
 		PrePickIds:     strings.Join(prePickIds, ","),
 		TaskName:       form.TaskName,
@@ -362,7 +364,7 @@ func MergePickByParams(db *gorm.DB, form req.MergePickForm) (err error) {
 	if form.Type == 1 { //全单拣货
 		prePickIdSlice = form.Ids
 	} else {
-		//0:未处理,1:已进入拣货池
+		//0:未处理,1:已进入拣货池 -前面修改过pre_pick_goods 状态了，重新查询
 		err, prePickGoods = model.GetPrePickGoodsByPrePickIdAndStatus(db, form.Ids, model.PrePickGoodsStatusUnhandled)
 
 		if err != nil {

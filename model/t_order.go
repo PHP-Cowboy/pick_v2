@@ -66,12 +66,13 @@ func OrderBatchSave(db *gorm.DB, list []Order) error {
 	return result.Error
 }
 
-func UpdateOrder(db *gorm.DB, list []Order, values []string) error {
+func OrderReplaceSave(db *gorm.DB, list []Order, values []string) error {
+	//[]string{"shop_id", "shop_name", "shop_type", "shop_code", "house_code", "line"}
 
 	result := db.Model(&Order{}).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{"shop_id,shop_name,shop_type,shop_code,house_code,line"}),
+			DoUpdates: clause.AssignmentColumns(values),
 		}).Save(&list)
 
 	return result.Error
@@ -85,6 +86,12 @@ func UpdateOrderByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
 
 func UpdateOrderByNumbers(db *gorm.DB, numbers []string, mp map[string]interface{}) error {
 	result := db.Model(&Order{}).Where("number in (?)", numbers).Updates(mp)
+
+	return result.Error
+}
+
+func DeleteOrderByNumbers(db *gorm.DB, numbers []string) error {
+	result := db.Delete(&Order{}, "number in (?)", numbers)
 
 	return result.Error
 }

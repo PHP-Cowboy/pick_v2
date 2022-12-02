@@ -13,18 +13,14 @@ import (
 func CompletePick(db *gorm.DB, form req.CompletePickForm) (err error) {
 	// 这里是否需要做并发处理
 	var (
-		pick       model.Pick
-		pickGoods  []model.PickGoods
-		orderGoods []model.OrderGoods
+		pick           model.Pick
+		pickGoods      []model.PickGoods
+		orderJoinGoods []model.OrderJoinGoods
 	)
 
 	err, pick = model.GetPickByPk(db, form.PickId)
 
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			err = ecode.DataNotExist
-			return
-		}
 		return
 	}
 
@@ -74,7 +70,6 @@ func CompletePick(db *gorm.DB, form req.CompletePickForm) (err error) {
 		orderGoodsIds      []int
 		orderPickGoodsIdMp = make(map[int]int, 0)
 		skuCompleteNumMp   = make(map[string]int, 0)
-		totalNum           int //更新拣货池拣货数量
 	)
 
 	//step:处理前端传递的拣货数据，构造[订单表id切片,订单表id和拣货商品表id映射,sku完成数量映射]
@@ -87,11 +82,10 @@ func CompletePick(db *gorm.DB, form req.CompletePickForm) (err error) {
 		}
 		//sku完成数量
 		skuCompleteNumMp[cp.Sku] = cp.CompleteNum
-		totalNum += cp.CompleteNum //总拣货数量
 	}
 
 	//step: 根据 订单表id切片 查出订单数据 根据支付时间升序
-	err, orderGoods = model.GetOrderGoodsListByIds(db, orderGoodsIds)
+	err, orderJoinGoods = model.GetOrderGoodsJoinOrderByIds(db, orderGoodsIds)
 
 	if err != nil {
 		return
@@ -103,7 +97,7 @@ func CompletePick(db *gorm.DB, form req.CompletePickForm) (err error) {
 	var pickGoodsIds []int
 
 	//step: 构造 拣货商品表 id, 完成数量 并扣减 sku 完成数量
-	for _, info := range orderGoods {
+	for _, info := range orderJoinGoods {
 		//完成数量
 		completeNum, completeOk := skuCompleteNumMp[info.Sku]
 
@@ -151,19 +145,19 @@ func CompletePick(db *gorm.DB, form req.CompletePickForm) (err error) {
 	}
 
 	//正常拣货 更新拣货数量
-	result := tx.Save(&pickGoods)
+	err = model.PickGoodsReplaceSave(tx, &pickGoods, []string{"need_num", "complete_num"})
 
-	if result.Error != nil {
+	if err != nil {
 		tx.Rollback()
-		return result.Error
+		return
 	}
 
 	//更新主表
-	result = tx.Model(&model.Pick{}).Where("id = ?", pick.Id).Updates(map[string]interface{}{"status": model.ToBeReviewedStatus})
+	err = model.UpdatePickByIds(db, []int{pick.Id}, map[string]interface{}{"status": model.ToBeReviewedStatus})
 
-	if result.Error != nil {
+	if err != nil {
 		tx.Rollback()
-		return result.Error
+		return
 	}
 
 	tx.Commit()

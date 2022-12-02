@@ -1,8 +1,15 @@
 package dao
 
 import (
+	"context"
 	"errors"
+	"strconv"
+
+	"github.com/apache/rocketmq-client-go/v2"
+	"github.com/apache/rocketmq-client-go/v2/primitive"
+	"github.com/apache/rocketmq-client-go/v2/producer"
 	"gorm.io/gorm"
+
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
@@ -363,4 +370,44 @@ func BatchList(db *gorm.DB, form req.GetBatchListForm) (err error, res rsp.GetBa
 	res.List = list
 
 	return
+}
+
+// 推送批次信息到消息队列
+func SyncBatch(batchId int) error {
+	p, _ := rocketmq.NewProducer(
+		producer.WithNsResolver(primitive.NewPassthroughResolver([]string{global.ServerConfig.RocketMQ})),
+		producer.WithRetry(2),
+	)
+
+	err := p.Start()
+
+	if err != nil {
+		global.Logger["err"].Infof("start producer error: %s", err.Error())
+		return err
+	}
+
+	topic := "pick_batch"
+
+	msg := &primitive.Message{
+		Topic: topic,
+		Body:  []byte(strconv.Itoa(batchId)),
+	}
+
+	res, err := p.SendSync(context.Background(), msg)
+
+	if err != nil {
+		global.Logger["err"].Infof("send message error: %s", err.Error())
+		return err
+	} else {
+		global.Logger["info"].Infof("send message success: result=%s", res.String())
+	}
+
+	err = p.Shutdown()
+
+	if err != nil {
+		global.Logger["err"].Infof("shutdown producer error: %s", err.Error())
+		return err
+	}
+
+	return nil
 }

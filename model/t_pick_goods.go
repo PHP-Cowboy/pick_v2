@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // 拣货商品明细
@@ -30,6 +31,17 @@ type PickGoods struct {
 
 func PickGoodsSave(db *gorm.DB, list *[]PickGoods) error {
 	result := db.Model(&PickGoods{}).Save(list)
+	return result.Error
+}
+
+func PickGoodsReplaceSave(db *gorm.DB, list *[]PickGoods, values []string) error {
+
+	result := db.Model(&PickGoods{}).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns(values),
+		}).Save(list)
+
 	return result.Error
 }
 
@@ -65,6 +77,17 @@ func GetPickGoodsByNumber(db *gorm.DB, numbers []string) (err error, list []Pick
 // 根据id查拣货池商品数据
 func GetPickGoodsByPickIds(db *gorm.DB, pickIds []int) (err error, list []PickGoods) {
 	result := db.Model(&PickGoods{}).Where("pick_id in (?)", pickIds).Find(&list)
+
+	return result.Error, list
+}
+
+// 根据订单商品表订单编号查询拣货表数据
+func GetPickGoodsJoinPickByNumbers(db *gorm.DB, numbers []string) (err error, list []PickAndGoods) {
+	result := db.Table("t_pick_goods pg").
+		Select("p.id as pick_id,p.status,pg.number").
+		Joins("left join t_pick p on pg.pick_id = p.id").
+		Where("number in (?)", numbers).
+		Find(&list)
 
 	return result.Error, list
 }
@@ -212,20 +235,22 @@ func CountBatchNumsByBatchIds(db *gorm.DB, batchIds []int) (err error, mp map[in
 }
 
 type CountPickPoolNums struct {
-	PickId   int `json:"pick_id"`   //拣货id
-	ShopNum  int `json:"shop_num"`  //门店数
-	OrderNum int `json:"order_num"` //订单数
-	NeedNum  int `json:"need_num"`  //商品数
+	PickId      int `json:"pick_id"`      //拣货id
+	ShopNum     int `json:"shop_num"`     //门店数
+	OrderNum    int `json:"order_num"`    //订单数
+	NeedNum     int `json:"need_num"`     //商品数
+	CompleteNum int `json:"complete_num"` //已拣数量
+	ReviewNum   int `json:"review_num"`   //复核数量
 }
 
 // 统计拣货 门店、订单、需拣数量
-func CountPickPoolNumsByPickIds(db *gorm.DB, pickIds []int) (err error, mp map[int]CountPickPoolNums) {
+func CountPickPoolNumsByPickIds(db *gorm.DB, pickIds []int, query string) (err error, mp map[int]CountPickPoolNums) {
 	var count []CountPickPoolNums
 
 	mp = make(map[int]CountPickPoolNums, 0)
 
 	result := db.Model(&PickGoods{}).
-		Select("pick_id,count(distinct(shop_id)) as shop_num,count(distinct(number)) as order_num,sum(need_num) as need_num").
+		Select(query).
 		Where("pick_id in (?)", pickIds).
 		Group("pick_id").
 		Find(&count)

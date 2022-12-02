@@ -115,7 +115,9 @@ func PickList(c *gin.Context) {
 		return
 	}
 
-	err, numsMp := model.CountPickPoolNumsByPickIds(db, pickIds)
+	query := "pick_id,count(distinct(shop_id)) as shop_num,count(distinct(number)) as order_num,sum(need_num) as need_num,sum(complete_num) as complete_num,sum(review_num) as review_num"
+
+	err, numsMp := model.CountPickPoolNumsByPickIds(db, pickIds, query)
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return
@@ -155,8 +157,8 @@ func PickList(c *gin.Context) {
 			IsRemark:       isRemark,
 			Status:         p.Status,
 			UpdateTime:     p.UpdateTime.Format(timeutil.TimeFormat),
-			PickNum:        p.PickNum,
-			ReviewNum:      p.ReviewNum,
+			PickNum:        nums.CompleteNum,
+			ReviewNum:      nums.ReviewNum,
 			Num:            p.Num,
 			PrintNum:       p.PrintNum,
 			ReviewUser:     p.ReviewUser,
@@ -215,7 +217,9 @@ func GetPickDetail(c *gin.Context) {
 		return
 	}
 
-	err, numsMp := model.CountPickPoolNumsByPickIds(db, []int{form.PickId})
+	query := "pick_id,count(distinct(shop_id)) as shop_num,count(distinct(number)) as order_num,sum(need_num) as need_num"
+
+	err, numsMp := model.CountPickPoolNumsByPickIds(db, []int{form.PickId}, query)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
@@ -445,7 +449,7 @@ func PushPrint(c *gin.Context) {
 	}
 
 	for _, ch := range printChSlice {
-		AddPrintJobMap(constant.JH_HUOSE_CODE, &global.PrintCh{
+		dao.AddPrintJobMap(constant.JH_HUOSE_CODE, &global.PrintCh{
 			DeliveryOrderNo: ch.DeliveryOrderNo,
 			ShopId:          ch.ShopId,
 			Type:            form.Type, //打印类型

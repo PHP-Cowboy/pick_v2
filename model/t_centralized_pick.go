@@ -7,12 +7,13 @@ type CentralizedPick struct {
 	Base
 	BatchId        int     `gorm:"type:int(11) unsigned;uniqueIndex:batchSku;comment:批次表id"`
 	Sku            string  `gorm:"type:varchar(64);uniqueIndex:batchSku;comment:sku"`
+	TaskId         int     `gorm:"type:int(11) unsigned;comment:任务表id"`
 	GoodsName      string  `gorm:"type:varchar(64);comment:商品名称"`
 	GoodsType      string  `gorm:"type:varchar(64);comment:商品类型"`
 	GoodsSpe       string  `gorm:"type:varchar(128);comment:商品规格"`
 	Shelves        string  `gorm:"type:varchar(64);comment:货架"`
 	NeedNum        int     `gorm:"type:int;default:0;comment:需拣数量"`
-	PickNum        int     `gorm:"type:int;default:0;comment:拣货数量"`
+	CompleteNum    int     `gorm:"type:int;default:0;comment:拣货数量"`
 	PickUser       string  `gorm:"type:varchar(32);default:'';comment:拣货人"`
 	TakeOrdersTime *MyTime `gorm:"type:datetime;default:null;comment:接单时间"`
 	GoodsRemark    string  `gorm:"type:varchar(255);comment:商品备注"`
@@ -20,7 +21,6 @@ type CentralizedPick struct {
 	Status         int     `gorm:"type:tinyint;comment:状态:0:待拣货,1:已完成"`
 	Version        int     `gorm:"type:int;default:0;comment:版本"`
 	Sort           int     `gorm:"type:int(11) unsigned;comment:排序"`
-	PickType       int     `gorm:"type:tinyint;default:0;comment:状态:0:正常拣货,1:无需拣货"`
 }
 
 const (
@@ -123,7 +123,7 @@ type CountPickNums struct {
 func CountCentralizedPickByBatch(db *gorm.DB, batchIds []int) (err error, countCentralizedPick []CountPickNums) {
 
 	result := db.Model(&CentralizedPick{}).
-		Select("batch_id,sum(need_num) as sum_need_num,sum(pick_num) as sum_pick_num,count(need_num) as count_need_num,count(pick_num) as count_pick_num").
+		Select("batch_id,sum(need_num) as sum_need_num,sum(complete_num) as sum_pick_num,count(need_num) as count_need_num,count(complete_num) as count_pick_num").
 		Where("batch_id in (?)", batchIds).
 		Group("batch_id").
 		Find(&countCentralizedPick)

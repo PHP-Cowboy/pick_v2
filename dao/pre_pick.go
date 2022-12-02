@@ -80,6 +80,7 @@ func CreatePrePickLogic(
 		//生成预拣池数据
 		prePicks = append(prePicks, model.PrePick{
 			WarehouseId: claims.WarehouseId,
+			TaskId:      form.TaskId,
 			BatchId:     batchId,
 			ShopId:      og.ShopId,
 			ShopCode:    og.ShopCode,

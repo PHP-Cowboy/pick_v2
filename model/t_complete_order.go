@@ -28,3 +28,9 @@ func CompleteOrderSave(db *gorm.DB, list *CompleteOrder) error {
 
 	return result.Error
 }
+
+func CompleteOrderBatchSave(db *gorm.DB, list *[]CompleteOrder) error {
+	result := db.Model(&CompleteOrder{}).Save(list)
+
+	return result.Error
+}

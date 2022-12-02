@@ -1,7 +1,9 @@
 package initialize
 
-import "pick_v2/handler"
+import (
+	"pick_v2/dao"
+)
 
 func InitJob() {
-	go handler.YongYouConsumer()
+	go dao.YongYouConsumer()
 }

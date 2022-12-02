@@ -103,6 +103,17 @@ func OrderGoodsBatchSave(db *gorm.DB, list *[]OrderGoods) error {
 	return result.Error
 }
 
+func OrderGoodsReplaceSave(db *gorm.DB, list *[]OrderGoods, values []string) error {
+
+	result := db.Model(&OrderGoods{}).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns(values),
+		}).Save(list)
+
+	return result.Error
+}
+
 // 批量更新订单商品数据
 func UpdateOrderGoodsByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
 	result := db.Model(&OrderGoods{}).Where("id in (?)", ids).Updates(mp)
@@ -163,6 +174,11 @@ func UpdateOrderGoodsStatus(db *gorm.DB, list []OrderGoods, values []string) err
 	return result.Error
 }
 
+func DeleteOrderGoodsByNumbers(db *gorm.DB, numbers []string) error {
+	result := db.Delete(&OrderGoods{}, "number in (?)", numbers)
+	return result.Error
+}
+
 // 临时加单
 // 订单&&商品信息
 func GetOrderJoinGoodsListByNumbers(db *gorm.DB, number []string) (err error, list []OrderJoinGoods) {
@@ -179,9 +195,10 @@ func GetOrderJoinGoodsListByNumbers(db *gorm.DB, number []string) (err error, li
 	return nil, list
 }
 
-func GetOrderGoodsListByIds(db *gorm.DB, ids []int) (err error, list []OrderGoods) {
+// 根据orderGoodsId查订单商品数据并根据支付时间排序
+func GetOrderGoodsJoinOrderByIds(db *gorm.DB, ids []int) (err error, list []OrderJoinGoods) {
 	result := db.Table("t_order_goods og").
-		Select("og.*").
+		Select("o.*,o.id as order_id,og.*").
 		Joins("left join t_order o on og.number = o.number").
 		Where("og.id in (?)", ids).
 		Order("pay_at ASC").
@@ -190,12 +207,23 @@ func GetOrderGoodsListByIds(db *gorm.DB, ids []int) (err error, list []OrderGood
 	return result.Error, list
 }
 
+// 根据订单商品id查询数据
+func GetOrderGoodsListByIds(db *gorm.DB, ids []int) (err error, list []OrderGoods) {
+	result := db.Model(&OrderGoods{}).Where("id in (?)", ids).Find(&list)
+	return result.Error, list
+}
+
+func GetOrderGoodsListByNumbers(db *gorm.DB, numbers []string) (err error, list []OrderGoods) {
+	result := db.Model(&OrderGoods{}).Where("number in (?)", numbers).Find(&list)
+	return result.Error, list
+}
+
 // 获取出库任务订单 商品相关数量
-func OrderGoodsNumsStatisticalByNumbers(db *gorm.DB, number []string) (err error, mp map[string]OrderGoodsNumsStatistical) {
+func OrderGoodsNumsStatisticalByNumbers(db *gorm.DB, query string, number []string) (err error, mp map[string]OrderGoodsNumsStatistical) {
 	var nums []OrderGoodsNumsStatistical
 
 	result := db.Model(&OrderGoods{}).
-		Select("number,sum(pay_count) as pay_count,sum(close_count) as close_count,sum(out_count) as out_count,sum(lack_count) as lack_count").
+		Select(query).
 		Where("number in (?)", number).
 		Group("number").
 		Find(&nums)

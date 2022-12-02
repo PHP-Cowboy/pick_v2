@@ -17,9 +17,8 @@ type CompletePickForm struct {
 }
 
 type CompleteConcentratedPickForm struct {
-	Id      int `json:"id" binding:"required"`
-	PickNum int `json:"pick_num" binding:"required"`
-	Typ     int `json:"typ" binding:"required"`
+	Id          int `json:"id" binding:"required"`
+	CompleteNum int `json:"complete_num" binding:"required"`
 }
 
 type RemainingQuantityForm struct {
@@ -39,4 +38,8 @@ type ParamsId struct {
 
 type PickingRecordDetailForm struct {
 	PickId int `json:"pick_id" form:"pick_id"`
+}
+
+type ConcentratedPickReceivingOrdersForm struct {
+	BatchId int `json:"batch_id" binding:"required"`
 }

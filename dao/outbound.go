@@ -197,7 +197,7 @@ func OutboundTaskSave(db *gorm.DB, form req.CreateOutboundForm, userInfo *middle
 		GoodsName: strings.Join(form.GoodsName, ","),
 	}
 
-	err = model.OutboundTaskSave(db, &task)
+	err = model.OutboundTaskCreate(db, &task)
 
 	if err != nil {
 		return taskId, err

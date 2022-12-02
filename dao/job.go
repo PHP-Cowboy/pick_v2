@@ -1,4 +1,4 @@
-package handler
+package dao
 
 import (
 	"pick_v2/global"

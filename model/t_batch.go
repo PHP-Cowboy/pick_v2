@@ -1,6 +1,11 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"errors"
+
+	"gorm.io/gorm"
+	"pick_v2/utils/ecode"
+)
 
 // 批次
 type Batch struct {
@@ -53,18 +58,28 @@ func GetDeliveryMethod(method int) string {
 	return s
 }
 
-func BatchSave(db *gorm.DB, list Batch) (err error, b Batch) {
+func BatchSave(db *gorm.DB, batch Batch) (err error, b Batch) {
 
-	result := db.Model(&Batch{}).Save(&list)
+	result := db.Model(&Batch{}).Save(&batch)
 
-	return result.Error, list
+	return result.Error, batch
 }
 
 // 通过主键查询数据
 func GetBatchByPk(db *gorm.DB, pk int) (err error, batch Batch) {
 	result := db.Model(&Batch{}).First(&batch, pk)
 
-	return result.Error, batch
+	if result.Error != nil {
+
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			err = ecode.DataNotExist
+			return
+		}
+
+		err = result.Error
+	}
+
+	return
 }
 
 // 根据出库任务获取批次列表
@@ -95,8 +110,8 @@ func GetBatchList(db *gorm.DB, cond Batch) (err error, list []Batch) {
 	return result.Error, list
 }
 
-func GetBatchListByIdsOrPending(db *gorm.DB, ids []int) (err error, list []Batch) {
-	result := db.Model(&Batch{}).Where("id in (?) or status = ? and typ = ?", ids, BatchOngoingStatus, ExpressDeliveryBatchTyp).Find(&list)
+func GetBatchListByIdsOrPending(db *gorm.DB, ids []int, typ int) (err error, list []Batch) {
+	result := db.Model(&Batch{}).Where("id in (?) or status = ? and typ = ?", ids, BatchOngoingStatus, typ).Find(&list)
 
 	return result.Error, list
 }

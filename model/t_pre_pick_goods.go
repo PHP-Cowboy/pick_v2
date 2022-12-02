@@ -55,10 +55,11 @@ type PrePickGoodsJoinPrePick struct {
 }
 
 type PrePickGoodsJoinPrePickRemark struct {
-	Number      string `gorm:"type:varchar(32);comment:订单编号"`
-	Sku         string `gorm:"type:varchar(64);comment:sku"`
-	NeedNum     int    `gorm:"type:int;not null;comment:需拣数量"`
-	GoodsRemark string `gorm:"type:varchar(255);comment:商品备注"`
+	Number      string `json:"number"`
+	Sku         string `json:"sku"`
+	GoodsName   string `json:"goods_name"`
+	NeedNum     int    `json:"need_num"`
+	GoodsRemark string `json:"goods_remark"`
 	Unit        string `json:"unit"`
 }
 
@@ -163,7 +164,7 @@ func GetPrePickGoodsList(db *gorm.DB, cond *PrePickGoods) (err error, list []Pre
 
 func GetPrePickGoodsAndRemark(db *gorm.DB, batchId int, sku string) (err error, list []PrePickGoodsJoinPrePickRemark) {
 	result := db.Table("t_pre_pick_goods pg").
-		Select("pg.number,pg.sku,pg.need_num,pg.unit,pr.goods_remark").
+		Select("pg.number,pg.sku,pg.goods_name,pg.need_num,pg.unit,pr.goods_remark").
 		Joins("left join t_pre_pick_remark pr on pg.pre_pick_id = pr.pre_pick_id and pg.order_goods_id = pr.order_goods_id").
 		Where("pg.batch_id = ? and pg.sku = ?", batchId, sku).
 		Find(&list)

@@ -28,8 +28,8 @@ const (
 	OutboundTaskStatusClosed  //已结束
 )
 
-func OutboundTaskSave(db *gorm.DB, task *OutboundTask) error {
-	result := db.Model(&OutboundTask{}).Save(task)
+func OutboundTaskCreate(db *gorm.DB, task *OutboundTask) error {
+	result := db.Model(&OutboundTask{}).Create(task)
 	return result.Error
 }
 
