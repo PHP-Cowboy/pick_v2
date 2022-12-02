@@ -27,10 +27,6 @@ func BatchRoute(g *gin.RouterGroup) {
 		batchGroup.GET("/centralizedPickList", handler.CentralizedPickList)
 		//集中拣货详情
 		batchGroup.GET("/centralizedPickDetail", handler.CentralizedPickDetail)
-		//创建批次
-		batchGroup.POST("/create", handler.CreateBatch)
-		//根据订单生成批次
-		batchGroup.POST("/create_by_order", handler.CreateByOrder)
 		//停止拣货
 		batchGroup.POST("/change", handler.ChangeBatch)
 		//当前批次是否有接单
