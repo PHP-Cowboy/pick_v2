@@ -15,9 +15,6 @@ import (
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
-	"time"
-
-	"github.com/beevik/etree"
 )
 
 // u8推送日志列表
@@ -124,51 +121,6 @@ func BatchSupplement(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-// u8 推送
-func PushYongYou(id int) {
-	var (
-		stockLog model.StockLog
-		db       = global.DB
-	)
-
-	result := db.First(&stockLog, id)
-
-	if result.Error != nil {
-		return
-	}
-
-	shopXml, err := dao.SendShopXml(stockLog.RequestXml)
-
-	doc := etree.NewDocument()
-
-	if err != nil {
-		stockLog.Msg = fmt.Sprintf("SendShopXml err:", err.Error())
-	} else {
-		xmlErr := doc.ReadFromString(shopXml)
-
-		if xmlErr != nil {
-			stockLog.Msg = fmt.Sprintf("解析用友响应错误=", xmlErr.Error())
-		} else {
-			item := doc.SelectElement("ufinterface").SelectElement("item")
-			code := item.SelectAttr("succeed").Value
-
-			if code == "0" { //成功
-				stockLog.ResponseNo = item.SelectAttr("u8key").Value
-				stockLog.Status = 1
-			} else {
-				stockLog.Status = 2
-			}
-
-			stockLog.Msg = item.SelectAttr("dsc").Value
-		}
-	}
-
-	stockLog.UpdateTime = time.Now()
-
-	//db.Omit("create_time", "number", "batch_id", "shop_name","delete_time").Save(stockLog)
-	db.Select("id", "update_time", "status", "request_xml", "response_xml", "msg").Save(stockLog)
-}
-
 // 推送u8拣货详情
 func LogDetail(c *gin.Context) {
 	var form req.LogDetailForm
@@ -181,13 +133,13 @@ func LogDetail(c *gin.Context) {
 	var (
 		res       rsp.LogDetailRsp
 		pickGoods []model.PickGoods
-		pickOrder model.PickOrder
+		order     model.Order
 		pick      model.Pick
 	)
 
 	db := global.DB
 
-	result := db.Model(&model.PickOrder{}).Where("number = ?", form.Number).First(&pickOrder)
+	result := db.Model(&model.Order{}).Where("number = ?", form.Number).First(&order)
 
 	if result.Error != nil {
 
@@ -202,8 +154,8 @@ func LogDetail(c *gin.Context) {
 		return
 	}
 
-	res.ShopName = pickOrder.ShopName
-	res.PayAt = pickOrder.PayAt
+	res.ShopName = order.ShopName
+	res.PayAt = order.PayAt
 
 	res.PickUser = pick.PickUser
 	res.TakeOrdersTime = pick.TakeOrdersTime

@@ -252,7 +252,7 @@ func GetOrderDetail(c *gin.Context) {
 
 	res.Detail = detailMap
 
-	deliveryOrderNoArr = slice.UniqueStringSlice(deliveryOrderNoArr)
+	deliveryOrderNoArr = slice.UniqueSlice(deliveryOrderNoArr)
 	//历史出库单号
 	res.DeliveryOrderNo = deliveryOrderNoArr
 
@@ -398,7 +398,7 @@ func CompleteOrder(c *gin.Context) {
 			numbers = append(numbers, detail.Number)
 		}
 
-		numbers = slice.UniqueStringSlice(numbers)
+		numbers = slice.UniqueSlice(numbers)
 	}
 
 	//商品
@@ -529,7 +529,7 @@ func CompleteOrderDetail(c *gin.Context) {
 		deliveryOrderNoArr = append(deliveryOrderNoArr, goods.DeliveryOrderNo...)
 	}
 
-	deliveryOrderNoArr = slice.UniqueStringSlice(deliveryOrderNoArr)
+	deliveryOrderNoArr = slice.UniqueSlice(deliveryOrderNoArr)
 
 	res.Goods = goodsMap
 
@@ -640,160 +640,4 @@ func Count(c *gin.Context) {
 	}
 
 	xsq_net.SucJson(c, res)
-}
-
-// 创建拣货单
-func CreatePickOrder(c *gin.Context) {
-	var form req.CreatePickOrderForm
-
-	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
-
-	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
-		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
-		return
-	}
-
-	var (
-		order      []model.Order
-		orderGoods []model.OrderGoods
-	)
-
-	db := global.DB
-
-	result := db.Model(&model.Order{}).Where("number in (?)", form.Numbers).Find(&order)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	result = db.Model(&model.OrderGoods{}).Where("number in (?)", form.Numbers).Find(&orderGoods)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	var (
-		pickOrder      = make([]model.PickOrder, 0)
-		pickOrderGoods = make([]model.PickOrderGoods, 0)
-	)
-
-	//for _, o := range order {
-	//
-	//	pickNumber, err := cache.GetIncrNumberByKey(constant.PICK_ORDER_NO, 4)
-	//
-	//	if err != nil {
-	//		xsq_net.ErrorJSON(c, errors.New("拣货单号生成失败"))
-	//		return
-	//	}
-	//
-	//	total := o.PayTotal - o.Picked
-	//
-	//	pickOrder = append(pickOrder, model.PickOrder{
-	//		OrderId:           o.Id,
-	//		ShopId:            o.ShopId,
-	//		ShopName:          o.ShopName,
-	//		ShopType:          o.ShopType,
-	//		ShopCode:          o.ShopCode,
-	//		Number:            o.Number,
-	//		PickNumber:        "JHD" + pickNumber,
-	//		HouseCode:         o.HouseCode,
-	//		Line:              o.Line,
-	//		DistributionType:  o.DistributionType,
-	//		OrderRemark:       o.OrderRemark,
-	//		PayAt:             o.PayAt,
-	//		ShipmentsNum:      total,
-	//		LimitNum:          total, //限发总数 默认等于应发总数
-	//		CloseNum:          o.CloseNum,
-	//		DeliveryAt:        o.DeliveryAt,
-	//		Province:          o.Province,
-	//		City:              o.City,
-	//		District:          o.District,
-	//		Address:           o.Address,
-	//		ConsigneeName:     o.ConsigneeName,
-	//		ConsigneeTel:      o.ConsigneeTel,
-	//		OrderType:         1, //重新进入时，改为新订单
-	//		HasRemark:         o.HasRemark,
-	//		LatestPickingTime: o.LatestPickingTime,
-	//	})
-	//}
-	//
-	//for _, og := range orderGoods {
-	//
-	//	if og.LackCount <= 0 {
-	//		continue
-	//	}
-	//
-	//	pickOrderGoods = append(pickOrderGoods, model.PickOrderGoods{
-	//		OrderGoodsId:    og.Id,
-	//		Number:          og.Number,
-	//		GoodsName:       og.GoodsName,
-	//		Sku:             og.Sku,
-	//		GoodsType:       og.GoodsType,
-	//		GoodsSpe:        og.GoodsSpe,
-	//		Shelves:         og.Shelves,
-	//		DiscountPrice:   og.DiscountPrice,
-	//		GoodsUnit:       og.GoodsUnit,
-	//		SaleUnit:        og.SaleUnit,
-	//		SaleCode:        og.SaleCode,
-	//		PayCount:        og.PayCount,
-	//		CloseCount:      og.CloseCount,
-	//		LackCount:       og.LackCount,
-	//		OutCount:        og.OutCount,
-	//		LimitNum:        og.LackCount,
-	//		GoodsRemark:     og.GoodsRemark,
-	//		BatchId:         0,
-	//		DeliveryOrderNo: og.DeliveryOrderNo,
-	//	})
-	//}
-
-	tx := db.Begin()
-
-	result = tx.Save(&pickOrder)
-
-	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	//取出pick_order 表中 number 对应的 id 存入 到 pick_order_goods 表中
-	var pickOrderNumberIdMp = make(map[string]int, len(pickOrder))
-
-	for _, po := range pickOrder {
-		pickOrderNumberIdMp[po.Number] = po.Id
-	}
-
-	for i, goods := range pickOrderGoods {
-		pickOrderId, ok := pickOrderNumberIdMp[goods.Number]
-
-		if !ok {
-			tx.Rollback()
-			xsq_net.ErrorJSON(c, errors.New("number:"+goods.Number+"拣货单表id数据不存在，请联系管理员"))
-			return
-		}
-
-		pickOrderGoods[i].PickOrderId = pickOrderId
-	}
-
-	result = tx.Save(&pickOrderGoods)
-
-	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	result = tx.Model(&model.Order{}).Where("number in (?)", form.Numbers).Updates(map[string]interface{}{"order_type": 2})
-
-	if result.Error != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	tx.Commit()
-
-	xsq_net.Success(c)
 }

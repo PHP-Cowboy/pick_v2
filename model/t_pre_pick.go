@@ -22,10 +22,10 @@ const (
 	PrePickStatusClose             //关闭
 )
 
-func PrePickBatchSave(db *gorm.DB, list []PrePick) (err error, res []PrePick) {
-	result := db.Model(&PrePick{}).Save(&list)
+func PrePickBatchSave(db *gorm.DB, list *[]PrePick) (err error) {
+	result := db.Model(&PrePick{}).Save(list)
 
-	return result.Error, list
+	return result.Error
 }
 
 func UpdatePrePickStatusByIds(db *gorm.DB, ids []int, status int) error {

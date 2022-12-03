@@ -2,8 +2,9 @@ package req
 
 type ReviewListReq struct {
 	Paging
-	Name   string `json:"name" form:"name"`
-	Status int    `json:"status" form:"status" binding:"required,oneof=1 2"`
+	Name     string `json:"name" form:"name"`
+	Status   int    `json:"status" form:"status" binding:"required,oneof=1 2"`
+	UserName string `json:"user_name"`
 }
 
 type ReviewDetailReq struct {

@@ -611,7 +611,7 @@ func ChangeReviewNum(c *gin.Context) {
 	}
 
 	//订单编号去重
-	numbers = slice.UniqueStringSlice(numbers)
+	numbers = slice.UniqueSlice(numbers)
 
 	//复核数 差值 = 原来sku复核总数 - form.Num
 	var (

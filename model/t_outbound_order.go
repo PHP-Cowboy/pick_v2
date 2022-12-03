@@ -13,6 +13,7 @@ type OutboundOrder struct {
 	CreateTime        time.Time `gorm:"autoCreateTime;type:datetime;comment:创建时间"`
 	UpdateTime        time.Time `gorm:"autoCreateTime;type:datetime;comment:更新时间"`
 	DeleteTime        time.Time `gorm:"type:datetime;default:null;comment:删除时间"`
+	OrderId           int       `gorm:"type:int(11);comment:订单id"`
 	PayAt             *MyTime   `gorm:"type:datetime;comment:支付时间"`
 	ShopId            int       `gorm:"type:int(11);not null;comment:店铺id"`
 	ShopName          string    `gorm:"type:varchar(64);not null;comment:店铺名称"`
@@ -53,12 +54,6 @@ func OutboundOrderBatchSave(db *gorm.DB, data []OutboundOrder) error {
 	return result.Error
 }
 
-func OutboundOrderBatchUpdate(db *gorm.DB, where OutboundOrder, mp map[string]interface{}) error {
-	result := db.Model(&OutboundOrder{}).Where(&where).Updates(mp)
-
-	return result.Error
-}
-
 func OutboundOrderReplaceSave(db *gorm.DB, list []OutboundOrder, values []string) error {
 	result := db.Model(&OutboundOrder{}).
 		Clauses(clause.OnConflict{
@@ -70,8 +65,30 @@ func OutboundOrderReplaceSave(db *gorm.DB, list []OutboundOrder, values []string
 	return result.Error
 }
 
+func OutboundOrderBatchUpdate(db *gorm.DB, where OutboundOrder, mp map[string]interface{}) error {
+	result := db.Model(&OutboundOrder{}).Where(&where).Updates(mp)
+
+	return result.Error
+}
+
+func UpdateOutboundOrderByTaskIdAndNumbers(db *gorm.DB, taskId int, numbers []string, mp map[string]interface{}) error {
+	result := db.Model(&OutboundOrder{}).Where("task_id = ? and number in (?)", taskId, numbers).Updates(mp)
+
+	return result.Error
+}
+
 func GetOutboundNumber(taskId int, number string) string {
 	return fmt.Sprintf("%v%s", taskId, number)
+}
+
+func GetOutboundOrderByPk(db *gorm.DB, taskId int, number string) (err error, outboundOrder OutboundOrder) {
+	result := db.Model(&OutboundOrder{}).Where("task_id = ? and number = ?", taskId, number).Find(&outboundOrder)
+	return result.Error, outboundOrder
+}
+
+func GetOutboundOrderByTaskIdAndNumbers(db *gorm.DB, taskId int, numbers []string) (err error, list []OutboundOrder) {
+	result := db.Model(&OutboundOrder{}).Where("task_id = ? and number in (?)", taskId, numbers).Find(&list)
+	return result.Error, list
 }
 
 // 根据status分组统计任务条数

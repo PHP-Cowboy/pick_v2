@@ -69,8 +69,8 @@ const (
 	PrePickGoodsStatusClose             //关闭
 )
 
-func PrePickGoodsBatchSave(db *gorm.DB, list []PrePickGoods) (err error) {
-	result := db.Model(&PrePickGoods{}).Save(&list)
+func PrePickGoodsBatchSave(db *gorm.DB, list *[]PrePickGoods) (err error) {
+	result := db.Model(&PrePickGoods{}).Save(list)
 
 	return result.Error
 }

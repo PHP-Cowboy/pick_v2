@@ -1,23 +1,5 @@
 package slice
 
-func UniqueStringSlice(arr []string) []string {
-	ret := make([]string, 0)
-
-	mp := make(map[string]struct{}, 0)
-
-	for _, s := range arr {
-		_, ok := mp[s]
-		if ok {
-			continue
-		}
-
-		mp[s] = struct{}{}
-		ret = append(ret, s)
-	}
-
-	return ret
-}
-
 // 泛型版 slice 去重
 func UniqueSlice[T comparable](arr []T) []T {
 	ret := make([]T, 0)

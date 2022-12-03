@@ -1,14 +1,16 @@
 package main
 
 import (
+	"log"
+	"os"
+	"time"
+
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	logger2 "gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
-	"log"
-	"os"
+
 	"pick_v2/model"
-	"time"
 )
 
 func main() {

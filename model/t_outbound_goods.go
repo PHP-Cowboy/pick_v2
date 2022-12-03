@@ -102,6 +102,18 @@ func OutboundGoodsReplaceSave(db *gorm.DB, list []OutboundGoods, values []string
 	return result.Error
 }
 
+// 获取出库任务商品列表
+func GetOutboundGoodsList(db *gorm.DB, cond OutboundGoods) (err error, list []OutboundGoods) {
+	result := db.Model(&OutboundGoods{}).Where(&cond).Find(&list)
+	return result.Error, list
+}
+
+// 获取出库任务商品列表
+func GetOutboundGoodsListByTaskIdAndNumber(db *gorm.DB, taskId int, number string) (err error, list []OutboundGoods) {
+	result := db.Model(&OutboundGoods{}).Where("task_id = ? and number = ?", taskId, number).Find(&list)
+	return result.Error, list
+}
+
 func GetOutboundGoodsJoinOrderList(db *gorm.DB, taskId int, number []string) (err error, list []OutboundGoodsJoinOrder) {
 
 	result := db.Table("t_outbound_goods og").

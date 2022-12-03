@@ -65,6 +65,11 @@ func BatchSave(db *gorm.DB, batch Batch) (err error, b Batch) {
 	return result.Error, batch
 }
 
+func UpdateBatchByPk(db *gorm.DB, pk int, mp map[string]interface{}) error {
+	result := db.Model(&Batch{}).Where("id = ?", pk).Updates(mp)
+	return result.Error
+}
+
 // 通过主键查询数据
 func GetBatchByPk(db *gorm.DB, pk int) (err error, batch Batch) {
 	result := db.Model(&Batch{}).First(&batch, pk)
@@ -95,13 +100,6 @@ func GetBatchListByTyp(db *gorm.DB, typ int) (err error, list []Batch) {
 	result := db.Model(&Batch{}).Where("typ = ? and ( status = 0 or status = 2 )", typ).Find(&list)
 
 	return result.Error, list
-}
-
-// 获取进行中或已被当前用户接取但为拣货完成的批次
-func GetPendingOrUserReceivedNotPickCompleteBatchList(db *gorm.DB, userName string) {
-	//db.Table("t_batch b").
-	//	Select("").
-	//	Joins("").Where("").Find()
 }
 
 func GetBatchList(db *gorm.DB, cond Batch) (err error, list []Batch) {

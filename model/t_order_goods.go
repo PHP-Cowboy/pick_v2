@@ -207,6 +207,17 @@ func GetOrderGoodsJoinOrderByIds(db *gorm.DB, ids []int) (err error, list []Orde
 	return result.Error, list
 }
 
+// 根据批次id查询订单&&订单商品数据
+func GetOrderGoodsJoinOrderByBatchId(db *gorm.DB, batchId int) (err error, list []OrderJoinGoods) {
+	result := db.Table("t_order_goods og").
+		Select("o.*,o.id as order_id,og.*").
+		Joins("left join t_order o on og.number = o.number").
+		Where("og.batch_id = ?", batchId).
+		Find(&list)
+
+	return result.Error, list
+}
+
 // 根据订单商品id查询数据
 func GetOrderGoodsListByIds(db *gorm.DB, ids []int) (err error, list []OrderGoods) {
 	result := db.Model(&OrderGoods{}).Where("id in (?)", ids).Find(&list)

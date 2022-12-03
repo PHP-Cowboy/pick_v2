@@ -213,7 +213,7 @@ func OutboundBatch(c *gin.Context) {
 
 	column := []string{"商品名称", "规格", "单位", "总计"}
 
-	shopCodes = slice.UniqueStringSlice(shopCodes)
+	shopCodes = slice.UniqueSlice(shopCodes)
 
 	column = append(column, shopCodes...)
 
@@ -623,7 +623,7 @@ func BatchTask(c *gin.Context) {
 		shopCodes = append(shopCodes, good.ShopCode)
 	}
 
-	shopCodes = slice.UniqueStringSlice(shopCodes)
+	shopCodes = slice.UniqueSlice(shopCodes)
 
 	for _, pg := range pickGoods {
 
@@ -663,7 +663,7 @@ func BatchTask(c *gin.Context) {
 
 	column := []string{"商品名称", "规格", "单位", "总计"}
 
-	shopCodes = slice.UniqueStringSlice(shopCodes)
+	shopCodes = slice.UniqueSlice(shopCodes)
 
 	column = append(column, shopCodes...)
 

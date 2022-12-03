@@ -26,36 +26,36 @@ func BatchPick(db *gorm.DB, form req.BatchPickForm) (err error) {
 		return
 	}
 
-	err = BatchPickByParams(db, form)
+	err = BatchPickByParams(db, form, nil, nil, nil)
 
 	return
 }
 
 // 批量拣货 - 根据参数类型
-func BatchPickByParams(db *gorm.DB, form req.BatchPickForm) (err error) {
+func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, prePicks []model.PrePick, prePickGoods []model.PrePickGoods, prePickRemarks []model.PrePickRemark) (err error) {
+	if form.Typ == 1 { //常规批次拣货池数据要查询，快递批次用传递过来的数据
+		err, prePicks = model.GetPrePickByIdsAndStatus(db, form.Ids, model.PrePickStatusUnhandled)
 
-	var (
-		prePick        []model.PrePick
-		prePickGoods   []model.PrePickGoods
-		prePickRemarks []model.PrePickRemark
-	)
+		if err != nil {
+			return
+		}
 
-	err, prePick = model.GetPrePickByIdsAndStatus(db, form.Ids, model.PrePickStatusUnhandled)
+		if len(prePicks) == 0 {
+			err = errors.New("对应的预拣池数据不存在")
+			return
+		}
 
-	if err != nil {
-		return
-	}
+		//按分类或商品获取未进入拣货池的商品数据
+		err, prePickGoods = model.GetPrePickGoodsByTypeParam(db, form.Ids, form.Type, form.TypeParam)
 
-	//按分类或商品获取未进入拣货池的商品数据
-	err, prePickGoods = model.GetPrePickGoodsByTypeParam(db, form.Ids, form.Type, form.TypeParam)
+		if err != nil {
+			return
+		}
 
-	if err != nil {
-		return
-	}
-
-	if len(prePickGoods) == 0 {
-		err = errors.New("对应的拣货池商品不存在")
-		return
+		if len(prePickGoods) == 0 {
+			err = errors.New("对应的预拣池商品不存在")
+			return
+		}
 	}
 
 	var (
@@ -65,10 +65,10 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm) (err error) {
 		pickRemark        []model.PickRemark
 	)
 
-	var picks = make([]model.Pick, 0, len(prePick))
+	var picks = make([]model.Pick, 0, len(prePicks))
 
 	//拣货池数据处理
-	for _, pre := range prePick {
+	for _, pre := range prePicks {
 
 		picks = append(picks, model.Pick{
 			WarehouseId:    form.WarehouseId,
@@ -143,10 +143,12 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm) (err error) {
 		})
 	}
 
-	result := db.Where("order_goods_id in (?)", orderGoodsIds).Find(&prePickRemarks)
+	if form.Typ == 1 {
+		result := db.Where("order_goods_id in (?)", orderGoodsIds).Find(&prePickRemarks)
 
-	if result.Error != nil {
-		return result.Error
+		if result.Error != nil {
+			return result.Error
+		}
 	}
 
 	for _, remark := range prePickRemarks {
@@ -174,7 +176,7 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm) (err error) {
 	}
 
 	//商品数据保存
-	result = db.Save(&pickGoods)
+	result := db.Save(&pickGoods)
 
 	if result.Error != nil {
 		return result.Error
@@ -189,51 +191,53 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm) (err error) {
 		}
 	}
 
-	//更新预拣池商品表的商品数据状态
-	if len(prePickGoodsIds) > 0 {
-		err = model.UpdatePrePickGoodsByIds(db, prePickGoodsIds, map[string]interface{}{"status": model.PrePickGoodsStatusProcessing})
+	if form.Typ == 1 { //常规批次更新预拣池相关数据状态，快递批次不需要更新
+		//更新预拣池商品表的商品数据状态
+		if len(prePickGoodsIds) > 0 {
+			err = model.UpdatePrePickGoodsByIds(db, prePickGoodsIds, map[string]interface{}{"status": model.PrePickGoodsStatusProcessing})
 
-		if err != nil {
-			return err
-		}
-	}
-
-	var prePickIds []int
-	//预拣池内商品全部进入拣货池时 更新 对应的 预拣池状态
-	if form.Type == 1 { //全单拣货
-		prePickIds = form.Ids
-	} else {
-		//0:未处理,1:已进入拣货池
-		result = db.Model(&model.PrePickGoods{}).Where("pre_pick_id in (?) and status = 0", form.Ids).Find(&prePickGoods)
-		if result.Error != nil {
-			return result.Error
+			if err != nil {
+				return err
+			}
 		}
 
-		//将传过来的id转换成map
-		idsMp := slice.SliceToMap(form.Ids)
+		var prePickIds []int
+		//预拣池内商品全部进入拣货池时 更新 对应的 预拣池状态
+		if form.Type == 1 { //全单拣货
+			prePickIds = form.Ids
+		} else {
+			//0:未处理,1:已进入拣货池
+			result = db.Model(&model.PrePickGoods{}).Where("pre_pick_id in (?) and status = 0", form.Ids).Find(&prePickGoods)
+			if result.Error != nil {
+				return result.Error
+			}
 
-		//去除未处理的预拣池id
-		for _, good := range prePickGoods {
-			delete(idsMp, good.PrePickId)
+			//将传过来的id转换成map
+			idsMp := slice.SliceToMap(form.Ids)
+
+			//去除未处理的预拣池id
+			for _, good := range prePickGoods {
+				delete(idsMp, good.PrePickId)
+			}
+
+			//将map转回切片
+			prePickIds = slice.MapToSlice(idsMp)
 		}
 
-		//将map转回切片
-		prePickIds = slice.MapToSlice(idsMp)
-	}
+		if len(prePickIds) > 0 {
+			err = model.UpdatePrePickByIds(db, prePickIds, map[string]interface{}{"status": model.PrePickStatusProcessing})
 
-	if len(prePickIds) > 0 {
-		err = model.UpdatePrePickByIds(db, prePickIds, map[string]interface{}{"status": model.PrePickStatusProcessing})
-
-		if err != nil {
-			return err
+			if err != nil {
+				return err
+			}
 		}
-	}
 
-	//更新预拣池商品备注表的数据状态
-	if len(prePickRemarksIds) > 0 {
-		err = model.UpdatePrePickRemarkByIds(db, prePickRemarksIds, map[string]interface{}{"status": model.PrePickRemarkStatusProcessing})
-		if err != nil {
-			return err
+		//更新预拣池商品备注表的数据状态
+		if len(prePickRemarksIds) > 0 {
+			err = model.UpdatePrePickRemarkByIds(db, prePickRemarksIds, map[string]interface{}{"status": model.PrePickRemarkStatusProcessing})
+			if err != nil {
+				return err
+			}
 		}
 	}
 

@@ -62,7 +62,7 @@ func GoodsSummaryList(db *gorm.DB, batchId int) (err error, mp map[string]map[st
 
 	column = []string{"商品名称", "规格", "单位", "总计"}
 
-	shopCodes = slice.UniqueStringSlice(shopCodes)
+	shopCodes = slice.UniqueSlice(shopCodes)
 
 	column = append(column, shopCodes...)
 

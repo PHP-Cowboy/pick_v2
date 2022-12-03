@@ -24,8 +24,8 @@ const (
 	PrePickRemarkStatusProcessing        //处理中(已进入拣货池)
 )
 
-func PrePickRemarkBatchSave(db *gorm.DB, list []PrePickRemark) (err error) {
-	result := db.Model(&PrePickRemark{}).Save(&list)
+func PrePickRemarkBatchSave(db *gorm.DB, list *[]PrePickRemark) (err error) {
+	result := db.Model(&PrePickRemark{}).Save(list)
 
 	return result.Error
 }

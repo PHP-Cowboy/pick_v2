@@ -11,37 +11,42 @@ import (
 )
 
 // 订单批量限发
-func OrderLimit(db *gorm.DB, form req.OrderLimitForm) error {
+func OrderLimit(db *gorm.DB, form req.OrderLimitForm) (err error) {
 
 	length := len(form.OrderLimit)
 
 	var (
-		outboundGoodsJoinOrder []model.OutboundGoodsJoinOrder
-		limitShipment          = make([]model.LimitShipment, 0, length)
-		sku                    = make([]string, 0, length)
-		limitMp                = make(map[string]int, 0)
-		outboundGoods          = make([]model.OutboundGoods, 0, length)
+		outboundOrder model.OutboundOrder
+		limitShipment = make([]model.LimitShipment, 0, length)
+		limitMp       = make(map[string]int, 0)
+		outboundGoods = make([]model.OutboundGoods, 0, length)
 	)
 
 	for _, limit := range form.OrderLimit {
-		sku = append(sku, limit.Sku)
 		limitMp[limit.Sku] = limit.LimitNum
 	}
 
-	result := db.Model(&model.OutboundGoodsJoinOrder{}).
-		Select("sku,shop_name,goods_name,goods_spe").
-		Where(&model.OutboundGoodsJoinOrder{
-			TaskId: form.TaskId,
-			Number: form.Number,
-		}).
-		Where("sku in (?)", sku).
-		Find(&outboundGoodsJoinOrder)
-
-	if result.Error != nil {
-		return result.Error
+	//出库订单数据
+	err, outboundOrder = model.GetOutboundOrderByPk(db, form.TaskId, form.Number)
+	if err != nil {
+		return
 	}
 
-	for _, orderGoods := range outboundGoodsJoinOrder {
+	//限发验证
+	if outboundOrder.OrderType != model.OutboundOrderTypeNew {
+		err = errors.New("当前订单不允许设置限发")
+		return
+	}
+
+	//获取出库任务商品列表
+	err, outboundGoods = model.GetOutboundGoodsListByTaskIdAndNumber(db, form.TaskId, form.Number)
+
+	if err != nil {
+		return
+	}
+
+	//构造限发表数据&&出库任务商品限发数据
+	for _, orderGoods := range outboundGoods {
 
 		limitNum, limitOk := limitMp[orderGoods.Sku]
 
@@ -49,11 +54,12 @@ func OrderLimit(db *gorm.DB, form req.OrderLimitForm) error {
 			continue
 		}
 
+		//构造限发表数据
 		limitShipment = append(limitShipment, model.LimitShipment{
 			TaskId:    form.TaskId,
 			Number:    form.Number,
 			Sku:       orderGoods.Sku,
-			ShopName:  orderGoods.ShopName,
+			ShopName:  outboundOrder.ShopName,
 			GoodsName: orderGoods.GoodsName,
 			GoodsSpe:  orderGoods.GoodsSpe,
 			LimitNum:  limitNum,
@@ -61,6 +67,7 @@ func OrderLimit(db *gorm.DB, form req.OrderLimitForm) error {
 			Typ:       model.LimitShipmentTypOrder,
 		})
 
+		//更新出库任务商品限发数量
 		outboundGoods = append(outboundGoods, model.OutboundGoods{
 			TaskId:   form.TaskId,
 			Number:   form.Number,
@@ -75,11 +82,11 @@ func OrderLimit(db *gorm.DB, form req.OrderLimitForm) error {
 
 	tx := db.Begin()
 
-	err := model.LimitShipmentSave(tx, limitShipment)
+	err = model.LimitShipmentSave(tx, limitShipment)
 
 	if err != nil {
 		tx.Rollback()
-		return err
+		return
 	}
 
 	//更新出库单商品的限发数量
@@ -87,12 +94,12 @@ func OrderLimit(db *gorm.DB, form req.OrderLimitForm) error {
 
 	if err != nil {
 		tx.Rollback()
-		return result.Error
+		return
 	}
 
 	tx.Commit()
 
-	return nil
+	return
 }
 
 // 更新出库单商品的限发数量

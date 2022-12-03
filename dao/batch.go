@@ -3,7 +3,9 @@ package dao
 import (
 	"context"
 	"errors"
+	"pick_v2/utils/ecode"
 	"strconv"
+	"strings"
 
 	"github.com/apache/rocketmq-client-go/v2"
 	"github.com/apache/rocketmq-client-go/v2/primitive"
@@ -76,7 +78,7 @@ func CreateBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.C
 	}
 
 	//预拣池逻辑
-	err, orderGoodsIds, outboundGoods, _, _ = CreatePrePickLogic(tx, form, claims, batch.Id)
+	err, orderGoodsIds, outboundGoods, _, _, _, _, _ = CreatePrePickLogic(tx, form, claims, batch.Id)
 
 	if err != nil {
 		tx.Rollback()
@@ -166,7 +168,10 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 		orderGoodsIds          []int
 		outboundGoods          []model.OutboundGoods
 		outboundGoodsJoinOrder []model.OutboundGoodsJoinOrder
-		//prePickIds             []int
+		prePickIds             []int
+		prePicks               []model.PrePick
+		prePickGoods           []model.PrePickGoods
+		prePickRemarks         []model.PrePickRemark
 	)
 
 	tx := db.Begin()
@@ -183,7 +188,7 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 	//todo 在快递批次时直接把状态设置成已进入拣货池？
 	//todo 拣货池逻辑中就可以不修改状态了，但是后续是否会快递批次被改成先集中拣货完成再到二次分拣？
 	//TODO 个人觉得集中拣货和二次分拣同时进行在实际业务中是有问题的
-	err, orderGoodsIds, outboundGoods, outboundGoodsJoinOrder, _ = CreatePrePickLogic(tx, form, claims, batch.Id)
+	err, orderGoodsIds, outboundGoods, outboundGoodsJoinOrder, prePickIds, prePicks, prePickGoods, prePickRemarks = CreatePrePickLogic(tx, form, claims, batch.Id)
 
 	if err != nil {
 		tx.Rollback()
@@ -210,21 +215,21 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 		return err
 	}
 
-	//pick := req.BatchPickForm{
-	//	BatchId:     batch.Id,
-	//	Ids:         prePickIds,
-	//	Type:        1,
-	//	TypeParam:   []string{},
-	//	WarehouseId: claims.WarehouseId,
-	//	Typ:         2,
-	//}
-	//
-	////生成拣货池
-	//err = BatchPickByParams(db, pick, 2)
-	//if err != nil {
-	//	tx.Rollback()
-	//	return err
-	//}
+	pick := req.BatchPickForm{
+		BatchId:     batch.Id,
+		Ids:         prePickIds,
+		Type:        1,
+		TypeParam:   []string{},
+		WarehouseId: claims.WarehouseId,
+		Typ:         2,
+	}
+
+	//生成拣货池
+	err = BatchPickByParams(db, pick, prePicks, prePickGoods, prePickRemarks)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
 
 	tx.Commit()
 
@@ -372,6 +377,84 @@ func BatchList(db *gorm.DB, form req.GetBatchListForm) (err error, res rsp.GetBa
 	return
 }
 
+// 结束批次
+func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
+	var (
+		batch          model.Batch
+		pickGoods      []model.PickGoods
+		picks          []model.Pick
+		orderJoinGoods []model.OrderJoinGoods
+	)
+
+	err, batch = model.GetBatchByPk(db, form.Id)
+	if err != nil {
+		return
+	}
+
+	if batch.Status != model.BatchSuspendStatus {
+		err = errors.New("请先停止拣货")
+		return
+	}
+
+	//修改批次状态为已结束
+	err = model.UpdateBatchByPk(db, batch.Id, map[string]interface{}{"status": model.BatchClosedStatus})
+
+	if err != nil {
+		return
+	}
+
+	//// 根据批次id查询订单&&订单商品数据
+	err, orderJoinGoods = model.GetOrderGoodsJoinOrderByBatchId(db, batch.Id)
+
+	if err != nil {
+		return
+	}
+
+	//查询批次下全部订单
+	err, pickGoods = model.GetPickGoodsByBatchId(db, batch.Id)
+
+	if err != nil {
+		err = errors.New("批次结束成功，但推送u8拣货数据查询失败:" + err.Error())
+		global.Logger["err"].Infof(err.Error())
+		return
+	}
+
+	err, picks = model.GetPickList(db, model.Pick{BatchId: batch.Id})
+
+	if err != nil {
+		err = errors.New("批次结束成功，但推送u8拣货数据查询失败:" + err.Error())
+		global.Logger["err"].Infof(err.Error())
+		return
+	}
+
+	//拣货表数据map
+	mpPick := make(map[int]model.Pick, 0)
+
+	for _, p := range picks {
+		mpPick[p.Id] = p
+	}
+
+	tx := global.DB.Begin()
+
+	err = YongYouLog(tx, pickGoods, orderJoinGoods, batch.Id)
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	//这里会删数据，要放在推u8之后处理，失败重试要加上这里的逻辑
+	err = UpdateCompleteOrder(tx, batch.Id, batch.TaskId, orderJoinGoods)
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	tx.Commit()
+
+	return
+}
+
 // 推送批次信息到消息队列
 func SyncBatch(batchId int) error {
 	p, _ := rocketmq.NewProducer(
@@ -410,4 +493,302 @@ func SyncBatch(batchId int) error {
 	}
 
 	return nil
+}
+
+// 结束批次更新订单，出库任务相关
+func UpdateCompleteOrder(db *gorm.DB, batchId, taskId int, orderJoinGoods []model.OrderJoinGoods) (err error) {
+
+	var (
+		orderGoods []model.OrderGoods
+		isSendMQ   = true
+	)
+
+	var (
+		//完成订单map
+		//key => number
+		completeMp          = make(map[string]interface{}, 0)
+		completeNumbers     []string
+		deleteIds           []int    //待删除订单表id
+		deleteNumbers       []string //删除订单商品表
+		completeOrder       = make([]model.CompleteOrder, 0)
+		completeOrderDetail = make([]model.CompleteOrderDetail, 0)
+		lackNumbers         []string //待更新为欠货订单表number
+		numsMp              = make(map[string]model.OrderGoodsNumsStatistical, 0)
+		orderNumbers        []string
+	)
+
+	for _, good := range orderJoinGoods {
+		orderNumbers = append(orderNumbers, good.Number)
+	}
+
+	query := "number,sum(lack_count) as lack_count"
+
+	err, numsMp = model.OrderGoodsNumsStatisticalByNumbers(db, query, orderNumbers)
+
+	if err != nil {
+		return
+	}
+
+	for _, o := range orderJoinGoods {
+
+		nums, numsOk := numsMp[o.Number]
+
+		if !numsOk {
+			err = errors.New("订单欠货数量统计异常")
+			return
+		}
+
+		//还有欠货 [这里需要保证每次出库(复核完成)时，都更新了商品订单欠货数]
+		if nums.LackCount > 0 {
+			lackNumbers = append(lackNumbers, o.Number)
+			continue
+		}
+
+		deleteIds = append(deleteIds, o.Id)
+
+		completeMp[o.Number] = struct{}{}
+
+		//完成订单订单号
+		completeNumbers = append(completeNumbers, o.Number)
+
+		//完成的订单在订单表中删除
+		deleteNumbers = append(deleteNumbers, o.Number)
+
+		//完成订单
+		completeOrder = append(completeOrder, model.CompleteOrder{
+			Number:         o.Number,
+			OrderRemark:    o.OrderRemark,
+			ShopId:         o.ShopId,
+			ShopName:       o.ShopName,
+			ShopType:       o.ShopType,
+			ShopCode:       o.ShopCode,
+			Line:           o.Line,
+			DeliveryMethod: o.DistributionType,
+			Province:       o.Province,
+			City:           o.City,
+			District:       o.District,
+			PickTime:       o.LatestPickingTime,
+			PayAt:          o.PayAt,
+		})
+	}
+
+	if len(completeNumbers) > 0 {
+		//如果有完成订单重新查询订单商品，因为这批商品可能是多个批次拣的，根据批次查的商品不全
+		err, orderGoods = model.GetOrderGoodsListByNumbers(db, completeNumbers)
+
+		if err != nil {
+			return
+		}
+
+		for _, og := range orderGoods {
+			//完成订单map中不存在订单的跳过
+			_, ok := completeMp[og.Number]
+
+			if !ok {
+				continue
+			}
+			//完成订单详情
+			completeOrderDetail = append(completeOrderDetail, model.CompleteOrderDetail{
+				Number:          og.Number,
+				GoodsName:       og.GoodsName,
+				Sku:             og.Sku,
+				GoodsSpe:        og.GoodsSpe,
+				GoodsType:       og.GoodsType,
+				Shelves:         og.Shelves,
+				PayCount:        og.PayCount,
+				CloseCount:      og.CloseCount,
+				ReviewCount:     og.OutCount,
+				GoodsRemark:     og.GoodsRemark,
+				DeliveryOrderNo: og.DeliveryOrderNo,
+			})
+		}
+	}
+
+	if len(deleteIds) > 0 {
+		err = model.DeleteOrderByIds(db, deleteIds)
+
+		if err != nil {
+			return
+		}
+	}
+
+	if len(deleteNumbers) > 0 {
+		deleteNumbers = slice.UniqueSlice(deleteNumbers)
+
+		err = model.DeleteOrderGoodsByNumbers(db, deleteNumbers)
+
+		if err != nil {
+			return
+		}
+	}
+
+	// 欠货的单 拣货池还有未完成的，不更新为欠货
+	if len(lackNumbers) > 0 {
+		var (
+			pickAndGoods   []model.PickAndGoods
+			pendingNumbers []string
+			diffSlice      []string
+		)
+
+		//获取欠货的订单number是否有在拣货池中未复核完成的数据，如果有，过滤掉欠货的订单number
+		err, pickAndGoods = model.GetPickGoodsJoinPickByNumbers(db, lackNumbers)
+
+		if err != nil {
+			return
+		}
+
+		//获取拣货id，根据拣货id查出 拣货单中 未复核完成的订单，不更新为欠货，
+		//且 有未复核完成的订单 不发送到mq中，完成后再发送到mq中
+		for _, p := range pickAndGoods {
+			//已经被接单，且未完成复核
+			if p.Status < model.ReviewCompletedStatus && p.PickUser != "" {
+				pendingNumbers = append(pendingNumbers, p.Number)
+				isSendMQ = false
+			}
+		}
+
+		pendingNumbers = slice.UniqueSlice(pendingNumbers)
+
+		diffSlice = slice.StrDiff(lackNumbers, pendingNumbers) // 在 lackNumbers 不在 pendingNumbers 中的
+
+		if len(diffSlice) > 0 {
+			//更新为欠货
+			err = model.UpdateOrderByNumbers(db, diffSlice, map[string]interface{}{"order_type": model.LackOrderType})
+			if err != nil {
+				return
+			}
+		}
+
+	}
+
+	//保存完成订单
+	if len(completeOrder) > 0 {
+		err = model.CompleteOrderBatchSave(db, &completeOrder)
+		if err != nil {
+			return
+		}
+	}
+
+	//保存完成订单详情
+	if len(completeOrderDetail) > 0 {
+		err = model.CompleteOrderDetailBatchSave(db, &completeOrderDetail)
+
+		if err != nil {
+			return
+		}
+	}
+
+	//更新 OutboundOrder 为已完成
+	err = model.UpdateOutboundOrderByTaskIdAndNumbers(db, taskId, orderNumbers, map[string]interface{}{"order_type": model.OutboundOrderTypeComplete})
+
+	if err != nil {
+
+		return
+	}
+
+	if isSendMQ {
+		//mq 存入 批次id
+		err = SyncBatch(batchId)
+		if err != nil {
+			return errors.New("写入mq失败")
+		}
+	}
+
+	return nil
+}
+
+// 批次出库订单和商品明细
+func GetBatchOrderAndGoods(db *gorm.DB, form req.GetBatchOrderAndGoodsForm) (err error, res rsp.GetBatchOrderAndGoodsRsp) {
+	var (
+		batch         model.Batch
+		outboundOrder []model.OutboundOrder
+		outboundGoods []model.OutboundGoods
+		mp            = make(map[string][]rsp.OutGoods)
+		numbers       = make([]string, 0)
+	)
+
+	err, batch = model.GetBatchByPk(db, form.Id)
+
+	if err != nil {
+		return
+	}
+
+	//状态:0:进行中,1:已结束,2:暂停
+	if batch.Status != 1 {
+		err = errors.New("批次未结束")
+		return
+	}
+
+	err, outboundGoods = model.GetOutboundGoodsList(db, model.OutboundGoods{BatchId: batch.Id})
+	if err != nil {
+		return
+	}
+
+	totalGoodsNum := 0
+
+	for _, good := range outboundGoods {
+		//出库为0的不推送
+		if good.OutCount == 0 {
+			continue
+		}
+
+		totalGoodsNum++
+
+		//编号 ，查询订单
+		numbers = append(numbers, good.Number)
+
+		_, ok := mp[good.Number]
+
+		if !ok {
+			mp[good.Number] = make([]rsp.OutGoods, 0)
+		}
+
+		mp[good.Number] = append(mp[good.Number], rsp.OutGoods{
+			Id:            good.OrderGoodsId,
+			Name:          good.GoodsName,
+			Sku:           good.Sku,
+			GoodsType:     good.GoodsType,
+			GoodsSpe:      good.GoodsSpe,
+			DiscountPrice: good.DiscountPrice,
+			GoodsUnit:     good.GoodsUnit,
+			SaleUnit:      good.SaleUnit,
+			SaleCode:      good.SaleCode,
+			OutCount:      good.OutCount,
+			OutAt:         good.UpdateTime.Format(timeutil.TimeFormat),
+			Number:        good.Number,
+			CkNumber:      strings.Join(good.DeliveryOrderNo, ","),
+		})
+
+	}
+
+	numbers = slice.UniqueSlice(numbers)
+
+	err, outboundOrder = model.GetOutboundOrderByTaskIdAndNumbers(db, batch.TaskId, numbers)
+
+	if err != nil {
+		return
+	}
+
+	list := make([]rsp.OutOrder, 0, len(outboundOrder))
+
+	for _, order := range outboundOrder {
+		goodsInfo, ok := mp[order.Number]
+
+		if !ok {
+			err = ecode.DataQueryError
+			return
+		}
+
+		list = append(list, rsp.OutOrder{
+			DistributionType: order.DistributionType,
+			PayAt:            *order.PayAt,
+			OrderId:          order.OrderId,
+			GoodsInfo:        goodsInfo,
+		})
+	}
+
+	res.Count = totalGoodsNum
+
+	res.List = list
+	return
 }

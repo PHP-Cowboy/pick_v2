@@ -96,6 +96,12 @@ func DeleteOrderByNumbers(db *gorm.DB, numbers []string) error {
 	return result.Error
 }
 
+func DeleteOrderByIds(db *gorm.DB, ids []int) error {
+	result := db.Delete(&Order{}, "id in (?)", ids)
+
+	return result.Error
+}
+
 func OrderOrCompleteOrderExist(db *gorm.DB, ids []int, number string) (err error, exist bool) {
 	var (
 		order         []Order

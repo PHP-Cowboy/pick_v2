@@ -18,11 +18,7 @@ import (
 // 复核列表 通过状态区分是否已完成
 func ReviewList(c *gin.Context) {
 	var (
-		form       req.ReviewListReq
-		res        rsp.ReviewListRsp
-		pick       []model.Pick
-		pickRemark []model.PickRemark
-		//pickListModel []rsp.PickListModel
+		form req.ReviewListReq
 	)
 
 	if err := c.ShouldBind(&form); err != nil {
@@ -30,89 +26,20 @@ func ReviewList(c *gin.Context) {
 		return
 	}
 
-	db := global.DB
+	userInfo := GetUserInfo(c)
 
-	//result := db.Model(&batch.Pick{}).Where("status = ?", form.Status).Where(batch.Pick{PickUser: form.Name}).Find(&pick)
-
-	localDb := db.Model(&model.Pick{}).Where("status = ?", form.Status)
-
-	claims, ok := c.Get("claims")
-
-	if !ok {
-		xsq_net.ErrorJSON(c, errors.New("claims 获取失败"))
+	if userInfo == nil {
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
 		return
 	}
 
-	userInfo := claims.(*middlewares.CustomClaims)
+	form.UserName = userInfo.Name
 
-	//1:待复核,2:复核完成
-	if form.Status == 1 {
-		localDb.Where("review_user = ? or review_user = ''", userInfo.Name)
-	} else {
-		localDb.Where("review_user = ? ", userInfo.Name).Order("review_time desc")
-	}
+	err, res := dao.ReviewList(global.DB, form)
 
-	result := localDb.Where(model.Pick{PickUser: form.Name}).Find(&pick)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
+	if err != nil {
 		return
 	}
-
-	res.Total = result.RowsAffected
-
-	list := make([]rsp.Pick, 0, form.Size)
-
-	if len(pick) > 0 {
-		//拣货ids
-		pickIds := make([]int, 0, len(pick))
-		for _, p := range pick {
-			pickIds = append(pickIds, p.Id)
-		}
-
-		//拣货ids 的订单备注
-		result = db.Where("pick_id in (?)", pickIds).Find(&pickRemark)
-		if result.Error != nil {
-			xsq_net.ErrorJSON(c, result.Error)
-			return
-		}
-
-		//构建pickId 对应的订单 是否有备注map
-		remarkMp := make(map[int]struct{}, 0) //key 存在即为有
-		for _, remark := range pickRemark {
-			remarkMp[remark.PickId] = struct{}{}
-		}
-
-		isRemark := false
-
-		for _, p := range pick {
-
-			_, remarkMpOk := remarkMp[p.Id]
-			if remarkMpOk { //拣货id在拣货备注中存在，即为有备注
-				isRemark = true
-			}
-
-			list = append(list, rsp.Pick{
-				Id:             p.Id,
-				TaskName:       p.TaskName,
-				ShopCode:       p.ShopCode,
-				ShopName:       p.ShopName,
-				ShopNum:        p.ShopNum,
-				OrderNum:       p.OrderNum,
-				NeedNum:        p.NeedNum,
-				PickUser:       p.PickUser,
-				TakeOrdersTime: p.TakeOrdersTime,
-				IsRemark:       isRemark,
-				PickNum:        p.PickNum,
-				ReviewNum:      p.ReviewNum,
-				Num:            p.Num,
-				ReviewUser:     p.ReviewUser,
-				ReviewTime:     p.ReviewTime,
-			})
-		}
-	}
-
-	res.List = list
 
 	xsq_net.SucJson(c, res)
 }

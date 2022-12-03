@@ -2,6 +2,7 @@ package dao
 
 import (
 	"errors"
+	"pick_v2/forms/rsp"
 	"time"
 
 	"gorm.io/gorm"
@@ -13,6 +14,108 @@ import (
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/slice"
 )
+
+func ReviewList(db *gorm.DB, form req.ReviewListReq) (err error, res rsp.ReviewListRsp) {
+	var (
+		pick       []model.Pick
+		pickRemark []model.PickRemark
+	)
+
+	localDb := db.Model(&model.Pick{}).Where("status = ?", form.Status)
+
+	//1:待复核,2:复核完成
+	if form.Status == 1 {
+		localDb.Where("review_user = ? or review_user = ''", form.UserName)
+	} else {
+		localDb.Where("review_user = ? ", form.UserName).Order("review_time desc")
+	}
+
+	result := localDb.Where(model.Pick{PickUser: form.Name}).Find(&pick)
+
+	err = result.Error
+
+	if err != nil {
+		return
+	}
+
+	res.Total = result.RowsAffected
+
+	size := len(pick)
+
+	list := make([]rsp.Pick, 0, size)
+
+	if size == 0 {
+		return
+	}
+
+	//拣货ids
+	pickIds := make([]int, 0, len(pick))
+
+	for _, p := range pick {
+		pickIds = append(pickIds, p.Id)
+	}
+
+	//拣货ids 的订单备注
+	result = db.Where("pick_id in (?)", pickIds).Find(&pickRemark)
+
+	err = result.Error
+
+	if err != nil {
+		return
+	}
+
+	query := "pick_id,count(distinct(shop_id)) as shop_num,count(distinct(number)) as order_num,sum(need_num) as need_num,sum(complete_num) as complete_num,sum(review_num) as review_num"
+
+	err, numsMp := model.CountPickPoolNumsByPickIds(db, pickIds, query)
+	if err != nil {
+		return
+	}
+
+	//构建pickId 对应的订单 是否有备注map
+	remarkMp := make(map[int]struct{}, 0) //key 存在即为有
+	for _, remark := range pickRemark {
+		remarkMp[remark.PickId] = struct{}{}
+	}
+
+	isRemark := false
+
+	for _, p := range pick {
+
+		_, remarkMpOk := remarkMp[p.Id]
+		if remarkMpOk { //拣货id在拣货备注中存在，即为有备注
+			isRemark = true
+		}
+
+		nums, numsOk := numsMp[p.Id]
+
+		if !numsOk {
+			err = errors.New("拣货相关数量统计有误")
+			return
+		}
+
+		list = append(list, rsp.Pick{
+			Id:             p.Id,
+			TaskName:       p.TaskName,
+			ShopCode:       p.ShopCode,
+			ShopName:       p.ShopName,
+			ShopNum:        nums.ShopNum,
+			OrderNum:       nums.OrderNum,
+			NeedNum:        nums.NeedNum,
+			PickUser:       p.PickUser,
+			TakeOrdersTime: p.TakeOrdersTime,
+			IsRemark:       isRemark,
+			PickNum:        nums.CompleteNum,
+			ReviewNum:      nums.ReviewNum,
+			Num:            p.Num,
+			ReviewUser:     p.ReviewUser,
+			ReviewTime:     p.ReviewTime,
+		})
+	}
+
+	res.List = list
+
+	return
+}
 
 func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 
@@ -328,7 +431,7 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 			pickNumbers = append(pickNumbers, good.Number)
 		}
 
-		pickNumbers = slice.UniqueStringSlice(pickNumbers)
+		pickNumbers = slice.UniqueSlice(pickNumbers)
 
 		//获取欠货的订单number是否有在拣货池中未复核完成的数据，如果有，过滤掉欠货的订单number
 		err, pickAndGoods = model.GetPickGoodsJoinPickByNumbers(db, pickNumbers)
@@ -352,7 +455,7 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 			}
 		}
 
-		pendingNumbers = slice.UniqueStringSlice(pendingNumbers)
+		pendingNumbers = slice.UniqueSlice(pendingNumbers)
 
 		diffSlice = slice.StrDiff(pickNumbers, pendingNumbers) // 在 pickNumbers 不在 pendingNumbers 中的
 

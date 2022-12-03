@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"gorm.io/gorm"
@@ -15,11 +14,10 @@ import (
 	"pick_v2/model"
 	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
-	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"strconv"
-	"strings"
+	"time"
 )
 
 // 全量拣货 -按任务创建批次
@@ -124,6 +122,7 @@ func CentralizedPickList(c *gin.Context) {
 	}
 
 	err, list := dao.CentralizedPickList(global.DB, form)
+
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return
@@ -171,307 +170,14 @@ func EndBatch(c *gin.Context) {
 		return
 	}
 
-	var (
-		batches       model.Batch
-		pickGoods     []model.PickGoods
-		pick          []model.Pick
-		orderAndGoods []rsp.OrderAndGoods
-	)
-
-	db := global.DB
-
-	result := db.First(&batches, form.Id)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	if batches.Status != 2 {
-		xsq_net.ErrorJSON(c, errors.New("请先停止拣货"))
-		return
-	}
-
-	//修改批次状态为已结束
-	result = db.Model(&model.Batch{}).Where("id = ?", batches.Id).Updates(map[string]interface{}{"status": 1})
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	result = db.Table("t_pick_order_goods og").
-		Select("og.*,o.shop_id,o.shop_name,o.shop_code,o.line,o.distribution_type,o.order_remark,o.pay_at,o.province,o.city,o.district,o.shop_type,o.latest_picking_time").
-		Joins("left join t_pick_order o on og.pick_order_id = o.id").
-		Where("batch_id = ? ", form.Id).
-		Find(&orderAndGoods)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	//查询批次下全部订单
-	result = db.Model(&model.PickGoods{}).Where("batch_id = ? ", form.Id).Find(&pickGoods)
-	if result.Error != nil {
-		global.Logger["err"].Infof("批次结束成功，但推送u8拣货数据查询失败:%s", result.Error.Error())
-		xsq_net.ErrorJSON(c, errors.New("批次结束成功，但推送u8拣货数据查询失败"))
-		return
-	}
-
-	result = db.Model(&model.Pick{}).Where("batch_id = ?", form.Id).Find(&pick)
-
-	if result.Error != nil {
-		global.Logger["err"].Infof("批次结束成功，但推送u8拣货数据查询失败:%s", result.Error.Error())
-		xsq_net.ErrorJSON(c, errors.New("批次结束成功，但推送u8拣货主表数据查询失败"))
-		return
-	}
-
-	//拣货表数据map
-	mpPick := make(map[int]model.Pick, 0)
-
-	for _, p := range pick {
-		mpPick[p.Id] = p
-	}
-
-	tx := global.DB.Begin()
-
-	err := YongYouLog(tx, pickGoods, orderAndGoods, form.Id)
+	err := dao.EndBatch(global.DB, form)
 
 	if err != nil {
-		tx.Rollback()
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
-
-	//这里会删数据，要放在推u8之后处理，失败重试要加上这里的逻辑
-	err = UpdateCompleteOrder(tx, form.Id)
-	if err != nil {
-		tx.Rollback()
-		xsq_net.ErrorJSON(c, err)
-		return
-	}
-
-	tx.Commit()
 
 	xsq_net.Success(c)
-}
-
-func UpdateCompleteOrder(tx *gorm.DB, batchId int) error {
-	db := global.DB
-
-	var (
-		order      []model.Order
-		orderGoods []model.OrderGoods
-		isSendMQ   = true
-	)
-	//根据批次拿order会导致完成订单有遗漏
-	//OrderGoods 的批次id是否被更新了---不会，批次里的单在被更新为欠货之前一个商品只能被一个批次拿走，如果不是应该优化批次拿数据逻辑
-	result := db.Model(&model.OrderGoods{}).Where("batch_id = ?", batchId).Find(&orderGoods)
-
-	if result.Error != nil {
-		return result.Error
-	}
-
-	//当前批次所有订单号
-	var numbers []string
-
-	for _, good := range orderGoods {
-		numbers = append(numbers, good.Number)
-	}
-
-	numbers = slice.UniqueStringSlice(numbers)
-
-	//根据当前批次的所有订单号，查询订单
-	result = db.Model(&model.Order{}).Where("number in (?)", numbers).Find(&order)
-
-	if result.Error != nil {
-		return result.Error
-	}
-
-	var (
-		//完成订单map
-		//key => number
-		completeMp          = make(map[string]interface{}, 0)
-		completeNumbers     []string
-		deleteIds           []int    //待删除订单表id
-		deleteNumbers       []string //删除订单商品表
-		completeOrder       = make([]model.CompleteOrder, 0)
-		completeOrderDetail = make([]model.CompleteOrderDetail, 0)
-		lackNumbers         []string //待更新为欠货订单表number
-	)
-
-	for _, o := range order {
-		//TODO [这个字段删除了，逻辑要改] 还有欠货
-		//if o.UnPicked > 0 {
-		//	lackNumbers = append(lackNumbers, o.Number)
-		//	continue
-		//}
-
-		deleteIds = append(deleteIds, o.Id)
-
-		completeMp[o.Number] = struct{}{}
-
-		//完成订单
-		completeNumbers = append(completeNumbers, o.Number)
-
-		deleteNumbers = append(deleteNumbers, o.Number)
-
-		//完成订单
-		completeOrder = append(completeOrder, model.CompleteOrder{
-			Number:         o.Number,
-			OrderRemark:    o.OrderRemark,
-			ShopId:         o.ShopId,
-			ShopName:       o.ShopName,
-			ShopType:       o.ShopType,
-			ShopCode:       o.ShopCode,
-			Line:           o.Line,
-			DeliveryMethod: o.DistributionType,
-			Province:       o.Province,
-			City:           o.City,
-			District:       o.District,
-			PickTime:       o.LatestPickingTime,
-			PayAt:          o.PayAt,
-		})
-	}
-
-	if len(completeNumbers) > 0 {
-		//如果有完成订单重新查询订单商品，因为这批商品可能是多个批次拣的，根据批次查的商品不全
-		result = db.Model(&model.OrderGoods{}).Where("number in (?)", completeNumbers).Find(&orderGoods)
-
-		if result.Error != nil {
-			return result.Error
-		}
-
-		for _, og := range orderGoods {
-			//完成订单map中不存在订单的跳过
-			_, ok := completeMp[og.Number]
-
-			if !ok {
-				continue
-			}
-			//完成订单详情
-			completeOrderDetail = append(completeOrderDetail, model.CompleteOrderDetail{
-				Number:          og.Number,
-				GoodsName:       og.GoodsName,
-				Sku:             og.Sku,
-				GoodsSpe:        og.GoodsSpe,
-				GoodsType:       og.GoodsType,
-				Shelves:         og.Shelves,
-				PayCount:        og.PayCount,
-				CloseCount:      og.CloseCount,
-				ReviewCount:     og.OutCount,
-				GoodsRemark:     og.GoodsRemark,
-				DeliveryOrderNo: og.DeliveryOrderNo,
-			})
-		}
-	}
-
-	if len(deleteIds) > 0 {
-		result = tx.Delete(&model.Order{}, "id in (?)", deleteIds)
-
-		if result.Error != nil {
-			tx.Rollback()
-			return result.Error
-		}
-	}
-
-	if len(deleteNumbers) > 0 {
-		deleteNumbers = slice.UniqueStringSlice(deleteNumbers)
-
-		result = tx.Delete(&model.OrderGoods{}, "number in (?)", deleteNumbers)
-		if result.Error != nil {
-			tx.Rollback()
-			return result.Error
-		}
-	}
-
-	// 欠货的单 拣货池还有未完成的，不更新为欠货
-	if len(lackNumbers) > 0 {
-		var (
-			pickAndGoods   []model.PickAndGoods
-			pendingNumbers []string
-			diffSlice      []string
-		)
-
-		//获取欠货的订单number是否有在拣货池中未复核完成的数据，如果有，过滤掉欠货的订单number
-		result = db.Table("t_pick_goods pg").
-			Select("p.id as pick_id,p.status,pg.number,p.pick_user").
-			Joins("left join t_pick p on pg.pick_id = p.id").
-			Where("number in (?)", lackNumbers).
-			Find(&pickAndGoods)
-
-		if result.Error != nil {
-			tx.Rollback()
-			return result.Error
-		}
-
-		//获取拣货id，根据拣货id查出 拣货单中 未复核完成的订单，不更新为欠货，
-		//且 有未复核完成的订单 不发送到mq中，完成后再发送到mq中
-		for _, p := range pickAndGoods {
-			//已经被接单，且未完成复核
-			if p.Status < model.ReviewCompletedStatus && p.PickUser != "" {
-				pendingNumbers = append(pendingNumbers, p.Number)
-				isSendMQ = false
-			}
-		}
-
-		pendingNumbers = slice.UniqueStringSlice(pendingNumbers)
-
-		diffSlice = slice.StrDiff(lackNumbers, pendingNumbers) // 在 lackNumbers 不在 pendingNumbers 中的
-
-		if len(diffSlice) > 0 {
-			//更新为欠货
-			result = tx.Model(&model.Order{}).Where("number in (?)", diffSlice).Updates(map[string]interface{}{
-				"order_type": model.LackOrderType,
-			})
-
-			if result.Error != nil {
-				tx.Rollback()
-				return result.Error
-			}
-		}
-
-	}
-
-	//保存完成订单
-	if len(completeOrder) > 0 {
-		result = tx.Save(&completeOrder)
-		if result.Error != nil {
-			tx.Rollback()
-			return result.Error
-		}
-	}
-
-	//保存完成订单详情
-	if len(completeOrderDetail) > 0 {
-		result = tx.Save(&completeOrderDetail)
-		if result.Error != nil {
-			tx.Rollback()
-			return result.Error
-		}
-	}
-
-	//更新pickOrder为已完成
-	result = tx.Model(&model.PickOrder{}).Where("number in (?)", numbers).Updates(map[string]interface{}{
-		"order_type": model.PickOrderCompleteOrderType,
-	})
-
-	if result.Error != nil {
-		tx.Rollback()
-		return result.Error
-	}
-
-	if isSendMQ {
-		//mq 存入 批次id
-		err := dao.SyncBatch(batchId)
-		if err != nil {
-			tx.Rollback()
-			return errors.New("写入mq失败")
-		}
-	}
-
-	return nil
 }
 
 // 编辑批次
@@ -495,89 +201,6 @@ func EditBatch(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-// 推送u8 日志记录生成
-func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderAndGoods []rsp.OrderAndGoods, batchId int) error {
-	mpOrderAndGoods := make(map[int]rsp.OrderAndGoods, 0)
-
-	for _, order := range orderAndGoods {
-		_, ok := mpOrderAndGoods[order.Id]
-		if ok {
-			continue
-		}
-		mpOrderAndGoods[order.Id] = order
-	}
-
-	mpPgv := make(map[string]req.PickGoodsView, 0)
-
-	for _, good := range pickGoods {
-		order, ogOk := mpOrderAndGoods[good.OrderGoodsId]
-		if !ogOk {
-			continue
-		}
-
-		//以拣货id和订单编号的纬度来推u8
-		mpPgvKey := fmt.Sprintf("%v%v", good.PickId, good.Number)
-
-		pgv, ok := mpPgv[mpPgvKey]
-
-		if !ok {
-			pgv = req.PickGoodsView{}
-		}
-
-		pgv.PickId = good.PickId
-		pgv.SaleNumber = order.Number
-		pgv.ShopId = int64(order.ShopId)
-		pgv.ShopName = order.ShopName
-		pgv.Date = order.PayAt
-		pgv.Remark = order.OrderRemark
-		pgv.DeliveryType = order.DistributionType //配送方式
-		pgv.Line = order.Line
-		pgv.List = append(pgv.List, req.PickGoods{
-			GoodsName:    good.GoodsName,
-			Sku:          good.Sku,
-			Price:        int64(order.DiscountPrice),
-			GoodsSpe:     good.GoodsSpe,
-			Shelves:      good.Shelves,
-			RealOutCount: good.ReviewNum,
-			SlaveCode:    order.SaleCode,
-			GoodsUnit:    order.GoodsUnit,
-			SlaveUnit:    order.SaleUnit,
-		})
-
-		mpPgv[mpPgvKey] = pgv
-	}
-
-	var stockLogs = make([]model.StockLog, 0)
-
-	for _, view := range mpPgv {
-		//推送u8
-		xml := dao.GenU8Xml(view, view.ShopId, view.ShopName, "05") //店铺属性中获 HouseCode
-
-		stockLogs = append(stockLogs, model.StockLog{
-			Number:      view.SaleNumber,
-			BatchId:     batchId,
-			PickId:      view.PickId,
-			Status:      model.StockLogCreatedStatus, //已创建
-			RequestXml:  xml,
-			ResponseXml: "",
-			ShopName:    view.ShopName,
-		})
-	}
-
-	if len(stockLogs) > 0 {
-		result := tx.Save(&stockLogs)
-		if result.Error != nil {
-			return result.Error
-		}
-
-		for _, log := range stockLogs {
-			dao.YongYouProducer(log.Id)
-		}
-	}
-
-	return nil
-}
-
 // 批次出库订单和商品明细
 func GetBatchOrderAndGoods(c *gin.Context) {
 	var form req.GetBatchOrderAndGoodsForm
@@ -589,101 +212,14 @@ func GetBatchOrderAndGoods(c *gin.Context) {
 		return
 	}
 
-	var (
-		batch          model.Batch
-		pickOrder      []model.PickOrder
-		pickOrderGoods []model.PickOrderGoods
-		data           rsp.GetBatchOrderAndGoodsRsp
-		mp             = make(map[string][]rsp.OutGoods)
-		numbers        = make([]string, 0)
-	)
+	err, res := dao.GetBatchOrderAndGoods(global.DB, form)
 
-	db := global.DB
-
-	result := db.First(&batch, form.Id)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
-	//状态:0:进行中,1:已结束,2:暂停
-	if batch.Status != 1 {
-		xsq_net.ErrorJSON(c, errors.New("批次未结束"))
-		return
-	}
-
-	result = db.Model(&model.PickOrderGoods{}).Where("batch_id = ?", form.Id).Find(&pickOrderGoods)
-
-	totalGoodsNum := 0
-
-	for _, good := range pickOrderGoods {
-		//出库为0的不推送
-		if good.OutCount == 0 {
-			continue
-		}
-
-		totalGoodsNum++
-
-		//编号 ，查询订单
-		numbers = append(numbers, good.Number)
-
-		_, ok := mp[good.Number]
-
-		if !ok {
-			mp[good.Number] = make([]rsp.OutGoods, 0)
-		}
-
-		mp[good.Number] = append(mp[good.Number], rsp.OutGoods{
-			Id:            good.OrderGoodsId,
-			Name:          good.GoodsName,
-			Sku:           good.Sku,
-			GoodsType:     good.GoodsType,
-			GoodsSpe:      good.GoodsSpe,
-			DiscountPrice: good.DiscountPrice,
-			GoodsUnit:     good.GoodsUnit,
-			SaleUnit:      good.SaleUnit,
-			SaleCode:      good.SaleCode,
-			OutCount:      good.OutCount,
-			OutAt:         good.UpdateTime.Format(timeutil.TimeFormat),
-			Number:        good.Number,
-			CkNumber:      strings.Join(good.DeliveryOrderNo, ","),
-		})
-
-	}
-
-	numbers = slice.UniqueStringSlice(numbers)
-
-	result = db.Model(&model.PickOrder{}).Where("number in (?)", numbers).Find(&pickOrder)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	list := make([]rsp.OutOrder, 0, len(pickOrder))
-
-	for _, order := range pickOrder {
-		goodsInfo, ok := mp[order.Number]
-
-		if !ok {
-			xsq_net.ErrorJSON(c, ecode.DataQueryError)
-			return
-		}
-
-		list = append(list, rsp.OutOrder{
-			DistributionType: order.DistributionType,
-			PayAt:            order.PayAt,
-			OrderId:          order.OrderId,
-			GoodsInfo:        goodsInfo,
-		})
-	}
-
-	data.Count = totalGoodsNum
-
-	data.List = list
-
-	xsq_net.SucJson(c, data)
+	xsq_net.SucJson(c, res)
 }
 
 // 当前批次是否有接单
@@ -1287,9 +823,8 @@ func PrintCallGet(c *gin.Context) {
 	}
 
 	var (
-		pick          model.Pick
-		pickGoods     []model.PickGoods
-		orderAndGoods []rsp.OrderAndGoods
+		pick      model.Pick
+		pickGoods []model.PickGoods
 	)
 
 	db := global.DB
@@ -1320,18 +855,12 @@ func PrintCallGet(c *gin.Context) {
 		goodsMp[good.OrderGoodsId] = good
 	}
 
-	result = db.Table("t_pick_order_goods og").
-		Select("og.*,o.shop_id,o.shop_name,o.shop_code,o.line,o.distribution_type,o.order_remark,o.pay_at,o.province,o.city,o.district,o.shop_type,o.latest_picking_time,o.house_code,o.consignee_name,o.consignee_tel").
-		Joins("left join t_pick_order o on og.pick_order_id = o.id").
-		Where("og.id in (?)", orderGoodsIds).
-		Scan(&orderAndGoods)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
+	err, orderJoinGoods := model.GetOrderGoodsJoinOrderByIds(db, orderGoodsIds)
+	if err != nil {
 		return
 	}
 
-	if len(orderAndGoods) <= 0 {
+	if len(orderJoinGoods) <= 0 {
 		xsq_net.ErrorJSON(c, ecode.OrderDataNotFound)
 		return
 	}
@@ -1347,25 +876,25 @@ func PrintCallGet(c *gin.Context) {
 		ShopName:    pick.ShopName,
 		JHNumber:    strconv.Itoa(pick.Id),
 		PickName:    pick.PickUser, //拣货人
-		ShopType:    orderAndGoods[0].ShopType,
-		CheckName:   pick.ReviewUser,                                             //复核员
-		HouseName:   TransferHouse(orderAndGoods[0].HouseCode),                   //TransferHouse(info.HouseCode)
-		Delivery:    TransferDistributionType(orderAndGoods[0].DistributionType), //TransferDistributionType(info.DistributionType),
-		OrderRemark: orderAndGoods[0].OrderRemark,
-		Consignee:   orderAndGoods[0].ConsigneeName, //info.ConsigneeName
+		ShopType:    orderJoinGoods[0].ShopType,
+		CheckName:   pick.ReviewUser,                                              //复核员
+		HouseName:   TransferHouse(orderJoinGoods[0].HouseCode),                   //TransferHouse(info.HouseCode)
+		Delivery:    TransferDistributionType(orderJoinGoods[0].DistributionType), //TransferDistributionType(info.DistributionType),
+		OrderRemark: orderJoinGoods[0].OrderRemark,
+		Consignee:   orderJoinGoods[0].ConsigneeName, //info.ConsigneeName
 		Shop_code:   pick.ShopCode,
 		Packages:    packages,
-		Phone:       orderAndGoods[0].ConsigneeTel, //info.ConsigneeTel,
+		Phone:       orderJoinGoods[0].ConsigneeTel, //info.ConsigneeTel,
 		PriType:     printCh.Type,
 	}
 
-	if orderAndGoods[0].ShopCode != "" {
-		item.ShopName = orderAndGoods[0].ShopCode + "--" + orderAndGoods[0].ShopName
+	if orderJoinGoods[0].ShopCode != "" {
+		item.ShopName = orderJoinGoods[0].ShopCode + "--" + orderJoinGoods[0].ShopName
 	}
 
 	item2Mp := make(map[string]rsp.CallGetGoodsView, 0)
 
-	for _, info := range orderAndGoods {
+	for _, info := range orderJoinGoods {
 
 		pgs, ok := goodsMp[info.Id]
 
@@ -1378,7 +907,7 @@ func PrintCallGet(c *gin.Context) {
 		if !item2ok {
 			item2val = rsp.CallGetGoodsView{
 				SaleNumber:  info.Number,
-				Date:        info.PayAt,
+				Date:        timeutil.FormatToDateTime(time.Time(info.PayAt)),
 				OrderRemark: info.OrderRemark,
 			}
 		}

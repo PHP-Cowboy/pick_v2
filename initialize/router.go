@@ -21,8 +21,6 @@ func InitRouter() *gin.Engine {
 	router.GoodsRoute(group)
 	//出库单
 	router.OutboundRoute(group)
-	//拣货单
-	router.OrderRoute(group)
 	//限发
 	router.LimitRoute(group)
 	//批次

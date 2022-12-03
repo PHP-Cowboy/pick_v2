@@ -302,6 +302,7 @@ func OutboundOrderBatchSaveLogic(db *gorm.DB, taskId int, orderJoinGoods []model
 				TaskId:            taskId,
 				Number:            goods.Number,
 				PayAt:             &goods.PayAt,
+				OrderId:           goods.OrderId,
 				ShopId:            goods.ShopId,
 				ShopName:          goods.ShopName,
 				ShopType:          goods.ShopType,
@@ -593,7 +594,7 @@ func OutboundOrderDetail(db *gorm.DB, form req.OutboundOrderDetailForm) (err err
 
 	res.Detail = detailMap
 
-	deliveryOrderNoArr = slice.UniqueStringSlice(deliveryOrderNoArr)
+	deliveryOrderNoArr = slice.UniqueSlice(deliveryOrderNoArr)
 	//历史出库单号
 	res.DeliveryOrderNo = deliveryOrderNoArr
 

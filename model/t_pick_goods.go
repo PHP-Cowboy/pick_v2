@@ -81,10 +81,17 @@ func GetPickGoodsByPickIds(db *gorm.DB, pickIds []int) (err error, list []PickGo
 	return result.Error, list
 }
 
+// 根据批次ID查询拣货商品数据
+func GetPickGoodsByBatchId(db *gorm.DB, batchId int) (err error, list []PickGoods) {
+	result := db.Model(&PickGoods{}).Where("batch_id = ?", batchId).Find(&list)
+
+	return result.Error, list
+}
+
 // 根据订单商品表订单编号查询拣货表数据
 func GetPickGoodsJoinPickByNumbers(db *gorm.DB, numbers []string) (err error, list []PickAndGoods) {
 	result := db.Table("t_pick_goods pg").
-		Select("p.id as pick_id,p.status,pg.number").
+		Select("p.id as pick_id,p.status,pg.number,p.pick_user").
 		Joins("left join t_pick p on pg.pick_id = p.id").
 		Where("number in (?)", numbers).
 		Find(&list)

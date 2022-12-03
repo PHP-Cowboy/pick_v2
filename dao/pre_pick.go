@@ -28,6 +28,9 @@ func CreatePrePickLogic(
 	outboundGoods []model.OutboundGoods,
 	outboundGoodsJoinOrder []model.OutboundGoodsJoinOrder,
 	prePickIds []int,
+	prePicks []model.PrePick,
+	prePickGoods []model.PrePickGoods,
+	prePickRemarks []model.PrePickRemark,
 ) {
 
 	mp, err := cache.GetClassification()
@@ -50,11 +53,21 @@ func CreatePrePickLogic(
 	}
 
 	var (
-		prePicks      []model.PrePick
-		prePickGoods  []model.PrePickGoods
-		prePickRemark []model.PrePickRemark
-		shopNumMp     = make(map[int]struct{}, 0) //店铺
+		shopNumMp = make(map[int]struct{}, 0) //店铺
+		prePickStatus,
+		prePickGoodsStatus,
+		prePickRemarkStatus int
 	)
+
+	if form.Typ == 1 { // 常规批次，所有的状态都是待处理
+		prePickStatus = model.PrePickStatusUnhandled
+		prePickGoodsStatus = model.PrePickGoodsStatusUnhandled
+		prePickRemarkStatus = model.PrePickRemarkStatusUnhandled
+	} else { //快递批次，所有的状态都是已处理，直接进入预拣池和拣货池
+		prePickStatus = model.PrePickStatusProcessing
+		prePickGoodsStatus = model.PrePickGoodsStatusProcessing
+		prePickRemarkStatus = model.PrePickRemarkStatusProcessing
+	}
 
 	for _, og := range outboundGoodsJoinOrder {
 		//todo 快递批次上线后删除 form.Typ == model.ExpressDeliveryBatchTyp &&
@@ -86,7 +99,7 @@ func CreatePrePickLogic(
 			ShopCode:    og.ShopCode,
 			ShopName:    og.ShopName,
 			Line:        cacheMpLine,
-			Status:      0,
+			Status:      prePickStatus,
 			Typ:         form.Typ,
 		})
 
@@ -102,7 +115,7 @@ func CreatePrePickLogic(
 	}
 
 	//预拣池任务数据保存
-	err, prePicksRes := model.PrePickBatchSave(db, prePicks)
+	err = model.PrePickBatchSave(db, &prePicks)
 	if err != nil {
 		return
 	}
@@ -110,7 +123,7 @@ func CreatePrePickLogic(
 	//单次创建批次时，预拣池表数据根据shop_id唯一
 	//构造 map[shop_id]pre_pick_id 更新 t_pre_pick_goods t_pre_pick_remark 表 pre_pick_id
 	prePickMp := make(map[int]int, 0)
-	for _, pp := range prePicksRes {
+	for _, pp := range prePicks {
 		prePickMp[pp.ShopId] = pp.Id
 		//预拣池ID
 		prePickIds = append(prePickIds, pp.Id)
@@ -170,12 +183,13 @@ func CreatePrePickLogic(
 			CloseNum:         og.CloseCount,
 			OutCount:         0,
 			NeedOutNum:       og.LackCount,
+			Status:           prePickGoodsStatus,
 			Typ:              form.Typ,
 		})
 
 		//如果有备注，构造预拣池备注数据
 		if og.GoodsRemark != "" || og.OrderRemark != "" {
-			prePickRemark = append(prePickRemark, model.PrePickRemark{
+			prePickRemarks = append(prePickRemarks, model.PrePickRemark{
 				WarehouseId:  claims.WarehouseId,
 				BatchId:      batchId,
 				OrderGoodsId: og.OrderGoodsId,
@@ -186,6 +200,7 @@ func CreatePrePickLogic(
 				GoodsRemark:  og.GoodsRemark,
 				ShopName:     og.ShopName,
 				Line:         cacheMpLine,
+				Status:       prePickRemarkStatus,
 				Typ:          form.Typ,
 			})
 		}
@@ -200,14 +215,14 @@ func CreatePrePickLogic(
 	}
 
 	//预拣池商品
-	err = model.PrePickGoodsBatchSave(db, prePickGoods)
+	err = model.PrePickGoodsBatchSave(db, &prePickGoods)
 	if err != nil {
 		return
 	}
 
 	//预拣池商品备注，可能没有备注
-	if len(prePickRemark) > 0 {
-		err = model.PrePickRemarkBatchSave(db, prePickRemark)
+	if len(prePickRemarks) > 0 {
+		err = model.PrePickRemarkBatchSave(db, &prePickRemarks)
 		if err != nil {
 			return
 		}
