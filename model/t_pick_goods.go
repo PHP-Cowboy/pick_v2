@@ -29,6 +29,16 @@ type PickGoods struct {
 	Unit             string `gorm:"type:varchar(64);comment:单位"`
 }
 
+type PickGoodsJoinOrder struct {
+	ShopCode  string `json:"shop_code"`
+	GoodsName string `json:"goods_name"`
+	GoodsSpe  string `json:"goods_spe"`
+	Unit      string `json:"unit"`
+	Sku       string `json:"sku"`
+	NeedNum   int    `json:"need_num"`
+	ReviewNum int    `json:"review_num"`
+}
+
 func PickGoodsSave(db *gorm.DB, list *[]PickGoods) error {
 	result := db.Model(&PickGoods{}).Save(list)
 	return result.Error
@@ -74,9 +84,16 @@ func GetPickGoodsByNumber(db *gorm.DB, numbers []string) (err error, list []Pick
 	return result.Error, list
 }
 
-// 根据id查拣货池商品数据
+// 根据拣货id查拣货池商品数据
 func GetPickGoodsByPickIds(db *gorm.DB, pickIds []int) (err error, list []PickGoods) {
 	result := db.Model(&PickGoods{}).Where("pick_id in (?)", pickIds).Find(&list)
+
+	return result.Error, list
+}
+
+// 根据拣货id查拣货池商品数据
+func GetPickGoodsByPickIdAndSku(db *gorm.DB, pickId int, skus []string) (err error, list []PickGoods) {
+	result := db.Model(&PickGoods{}).Where("pick_id = ? and sku in (?)", pickId, skus).Find(&list)
 
 	return result.Error, list
 }
@@ -95,6 +112,17 @@ func GetPickGoodsJoinPickByNumbers(db *gorm.DB, numbers []string) (err error, li
 		Joins("left join t_pick p on pg.pick_id = p.id").
 		Where("number in (?)", numbers).
 		Find(&list)
+
+	return result.Error, list
+}
+
+// 根据拣货ID查询拣货池商品数据并获取相关订单数据
+func GetPickGoodsJoinOrderByPickId(db *gorm.DB, pickId int) (err error, list []PickGoodsJoinOrder) {
+	result := db.Table("t_pick_goods pg").
+		Select("shop_code,goods_name,goods_spe,unit,sku,pg.need_num,pg.review_num").
+		Where("pg.pick_id = ?", pickId).
+		Joins("left join t_pick_order po on po.number = pg.number").
+		Scan(&list)
 
 	return result.Error, list
 }

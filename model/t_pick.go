@@ -2,6 +2,7 @@ package model
 
 import (
 	"errors"
+	"gorm.io/gorm/clause"
 
 	"gorm.io/gorm"
 	"pick_v2/utils/ecode"
@@ -60,6 +61,17 @@ func PickBatchSave(db *gorm.DB, picks *[]Pick) error {
 
 func PickSave(db *gorm.DB, picks *Pick) error {
 	result := db.Model(&Pick{}).Save(picks)
+	return result.Error
+}
+
+func PickReplaceSave(db *gorm.DB, list []Pick, values []string) error {
+	result := db.Model(&Pick{}).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns(values),
+		}).
+		Save(&list)
+
 	return result.Error
 }
 

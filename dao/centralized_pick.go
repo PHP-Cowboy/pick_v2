@@ -106,7 +106,7 @@ func CentralizedPickDetail(db *gorm.DB, form req.CentralizedPickDetailForm) (err
 			GoodsName:   l.GoodsName,
 			NeedNum:     l.NeedNum,
 			GoodsRemark: l.GoodsRemark,
-			GoodsUnit:   l.Unit,
+			Unit:        l.Unit,
 		}
 	}
 
@@ -132,7 +132,7 @@ func CentralizedPickDetail(db *gorm.DB, form req.CentralizedPickDetailForm) (err
 			GoodsName:   goodsInfo.GoodsName,
 			NeedNum:     goodsInfo.NeedNum,
 			GoodsRemark: goodsInfo.GoodsRemark,
-			GoodsUnit:   goodsInfo.GoodsUnit,
+			Unit:        goodsInfo.Unit,
 			OrderRemark: ol.OrderRemark,
 		})
 	}

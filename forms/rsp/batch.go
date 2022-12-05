@@ -70,7 +70,7 @@ type CentralizedPickDetailGoodsInfo struct {
 	GoodsName   string `json:"goods_name"`
 	NeedNum     int    `json:"need_num"`
 	GoodsRemark string `json:"goods_remark"`
-	GoodsUnit   string `json:"goods_unit"`
+	Unit        string `json:"unit"`
 }
 
 type CentralizedPickDetailList struct {
@@ -78,7 +78,7 @@ type CentralizedPickDetailList struct {
 	ShopCode    string `json:"shop_code"`
 	Line        string `json:"line"`
 	GoodsName   string `json:"goods_name"`
-	GoodsUnit   string `json:"goods_unit"`
+	Unit        string `json:"unit"`
 	GoodsRemark string `json:"goods_remark"`
 	OrderRemark string `json:"order_remark"`
 	NeedNum     int    `json:"need_num"`

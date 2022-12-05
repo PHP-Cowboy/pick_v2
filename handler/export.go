@@ -581,16 +581,6 @@ func BatchTask(c *gin.Context) {
 
 	db := global.DB
 
-	type PickGoods struct {
-		ShopCode  string `json:"shop_code"`
-		GoodsName string `json:"goods_name"`
-		GoodsSpe  string `json:"goods_spe"`
-		Unit      string `json:"unit"`
-		Sku       string `json:"sku"`
-		NeedNum   int    `json:"need_num"`
-		ReviewNum int    `json:"review_num"`
-	}
-
 	result := db.First(&pick, form.Id)
 
 	if result.Error != nil {
@@ -602,16 +592,10 @@ func BatchTask(c *gin.Context) {
 		return
 	}
 
-	var pickGoods []PickGoods
+	err, pickGoods := model.GetPickGoodsJoinOrderByPickId(db, form.Id)
 
-	result = db.Table("t_pick_goods pg").
-		Select("shop_code,goods_name,goods_spe,unit,sku,pg.need_num,pg.review_num").
-		Where("pg.pick_id = ?", form.Id).
-		Joins("left join t_pick_order po on po.number = pg.number").
-		Scan(&pickGoods)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
