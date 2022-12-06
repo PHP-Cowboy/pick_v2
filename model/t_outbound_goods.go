@@ -84,70 +84,65 @@ const (
 	OutboundGoodsStatusOutboundClose           //已关闭
 )
 
-func OutboundGoodsBatchSave(db *gorm.DB, list []OutboundGoods) error {
+func OutboundGoodsBatchSave(db *gorm.DB, list []OutboundGoods) (err error) {
 
-	result := db.Model(&OutboundGoods{}).CreateInBatches(&list, BatchSize)
+	err = db.Model(&OutboundGoods{}).CreateInBatches(&list, BatchSize).Error
 
-	return result.Error
+	return
 }
 
-func OutboundGoodsReplaceSave(db *gorm.DB, list []OutboundGoods, values []string) error {
-	result := db.Model(&OutboundGoods{}).
+func OutboundGoodsReplaceSave(db *gorm.DB, list []OutboundGoods, values []string) (err error) {
+	err = db.Model(&OutboundGoods{}).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "task_id,number,sku"}},
 			DoUpdates: clause.AssignmentColumns(values),
 		}).
-		Save(&list)
+		Save(&list).
+		Error
 
-	return result.Error
+	return
 }
 
 // 获取出库任务商品列表
 func GetOutboundGoodsList(db *gorm.DB, cond OutboundGoods) (err error, list []OutboundGoods) {
-	result := db.Model(&OutboundGoods{}).Where(&cond).Find(&list)
-	return result.Error, list
+	err = db.Model(&OutboundGoods{}).Where(&cond).Find(&list).Error
+	return
 }
 
 // 获取出库任务商品列表
 func GetOutboundGoodsListByTaskIdAndNumber(db *gorm.DB, taskId int, number string) (err error, list []OutboundGoods) {
-	result := db.Model(&OutboundGoods{}).Where("task_id = ? and number = ?", taskId, number).Find(&list)
-	return result.Error, list
+	err = db.Model(&OutboundGoods{}).Where("task_id = ? and number = ?", taskId, number).Find(&list).Error
+	return
 }
 
 // 根据 order_goods_id 获取出库任务商品列表
 func GetOutboundGoodsListByOrderGoodsIdAndTaskId(db *gorm.DB, orderGoodsIds []int, taskId int) (err error, list []OutboundGoods) {
-	result := db.Model(&OutboundGoods{}).Where("order_goods_id in (?) and task_id = ?", orderGoodsIds, taskId).Find(&list)
-	return result.Error, list
+	err = db.Model(&OutboundGoods{}).Where("order_goods_id in (?) and task_id = ?", orderGoodsIds, taskId).Find(&list).Error
+	return
 }
 
 func GetOutboundGoodsJoinOrderList(db *gorm.DB, taskId int, number []string) (err error, list []OutboundGoodsJoinOrder) {
 
-	result := db.Table("t_outbound_goods og").
+	err = db.Table("t_outbound_goods og").
 		Select("*").
 		Joins("left join t_outbound_order oo on og.task_id = oo.task_id and og.number = oo.number").
 		Where("oo.task_id = ? and oo.number in (?)", taskId, number).
-		Find(&list)
+		Find(&list).
+		Error
 
-	if result.Error != nil {
-		return result.Error, nil
-	}
-
-	return nil, list
+	return
 }
 
 func GetOutboundGoodsJoinOrderListByNumbers(db *gorm.DB, number []string) (err error, list []OutboundGoodsJoinOrder) {
 
-	result := db.Table("t_outbound_goods og").
+	err = db.Table("t_outbound_goods og").
 		Select("*").
 		Joins("left join t_outbound_order oo on og.task_id = oo.task_id and og.number = oo.number").
 		Where("oo.number in (?)", number).
-		Find(&list)
+		Find(&list).
+		Error
 
-	if result.Error != nil {
-		return result.Error, nil
-	}
-
-	return nil, list
+	return
 }
 
 type OutboundGoodsGoodsNumsStatistical struct {
@@ -162,14 +157,15 @@ type OutboundGoodsGoodsNumsStatistical struct {
 func OutboundGoodsNumsStatisticalByTaskIdAndNumbers(db *gorm.DB, taskId int, number []string) (err error, mp map[string]OutboundGoodsGoodsNumsStatistical) {
 	var nums []OutboundGoodsGoodsNumsStatistical
 
-	result := db.Model(&OutboundGoods{}).
+	err = db.Model(&OutboundGoods{}).
 		Select("number,sum(pay_count) as pay_count,sum(close_count) as close_count,sum(out_count) as out_count,sum(limit_num) as limit_num").
 		Where("task_id = ? and number in (?)", taskId, number).
 		Group("number").
-		Find(&nums)
+		Find(&nums).
+		Error
 
-	if result.Error != nil {
-		return result.Error, nil
+	if err != nil {
+		return
 	}
 
 	mp = make(map[string]OutboundGoodsGoodsNumsStatistical, 0)
@@ -195,22 +191,22 @@ func OutboundGoodsNumsStatisticalByTaskIdAndNumbers(db *gorm.DB, taskId int, num
 }
 
 func OutboundOrderDistinctGoodsList(db *gorm.DB, taskId int) (err error, list []OutboundGoods) {
-	result := db.Model(&OutboundGoods{}).
+	err = db.Model(&OutboundGoods{}).
 		Select("DISTINCT(`sku`),goods_name").
 		Where("task_id = ?", taskId).
-		Find(&list)
+		Find(&list).
+		Error
 
-	return result.Error, list
+	return
 }
 
 func GetOutboundGoods(db *gorm.DB, taskId int, sku string) (err error, sum int) {
 
-	result := db.Model(&OutboundGoods{}).
+	err = db.Model(&OutboundGoods{}).
 		Select("IFNULL(sum(lack_count),0) as sum").
 		Where("task_id = ? and sku = ? and status = ?", taskId, sku, OutboundGoodsStatusUnhandled).
-		Scan(&sum)
-
-	err = result.Error
+		Scan(&sum).
+		Error
 
 	return
 }

@@ -25,32 +25,30 @@ const (
 )
 
 func PrePickRemarkBatchSave(db *gorm.DB, list *[]PrePickRemark) (err error) {
-	result := db.Model(&PrePickRemark{}).Save(list)
+	err = db.Model(&PrePickRemark{}).Save(list).Error
 
-	return result.Error
+	return
 }
 
-func UpdatePrePickRemarkByPrePickIds(db *gorm.DB, prePickIds []int, mp map[string]interface{}) error {
-	result := db.Model(&PrePickRemark{}).
+func UpdatePrePickRemarkByPrePickIds(db *gorm.DB, prePickIds []int, mp map[string]interface{}) (err error) {
+	err = db.Model(&PrePickRemark{}).
 		Where("pre_pick_id in (?)", prePickIds).
-		Updates(mp)
+		Updates(mp).
+		Error
 
-	if result.Error != nil {
-		return result.Error
-	}
-
-	return nil
+	return
 }
 
-func UpdatePrePickRemarkByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
-	result := db.Model(&PrePickRemark{}).
+func UpdatePrePickRemarkByIds(db *gorm.DB, ids []int, mp map[string]interface{}) (err error) {
+	err = db.Model(&PrePickRemark{}).
 		Where("id in (?)", ids).
-		Updates(mp)
+		Updates(mp).
+		Error
 
-	return result.Error
+	return
 }
 
 func GetPrePickRemarkByOrderGoodsIds(db *gorm.DB, orderGoodsIds []int) (err error, prePickRemarks []PrePickRemark) {
-	result := db.Model(&PrePickRemark{}).Where("order_goods_id in (?)", orderGoodsIds).Find(&prePickRemarks)
-	return result.Error, prePickRemarks
+	err = db.Model(&PrePickRemark{}).Where("order_goods_id in (?)", orderGoodsIds).Find(&prePickRemarks).Error
+	return
 }

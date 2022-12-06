@@ -164,6 +164,8 @@ func GetDiffDateTime(t time.Time) string {
 	return diffStr
 }
 
+// 这个方法有特殊用途，不建议修改或使用
+// dateStr == "" 时的返回不是很合理，但符合使用场景的业务逻辑
 func DateStrToTime(dateStr string) (*time.Time, error) {
 	if dateStr == "" {
 		return nil, nil

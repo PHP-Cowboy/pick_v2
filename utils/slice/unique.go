@@ -21,6 +21,7 @@ func UniqueSlice[T comparable](arr []T) []T {
 
 // slice 转 map
 func SliceToMap[T comparable](arr []T) (mp map[T]struct{}) {
+	mp = make(map[T]struct{}, 0)
 	for _, t := range arr {
 		mp[t] = struct{}{}
 	}

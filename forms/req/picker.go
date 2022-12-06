@@ -22,7 +22,7 @@ type CompleteConcentratedPickForm struct {
 }
 
 type RemainingQuantityForm struct {
-	Typ int `json:"typ"`
+	Typ int `json:"typ" form:"typ"`
 }
 
 type CompletePickDetail struct {

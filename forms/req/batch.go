@@ -58,6 +58,7 @@ type GetBatchListForm struct {
 	DeliveryMethod int    `json:"delivery_method" form:"delivery_method"`
 	CreateTime     string `json:"create_time" form:"create_time"`
 	EndTime        string `json:"end_time" form:"end_time"`
+	Typ            int    `json:"typ" form:"typ"`
 }
 
 type GetPrePickListForm struct {
@@ -104,4 +105,8 @@ type PrintCallGetReq struct {
 
 type GetPoolNumReq struct {
 	BatchId int `json:"batch_id" form:"batch_id" binding:"required"`
+}
+
+type GetBatchPoolNumForm struct {
+	Typ int `json:"typ" form:"typ"`
 }

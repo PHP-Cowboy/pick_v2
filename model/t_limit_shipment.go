@@ -25,16 +25,17 @@ const (
 	LimitShipmentTypTask  //任务限发
 )
 
-func LimitShipmentSave(db *gorm.DB, list []LimitShipment) error {
-	result := db.Model(&LimitShipment{}).Save(&list)
-	return result.Error
+func LimitShipmentSave(db *gorm.DB, list []LimitShipment) (err error) {
+	err = db.Model(&LimitShipment{}).Save(&list).Error
+	return
 }
 
+// 根据任务ID和订单编号查询限发列表
 func GetLimitShipmentListByTaskIdAndNumbers(db *gorm.DB, taskId int, number []string) (err error, list []LimitShipment) {
 
-	result := db.Model(&LimitShipment{}).Where("task_id = ? and number in (?)", taskId, number).Find(&list)
+	err = db.Model(&LimitShipment{}).Where("task_id = ? and number in (?)", taskId, number).Find(&list).Error
 
-	return result.Error, list
+	return
 }
 
 // 查询 订单
@@ -46,19 +47,18 @@ func GetLimitShipmentPageListByTaskIdAndNumber(db *gorm.DB, taskId int, number s
 			Status: LimitShipmentStatusNormal,
 		})
 
-	result := local.Find(&list)
-
-	err = result.Error
+	err = local.Count(&total).Error
 
 	if err != nil {
 		return
 	}
 
-	total = result.RowsAffected
+	//没查到直接返回
+	if total == 0 {
+		return
+	}
 
-	result = local.Scopes(Paginate(page, size)).Find(&list)
-
-	err = result.Error
+	err = local.Scopes(Paginate(page, size)).Find(&list).Error
 
 	return
 }

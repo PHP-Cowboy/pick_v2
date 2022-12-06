@@ -58,6 +58,8 @@ type PrePickGoodsJoinPrePickRemark struct {
 	Number      string `json:"number"`
 	Sku         string `json:"sku"`
 	GoodsName   string `json:"goods_name"`
+	GoodsSpe    string `json:"goods_spe"`
+	Shelves     string `json:"shelves"`
 	NeedNum     int    `json:"need_num"`
 	GoodsRemark string `json:"goods_remark"`
 	Unit        string `json:"unit"`
@@ -70,69 +72,58 @@ const (
 )
 
 func PrePickGoodsBatchSave(db *gorm.DB, list *[]PrePickGoods) (err error) {
-	result := db.Model(&PrePickGoods{}).Save(list)
+	err = db.Model(&PrePickGoods{}).Save(list).Error
 
-	return result.Error
+	return
 }
 
-func UpdatePrePickGoodsByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
-	result := db.Model(&PrePickGoods{}).
+func UpdatePrePickGoodsByIds(db *gorm.DB, ids []int, mp map[string]interface{}) (err error) {
+	err = db.Model(&PrePickGoods{}).
 		Where("id in (?)", ids).
-		Updates(mp)
+		Updates(mp).
+		Error
 
-	return result.Error
+	return
 }
 
-func UpdatePrePickGoodsStatusByIds(db *gorm.DB, ids []int, status int) error {
-	result := db.Model(&PrePickGoods{}).
+func UpdatePrePickGoodsStatusByIds(db *gorm.DB, ids []int, status int) (err error) {
+	err = db.Model(&PrePickGoods{}).
 		Where("id in (?)", ids).
-		Update("status", status)
+		Update("status", status).
+		Error
 
-	if result.Error != nil {
-		return result.Error
-	}
-
-	return nil
+	return
 }
 
-func UpdatePrePickGoodsByPrePickIds(db *gorm.DB, prePickIds []int, mp map[string]interface{}) error {
-	result := db.Model(&PrePickGoods{}).
+func UpdatePrePickGoodsByPrePickIds(db *gorm.DB, prePickIds []int, mp map[string]interface{}) (err error) {
+	err = db.Model(&PrePickGoods{}).
 		Where("pre_pick_id in (?)", prePickIds).
-		Updates(mp)
+		Updates(mp).
+		Error
 
-	if result.Error != nil {
-		return result.Error
-	}
-
-	return nil
+	return
 }
 
 func GetPrePickGoodsJoinPrePickListByNumber(db *gorm.DB, numbers []string) (err error, list []PrePickGoodsJoinPrePick) {
-	result := db.Table("t_pre_pick_goods pg").
+	err = db.Table("t_pre_pick_goods pg").
 		Select("pg.id as pre_pick_goods_id,pg.*,pp.*").
 		Joins("left join t_pre_pick pp on pg.pre_pick_id = pp.id").
 		Where("pg.number in (?)", numbers).
-		Find(&list)
+		Find(&list).
+		Error
 
-	if result.Error != nil {
-		return result.Error, list
-	}
-
-	return result.Error, list
+	return
 }
 
 func GetPrePickGoodsJoinPrePickListByBatchId(db *gorm.DB, batchId int) (err error, list []PrePickGoodsJoinPrePick) {
-	result := db.Table("t_pre_pick_goods pg").
+	err = db.Table("t_pre_pick_goods pg").
 		Select("pg.id as pre_pick_goods_id,pg.*,pp.*").
 		Joins("left join t_pre_pick pp on pg.pre_pick_id = pp.id").
 		Where("pg.batch_id = ?", batchId).
-		Find(&list)
+		Find(&list).
+		Error
 
-	if result.Error != nil {
-		return result.Error, list
-	}
-
-	return result.Error, list
+	return
 }
 
 // 按分类或商品获取未进入拣货池的商品数据
@@ -147,35 +138,33 @@ func GetPrePickGoodsByTypeParam(db *gorm.DB, ids []int, formType int, typeParam 
 		local.Where("sku in (?)", typeParam)
 	}
 
-	result := local.Find(&prePickGoods)
+	err = local.Find(&prePickGoods).Error
 
-	return result.Error, prePickGoods
+	return
 }
 
 func GetPrePickGoodsList(db *gorm.DB, cond *PrePickGoods) (err error, list []PrePickGoods) {
-	result := db.Model(&PrePickGoods{}).Where(cond).Find(&list)
+	err = db.Model(&PrePickGoods{}).Where(cond).Find(&list).Error
 
-	if result.Error != nil {
-		return result.Error, nil
-	}
-
-	return nil, list
+	return
 }
 
 func GetPrePickGoodsAndRemark(db *gorm.DB, batchId int, sku string) (err error, list []PrePickGoodsJoinPrePickRemark) {
-	result := db.Table("t_pre_pick_goods pg").
-		Select("pg.number,pg.sku,pg.goods_name,pg.need_num,pg.unit,pr.goods_remark").
+	err = db.Table("t_pre_pick_goods pg").
+		Select("pg.number,pg.sku,pg.goods_name,pg.need_num,pg.unit,pg.goods_spe,pg.shelves,pr.goods_remark").
 		Joins("left join t_pre_pick_remark pr on pg.pre_pick_id = pr.pre_pick_id and pg.order_goods_id = pr.order_goods_id").
 		Where("pg.batch_id = ? and pg.sku = ?", batchId, sku).
-		Find(&list)
+		Find(&list).
+		Error
 
-	return result.Error, list
+	return
 }
 
 func GetPrePickGoodsByPrePickIdAndStatus(db *gorm.DB, ids []int, status int) (err error, list []PrePickGoods) {
-	result := db.Model(&PrePickGoods{}).
+	err = db.Model(&PrePickGoods{}).
 		Where("pre_pick_id in (?) and status = ?", ids, status).
-		Find(&list)
+		Find(&list).
+		Error
 
-	return result.Error, list
+	return
 }

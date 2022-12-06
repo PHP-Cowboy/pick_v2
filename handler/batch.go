@@ -140,13 +140,13 @@ func CentralizedPickDetail(c *gin.Context) {
 		return
 	}
 
-	err, list := dao.CentralizedPickDetail(global.DB, form)
+	err, res := dao.CentralizedPickDetail(global.DB, form)
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
-	xsq_net.SucJson(c, gin.H{"list": list})
+	xsq_net.SucJson(c, res)
 }
 
 func GetUserInfo(c *gin.Context) *middlewares.CustomClaims {
@@ -311,6 +311,7 @@ func GetBatchList(c *gin.Context) {
 // 批次池数量
 func GetBatchPoolNum(c *gin.Context) {
 	var (
+		form      req.GetBatchPoolNumForm
 		batchPool []rsp.BatchPoolNum
 		res       rsp.GetBatchPoolNumRsp
 		ongoing   int
@@ -318,8 +319,14 @@ func GetBatchPoolNum(c *gin.Context) {
 		finished  int
 	)
 
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
 	result := global.DB.Model(&model.Batch{}).
 		Select("count(id) as count, status").
+		Where(model.Batch{Typ: form.Typ}).
 		Group("status").
 		Find(&batchPool)
 

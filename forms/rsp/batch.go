@@ -37,6 +37,7 @@ type CentralizedPickListRsp struct {
 type CentralizedPickList struct {
 	TaskName    string `json:"task_name"`
 	GoodsName   string `json:"goods_name"`
+	Sku         string `json:"sku"`
 	GoodsSpe    string `json:"goods_spe"`
 	NeedNum     int    `json:"need_num"`
 	CompleteNum int    `json:"complete_num"`
@@ -68,9 +69,16 @@ type Secondary struct {
 
 type CentralizedPickDetailGoodsInfo struct {
 	GoodsName   string `json:"goods_name"`
+	GoodsSpe    string `json:"goods_spe"`
+	Shelves     string `json:"shelves"`
 	NeedNum     int    `json:"need_num"`
 	GoodsRemark string `json:"goods_remark"`
 	Unit        string `json:"unit"`
+}
+
+type CentralizedPickDetailRsp struct {
+	Info CentralizedPickDetailGoodsInfo `json:"info"`
+	List []CentralizedPickDetailList    `json:"list"`
 }
 
 type CentralizedPickDetailList struct {
@@ -82,6 +90,7 @@ type CentralizedPickDetailList struct {
 	GoodsRemark string `json:"goods_remark"`
 	OrderRemark string `json:"order_remark"`
 	NeedNum     int    `json:"need_num"`
+	Number      string `json:"number"`
 	CompleteNum int    `json:"complete_num"`
 }
 

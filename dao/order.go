@@ -2,9 +2,13 @@ package dao
 
 import (
 	"errors"
+	"fmt"
 	"github.com/apache/rocketmq-client-go/v2/consumer"
 	"gorm.io/gorm"
 	"pick_v2/forms/req"
+	"pick_v2/utils/slice"
+	"pick_v2/utils/timeutil"
+	"time"
 
 	"pick_v2/forms/rsp"
 	"pick_v2/model"
@@ -17,7 +21,7 @@ func Shipping(db *gorm.DB, form req.PurchaseOrderForm, info rsp.OrderInfo) (cons
 		orderGoods []model.OrderGoods
 	)
 
-	err, exist := model.OrderOrCompleteOrderExist(db, form.OrderId, info.Number)
+	err, exist := OrderOrCompleteOrderExist(db, form.OrderId, info.Number)
 	//出现错误，消息消费重试
 	if err != nil {
 		return consumer.ConsumeRetryLater, err
@@ -108,7 +112,7 @@ func NoShipping(db *gorm.DB, form req.PurchaseOrderForm, info rsp.OrderInfo) (co
 
 	//查询订单和完成订单中是否已存在
 	//订单中也查询，避免因拣货的错误导致拣货系统也出现错误(极端情况，正常不可能出现,也处理一下，以防万一)
-	err, exist := model.OrderOrCompleteOrderExist(db, form.OrderId, info.Number)
+	err, exist := OrderOrCompleteOrderExist(db, form.OrderId, info.Number)
 	//出现错误，消息消费重试
 	if err != nil {
 		return consumer.ConsumeRetryLater, err
@@ -167,4 +171,141 @@ func NoShipping(db *gorm.DB, form req.PurchaseOrderForm, info rsp.OrderInfo) (co
 	tx.Commit()
 
 	return consumer.ConsumeSuccess, nil
+}
+
+// 完成订单
+func CompleteOrder(db *gorm.DB, form req.CompleteOrderForm) (err error, res rsp.CompleteOrderRsp) {
+	var completeOrder []model.CompleteOrder
+
+	numbers := []string{}
+
+	if form.Sku != "" {
+		var completeOrderDetail []model.CompleteOrderDetail
+
+		err, completeOrderDetail = model.GetCompleteOrderDetailBySku(db, form.Sku)
+
+		if err != nil {
+			return
+		}
+
+		for _, detail := range completeOrderDetail {
+			numbers = append(numbers, detail.Number)
+		}
+
+		numbers = slice.UniqueSlice(numbers)
+	}
+
+	//商品
+	local := db.
+		Model(&model.CompleteOrder{}).
+		Where(&model.CompleteOrder{
+			ShopId:         form.ShopId,
+			Number:         form.Number,
+			Line:           form.Line,
+			DeliveryMethod: form.DeliveryMethod,
+			ShopType:       form.ShopType,
+			Province:       form.Province,
+			City:           form.City,
+			District:       form.District,
+		})
+
+	if len(numbers) > 0 {
+		local.Where("number in (?)", numbers)
+	}
+
+	if form.IsRemark == 1 { //没有备注
+		local.Where("order_remark == ''")
+	} else if form.IsRemark == 2 { //有备注
+		local.Where("order_remark != ''")
+	}
+
+	if form.PayAt != "" {
+
+		var payAt time.Time
+
+		//将支付时间字符串格式时间转换成当天的结束时间
+		err, payAt = timeutil.StrToLastTime(form.PayAt)
+
+		if err != nil {
+			return
+		}
+
+		local.Where("pay_at <= ", payAt)
+	}
+
+	result := local.Find(&completeOrder)
+
+	if result.Error != nil {
+		err = result.Error
+		return
+	}
+
+	if len(numbers) == 0 {
+		for _, order := range completeOrder {
+			numbers = append(numbers, order.Number)
+		}
+	}
+
+	res.Total = result.RowsAffected
+
+	result = local.Scopes(model.Paginate(form.Page, form.Size)).Find(&completeOrder)
+
+	if result.Error != nil {
+		err = result.Error
+		return
+	}
+
+	err, mpNums := model.CountCompleteOrderNumsByNumber(db, numbers)
+
+	if err != nil {
+		return
+	}
+
+	list := make([]rsp.CompleteOrder, 0, form.Size)
+
+	for _, o := range completeOrder {
+
+		nums, mpNumsOk := mpNums[o.Number]
+
+		if !mpNumsOk {
+			err = errors.New("订单相关数量统计有误")
+			return
+		}
+
+		list = append(list, rsp.CompleteOrder{
+			Number:         o.Number,
+			PayAt:          o.PayAt,
+			ShopCode:       o.ShopCode,
+			ShopName:       o.ShopName,
+			ShopType:       o.ShopType,
+			PayCount:       nums.SumPayCount,
+			OutCount:       nums.SumReviewCount,
+			CloseCount:     nums.SumCloseCount,
+			Line:           o.Line,
+			DeliveryMethod: o.DeliveryMethod,
+			Region:         fmt.Sprintf("%s-%s-%s", o.Province, o.City, o.District),
+			PickTime:       o.PickTime,
+			OrderRemark:    o.OrderRemark,
+		})
+	}
+
+	res.List = list
+	return
+}
+
+// 查询订单是否在拣货系统已存在[订单表、完成订单表]
+func OrderOrCompleteOrderExist(db *gorm.DB, ids []int, number string) (err error, exist bool) {
+
+	// 根据id查询订单表中是否已存在
+	err, exist = model.FindOrderExistByIds(db, ids)
+
+	//有错误或者已存在，直接返回
+	if err != nil || exist {
+		return
+	}
+
+	//查询完成订单里是否存在
+	err, exist = model.FindCompleteOrderExist(db, number)
+
+	return
 }

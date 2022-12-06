@@ -23,39 +23,33 @@ const (
 )
 
 func PrePickBatchSave(db *gorm.DB, list *[]PrePick) (err error) {
-	result := db.Model(&PrePick{}).Save(list)
+	err = db.Model(&PrePick{}).Save(list).Error
 
-	return result.Error
+	return
 }
 
-func UpdatePrePickStatusByIds(db *gorm.DB, ids []int, status int) error {
-	result := db.Model(&PrePick{}).
+func UpdatePrePickStatusByIds(db *gorm.DB, ids []int, status int) (err error) {
+	err = db.Model(&PrePick{}).
 		Where("id in (?)", ids).
-		Update("status", status)
+		Update("status", status).
+		Error
 
-	if result.Error != nil {
-		return result.Error
-	}
-
-	return nil
+	return
 }
 
-func UpdatePrePickByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
-	result := db.Model(&PrePick{}).
+func UpdatePrePickByIds(db *gorm.DB, ids []int, mp map[string]interface{}) (err error) {
+	err = db.Model(&PrePick{}).
 		Where("id in (?)", ids).
-		Updates(mp)
+		Updates(mp).
+		Error
 
-	if result.Error != nil {
-		return result.Error
-	}
-
-	return nil
+	return
 }
 
 // 根据id和status状态获取拣货池数据
 func GetPrePickByIdsAndStatus(db *gorm.DB, ids []int, status int) (err error, prePick []PrePick) {
 	//status 0:未处理,1:已进入拣货池
-	result := db.Model(&PrePick{}).Where("id in (?) and status = ?", ids, status).Find(&prePick)
+	err = db.Model(&PrePick{}).Where("id in (?) and status = ?", ids, status).Find(&prePick).Error
 
-	return result.Error, prePick
+	return
 }

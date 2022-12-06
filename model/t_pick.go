@@ -54,50 +54,49 @@ type PickAndGoods struct {
 	PickUser string `json:"pick_user"`
 }
 
-func PickBatchSave(db *gorm.DB, picks *[]Pick) error {
-	result := db.Model(&Pick{}).Save(picks)
-	return result.Error
+func PickBatchSave(db *gorm.DB, picks *[]Pick) (err error) {
+	err = db.Model(&Pick{}).Save(picks).Error
+	return
 }
 
-func PickSave(db *gorm.DB, picks *Pick) error {
-	result := db.Model(&Pick{}).Save(picks)
-	return result.Error
+func PickSave(db *gorm.DB, picks *Pick) (err error) {
+	err = db.Model(&Pick{}).Save(picks).Error
+	return
 }
 
-func PickReplaceSave(db *gorm.DB, list []Pick, values []string) error {
-	result := db.Model(&Pick{}).
+func PickReplaceSave(db *gorm.DB, list []Pick, values []string) (err error) {
+	err = db.Model(&Pick{}).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns(values),
 		}).
-		Save(&list)
+		Save(&list).
+		Error
 
-	return result.Error
+	return
 }
 
-func UpdatePickByPk(db *gorm.DB, pk int, mp map[string]interface{}) error {
-	result := db.Model(&Pick{}).Where("id = ?", pk).Updates(mp)
+func UpdatePickByPk(db *gorm.DB, pk int, mp map[string]interface{}) (err error) {
+	err = db.Model(&Pick{}).Where("id = ?", pk).Updates(mp).Error
 
-	return result.Error
+	return
 }
 
-func UpdatePickByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
-	result := db.Model(&Pick{}).Where("id in (?)", ids).Updates(mp)
+func UpdatePickByIds(db *gorm.DB, ids []int, mp map[string]interface{}) (err error) {
+	err = db.Model(&Pick{}).Where("id in (?)", ids).Updates(mp).Error
 
-	return result.Error
+	return
 }
 
 func GetPickByPk(db *gorm.DB, id int) (err error, pick Pick) {
-	result := db.Model(&Pick{}).First(&pick, id)
+	err = db.Model(&Pick{}).First(&pick, id).Error
 
-	if result.Error != nil {
+	if err != nil {
 
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			err = ecode.DataNotExist
 			return
 		}
-
-		err = result.Error
 	}
 
 	return
@@ -105,24 +104,25 @@ func GetPickByPk(db *gorm.DB, id int) (err error, pick Pick) {
 
 func GetPickListByIds(db *gorm.DB, ids []int) (err error, list []Pick) {
 
-	result := db.Model(&Pick{}).Where("id in (?)", ids).Find(&list)
+	err = db.Model(&Pick{}).Where("id in (?)", ids).Find(&list).Error
 
-	return result.Error, list
+	return
 }
 
 // 根据条件获取拣货列表
 func GetPickList(db *gorm.DB, cond Pick) (err error, list []Pick) {
 
-	result := db.Model(&Pick{}).Where(cond).Find(&list)
+	err = db.Model(&Pick{}).Where(cond).Find(&list).Error
 
-	return result.Error, list
+	return
 }
 
 // 获取当前用户已接单但未复核完成的批次
 func GetPickListByPickUserAndNotReviewCompleted(db *gorm.DB, userName string, typ int) (err error, list []Pick) {
-	result := db.Model(&Pick{}).
+	err = db.Model(&Pick{}).
 		Where("pick_user = ? and status in (?) and typ = ?", userName, []int{ToBePickedStatus, ToBeReviewedStatus}, typ).
-		Find(&list)
+		Find(&list).
+		Error
 
-	return result.Error, list
+	return
 }

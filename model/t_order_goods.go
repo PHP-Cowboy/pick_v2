@@ -97,41 +97,43 @@ const (
 )
 
 // 批量保存订单商品
-func OrderGoodsBatchSave(db *gorm.DB, list *[]OrderGoods) error {
-	result := db.Model(&OrderGoods{}).CreateInBatches(list, BatchSize)
+func OrderGoodsBatchSave(db *gorm.DB, list *[]OrderGoods) (err error) {
+	err = db.Model(&OrderGoods{}).CreateInBatches(list, BatchSize).Error
 
-	return result.Error
+	return
 }
 
-func OrderGoodsReplaceSave(db *gorm.DB, list *[]OrderGoods, values []string) error {
+func OrderGoodsReplaceSave(db *gorm.DB, list *[]OrderGoods, values []string) (err error) {
 
-	result := db.Model(&OrderGoods{}).
+	err = db.Model(&OrderGoods{}).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns(values),
-		}).Save(list)
+		}).
+		Save(list).
+		Error
 
-	return result.Error
+	return
 }
 
 // 批量更新订单商品数据
-func UpdateOrderGoodsByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
-	result := db.Model(&OrderGoods{}).Where("id in (?)", ids).Updates(mp)
+func UpdateOrderGoodsByIds(db *gorm.DB, ids []int, mp map[string]interface{}) (err error) {
+	err = db.Model(&OrderGoods{}).Where("id in (?)", ids).Updates(mp).Error
 
-	return result.Error
+	return
 }
 
 // 批量更新订单商品数据
-func UpdateOrderGoodsByNumbers(db *gorm.DB, numbers []string, mp map[string]interface{}) error {
-	result := db.Model(&OrderGoods{}).Where("number in (?)", numbers).Updates(mp)
+func UpdateOrderGoodsByNumbers(db *gorm.DB, numbers []string, mp map[string]interface{}) (err error) {
+	err = db.Model(&OrderGoods{}).Where("number in (?)", numbers).Updates(mp).Error
 
-	return result.Error
+	return
 }
 
 // 通过ids变更订单类型&&商品状态
-func UpdateOrderAndGoodsByIds(db *gorm.DB, orderIds []int, orderGoodsIds []int, orderType, status int) error {
+func UpdateOrderAndGoodsByIds(db *gorm.DB, orderIds []int, orderGoodsIds []int, orderType, status int) (err error) {
 
-	err := UpdateOrderByIds(db, orderIds, map[string]interface{}{"order_type": orderType})
+	err = UpdateOrderByIds(db, orderIds, map[string]interface{}{"order_type": orderType})
 
 	if err != nil {
 		return err
@@ -147,9 +149,9 @@ func UpdateOrderAndGoodsByIds(db *gorm.DB, orderIds []int, orderGoodsIds []int, 
 }
 
 // 通过numbers变更订单类型&&商品状态
-func UpdateOrderAndGoodsByNumbers(db *gorm.DB, numbers []string, orderType, status int) error {
+func UpdateOrderAndGoodsByNumbers(db *gorm.DB, numbers []string, orderType, status int) (err error) {
 
-	err := UpdateOrderByNumbers(db, numbers, map[string]interface{}{"order_type": orderType})
+	err = UpdateOrderByNumbers(db, numbers, map[string]interface{}{"order_type": orderType})
 
 	if err != nil {
 		return err
@@ -165,82 +167,84 @@ func UpdateOrderAndGoodsByNumbers(db *gorm.DB, numbers []string, orderType, stat
 }
 
 // 变更订单商品状态
-func UpdateOrderGoodsStatus(db *gorm.DB, list []OrderGoods, values []string) error {
-	result := db.Model(&OrderGoods{}).Clauses(clause.OnConflict{
+func UpdateOrderGoodsStatus(db *gorm.DB, list []OrderGoods, values []string) (err error) {
+	err = db.Model(&OrderGoods{}).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns(values),
-	}).Save(&list)
+	}).
+		Save(&list).
+		Error
 
-	return result.Error
+	return
 }
 
-func DeleteOrderGoodsByNumbers(db *gorm.DB, numbers []string) error {
-	result := db.Delete(&OrderGoods{}, "number in (?)", numbers)
-	return result.Error
+func DeleteOrderGoodsByNumbers(db *gorm.DB, numbers []string) (err error) {
+	err = db.Delete(&OrderGoods{}, "number in (?)", numbers).Error
+	return
 }
 
 // 临时加单
 // 订单&&商品信息
 func GetOrderJoinGoodsListByNumbers(db *gorm.DB, number []string) (err error, list []OrderJoinGoods) {
-	result := db.Table("t_order_goods og").
+	err = db.Table("t_order_goods og").
 		Select("o.*,o.id as order_id,og.*,og.id as order_goods_id").
 		Joins("left join t_order o on og.number = o.number").
 		Where("og.number in (?)", number).
-		Find(&list)
+		Find(&list).
+		Error
 
-	if result.Error != nil {
-		return result.Error, nil
-	}
-
-	return nil, list
+	return
 }
 
 // 根据orderGoodsId查订单商品数据并根据支付时间排序
 func GetOrderGoodsJoinOrderByIds(db *gorm.DB, ids []int) (err error, list []OrderJoinGoods) {
-	result := db.Table("t_order_goods og").
+	err = db.Table("t_order_goods og").
 		Select("o.*,o.id as order_id,og.*").
 		Joins("left join t_order o on og.number = o.number").
 		Where("og.id in (?)", ids).
 		Order("pay_at ASC").
-		Find(&list)
+		Find(&list).
+		Error
 
-	return result.Error, list
+	return
 }
 
 // 根据批次id查询订单&&订单商品数据
 func GetOrderGoodsJoinOrderByBatchId(db *gorm.DB, batchId int) (err error, list []OrderJoinGoods) {
-	result := db.Table("t_order_goods og").
+	err = db.Table("t_order_goods og").
 		Select("o.*,o.id as order_id,og.*").
 		Joins("left join t_order o on og.number = o.number").
 		Where("og.batch_id = ?", batchId).
-		Find(&list)
+		Find(&list).
+		Error
 
-	return result.Error, list
+	return
 }
 
 // 根据订单商品id查询数据
 func GetOrderGoodsListByIds(db *gorm.DB, ids []int) (err error, list []OrderGoods) {
-	result := db.Model(&OrderGoods{}).Where("id in (?)", ids).Find(&list)
-	return result.Error, list
+	err = db.Model(&OrderGoods{}).Where("id in (?)", ids).Find(&list).Error
+	return
 }
 
 func GetOrderGoodsListByNumbers(db *gorm.DB, numbers []string) (err error, list []OrderGoods) {
-	result := db.Model(&OrderGoods{}).Where("number in (?)", numbers).Find(&list)
-	return result.Error, list
+	err = db.Model(&OrderGoods{}).Where("number in (?)", numbers).Find(&list).Error
+	return
 }
 
 // 获取出库任务订单 商品相关数量
 func OrderGoodsNumsStatisticalByNumbers(db *gorm.DB, query string, number []string) (err error, mp map[string]OrderGoodsNumsStatistical) {
 	var nums []OrderGoodsNumsStatistical
 
-	result := db.Model(&OrderGoods{}).
+	err = db.Model(&OrderGoods{}).
 		Select(query).
 		Where("number in (?)", number).
 		Group("number").
-		Find(&nums)
+		Find(&nums).
+		Error
 
-	if result.Error != nil {
-		return result.Error, nil
+	if err != nil {
+		return
 	}
 
 	mp = make(map[string]OrderGoodsNumsStatistical, 0)

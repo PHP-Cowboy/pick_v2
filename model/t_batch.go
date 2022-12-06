@@ -47,7 +47,14 @@ const (
 
 // 获取配送方式
 func GetDeliveryMethod(method int) string {
-	var methodMp = map[int]string{1: "公司配送", 2: "用户自提", 3: "三方物流", 4: "快递配送", 5: "首批物料|设备单"}
+	var methodMp = map[int]string{
+		1: "公司配送",
+		2: "用户自提",
+		3: "三方物流",
+		4: "快递配送",
+		5: "首批物料|设备单",
+		6: "无需出库",
+	}
 
 	s, ok := methodMp[method]
 
@@ -60,28 +67,26 @@ func GetDeliveryMethod(method int) string {
 
 func BatchSave(db *gorm.DB, batch Batch) (err error, b Batch) {
 
-	result := db.Model(&Batch{}).Save(&batch)
+	err = db.Model(&Batch{}).Save(&batch).Error
 
-	return result.Error, batch
+	return
 }
 
-func UpdateBatchByPk(db *gorm.DB, pk int, mp map[string]interface{}) error {
-	result := db.Model(&Batch{}).Where("id = ?", pk).Updates(mp)
-	return result.Error
+// 根据主键更新批次数据
+func UpdateBatchByPk(db *gorm.DB, pk int, mp map[string]interface{}) (err error) {
+	err = db.Model(&Batch{}).Where("id = ?", pk).Updates(mp).Error
+	return
 }
 
 // 通过主键查询数据
 func GetBatchByPk(db *gorm.DB, pk int) (err error, batch Batch) {
-	result := db.Model(&Batch{}).First(&batch, pk)
+	err = db.Model(&Batch{}).First(&batch, pk).Error
 
-	if result.Error != nil {
-
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			err = ecode.DataNotExist
 			return
 		}
-
-		err = result.Error
 	}
 
 	return
@@ -90,26 +95,39 @@ func GetBatchByPk(db *gorm.DB, pk int) (err error, batch Batch) {
 // 根据出库任务获取批次列表
 func GetBatchListByTaskId(db *gorm.DB, taskId int) (err error, list []Batch) {
 
-	result := db.Model(&Batch{}).Where(&Batch{TaskId: taskId}).Find(&list)
+	err = db.Model(&Batch{}).
+		Where(&Batch{TaskId: taskId}).
+		Find(&list).
+		Error
 
-	return result.Error, list
+	return
 }
 
 // 快递批次进行中或暂停的单数量
 func GetBatchListByTyp(db *gorm.DB, typ int) (err error, list []Batch) {
-	result := db.Model(&Batch{}).Where("typ = ? and ( status = 0 or status = 2 )", typ).Find(&list)
+	err = db.Model(&Batch{}).
+		Where("typ = ? and ( status = 0 or status = 2 )", typ).
+		Find(&list).
+		Error
 
-	return result.Error, list
+	return
 }
 
 func GetBatchList(db *gorm.DB, cond Batch) (err error, list []Batch) {
-	result := db.Model(&Batch{}).Where(&cond).Find(&list)
+	err = db.Model(&Batch{}).
+		Where(&cond).
+		Find(&list).
+		Error
 
-	return result.Error, list
+	return
 }
 
+// 获取进行中的批次 或 用户已接单但未完成的批次
 func GetBatchListByIdsOrPending(db *gorm.DB, ids []int, typ int) (err error, list []Batch) {
-	result := db.Model(&Batch{}).Where("id in (?) or status = ? and typ = ?", ids, BatchOngoingStatus, typ).Find(&list)
+	err = db.Model(&Batch{}).
+		Where("id in (?) or status = ? and typ = ?", ids, BatchOngoingStatus, typ).
+		Find(&list).
+		Error
 
-	return result.Error, list
+	return
 }

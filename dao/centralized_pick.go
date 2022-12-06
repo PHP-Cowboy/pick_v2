@@ -73,6 +73,7 @@ func CentralizedPickList(db *gorm.DB, form req.CentralizedPickListForm) (err err
 		list = append(list, &rsp.CentralizedPickList{
 			TaskName:    pick.GoodsName,
 			GoodsName:   pick.GoodsName,
+			Sku:         pick.Sku,
 			GoodsSpe:    pick.GoodsSpe,
 			NeedNum:     pick.NeedNum,
 			CompleteNum: pick.CompleteNum,
@@ -86,12 +87,12 @@ func CentralizedPickList(db *gorm.DB, form req.CentralizedPickListForm) (err err
 }
 
 // 集中拣货详情
-func CentralizedPickDetail(db *gorm.DB, form req.CentralizedPickDetailForm) (err error, list []rsp.CentralizedPickDetailList) {
+func CentralizedPickDetail(db *gorm.DB, form req.CentralizedPickDetailForm) (err error, res rsp.CentralizedPickDetailRsp) {
 
 	err, prePickGoodsList := model.GetPrePickGoodsAndRemark(db, form.BatchId, form.Sku)
 
 	if err != nil {
-		return err, nil
+		return
 	}
 
 	var (
@@ -104,25 +105,30 @@ func CentralizedPickDetail(db *gorm.DB, form req.CentralizedPickDetailForm) (err
 
 		pickMp[l.Number] = rsp.CentralizedPickDetailGoodsInfo{
 			GoodsName:   l.GoodsName,
+			GoodsSpe:    l.GoodsSpe,
+			Shelves:     l.Shelves,
 			NeedNum:     l.NeedNum,
 			GoodsRemark: l.GoodsRemark,
 			Unit:        l.Unit,
 		}
+
+		res.Info = pickMp[l.Number]
 	}
 
 	err, orderList := model.GetOrderListByNumbers(db, numbers)
 
 	if err != nil {
-		return err, nil
+		return
 	}
 
-	list = make([]rsp.CentralizedPickDetailList, 0, len(orderList))
+	list := make([]rsp.CentralizedPickDetailList, 0, len(orderList))
 
 	for _, ol := range orderList {
 		goodsInfo, pickOk := pickMp[ol.Number]
 
 		if !pickOk {
-			return errors.New("商品数据异常"), nil
+			err = errors.New("商品数据异常")
+			return
 		}
 
 		list = append(list, rsp.CentralizedPickDetailList{
@@ -133,11 +139,14 @@ func CentralizedPickDetail(db *gorm.DB, form req.CentralizedPickDetailForm) (err
 			NeedNum:     goodsInfo.NeedNum,
 			GoodsRemark: goodsInfo.GoodsRemark,
 			Unit:        goodsInfo.Unit,
+			Number:      ol.Number,
 			OrderRemark: ol.OrderRemark,
 		})
 	}
 
-	return err, list
+	res.List = list
+
+	return
 }
 
 // 集中拣货剩余数量统计

@@ -46,6 +46,7 @@ type OutboundOrderList struct {
 	ShopName          string        `json:"shop_name"`
 	ShopType          string        `json:"shop_type"`
 	DistributionType  int           `json:"distribution_type"`
+	Sku               string        `json:"sku"`
 	GoodsNum          int           `json:"goods_num"`
 	LimitNum          int           `json:"limit_num"`
 	CloseNum          int           `json:"close_num"`

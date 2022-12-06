@@ -23,50 +23,49 @@ type OutboundTaskCountStatus struct {
 }
 
 const (
-	OutboundTaskStatus        = iota
+	_                         = iota
 	OutboundTaskStatusOngoing //进行中
 	OutboundTaskStatusClosed  //已结束
 )
 
-func OutboundTaskCreate(db *gorm.DB, task *OutboundTask) error {
-	result := db.Model(&OutboundTask{}).Create(task)
-	return result.Error
+func OutboundTaskCreate(db *gorm.DB, task *OutboundTask) (err error) {
+	err = db.Model(&OutboundTask{}).Create(task).Error
+	return
 }
 
-func UpdateOutboundTaskStatusById(db *gorm.DB, taskId int) error {
-	result := db.Model(&OutboundTask{}).
+func UpdateOutboundTaskStatusById(db *gorm.DB, taskId int) (err error) {
+	err = db.Model(&OutboundTask{}).
 		Where("id = ?", taskId).
-		Update("status", OutboundTaskStatusClosed)
+		Update("status", OutboundTaskStatusClosed).
+		Error
 
-	return result.Error
+	return
 }
 
 // 根据status分组统计任务条数
 func OutboundTaskCountGroupStatus(db *gorm.DB) (err error, count []OutboundTaskCountStatus) {
 
-	result := db.Model(&OutboundTask{}).
+	err = db.Model(&OutboundTask{}).
 		Select("count(1) as count, status").
 		Group("status").
-		Find(&count)
+		Find(&count).
+		Error
 
-	if result.Error != nil {
-		return result.Error, nil
-	}
-
-	return nil, count
+	return
 }
 
 func GetOutboundTaskStatusOngoingList(db *gorm.DB) (err error, list []OutboundTask) {
-	result := db.Model(&OutboundTask{}).
+	err = db.Model(&OutboundTask{}).
 		Where("status = ?", OutboundTaskStatusOngoing).
-		Find(&list)
+		Find(&list).
+		Error
 
-	return result.Error, list
+	return
 }
 
 // 根据ID查找出库任务数据
 func GetOutboundTaskById(db *gorm.DB, id int) (err error, task OutboundTask) {
-	result := db.Model(&OutboundTask{}).First(&task, id)
+	err = db.Model(&OutboundTask{}).First(&task, id).Error
 
-	return result.Error, task
+	return
 }

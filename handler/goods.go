@@ -4,10 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
-
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"pick_v2/dao"
 
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
@@ -17,7 +16,6 @@ import (
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/request"
 	"pick_v2/utils/slice"
-	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 )
 
@@ -371,8 +369,7 @@ func ShippingRecordDetail(c *gin.Context) {
 // 完成订单
 func CompleteOrder(c *gin.Context) {
 	var (
-		form req.CompleteOrderReq
-		res  rsp.CompleteOrderRsp
+		form req.CompleteOrderForm
 	)
 
 	if err := c.ShouldBind(&form); err != nil {
@@ -380,100 +377,10 @@ func CompleteOrder(c *gin.Context) {
 		return
 	}
 
-	var completeOrder []model.CompleteOrder
-
-	db := global.DB
-
-	numbers := []string{}
-
-	if form.Sku != "" {
-		var completeOrderDetail []model.CompleteOrderDetail
-		result := db.Model(&model.CompleteOrderDetail{}).Where("sku = ?", form.Sku).Find(&completeOrderDetail)
-		if result.Error != nil {
-			xsq_net.ErrorJSON(c, result.Error)
-			return
-		}
-
-		for _, detail := range completeOrderDetail {
-			numbers = append(numbers, detail.Number)
-		}
-
-		numbers = slice.UniqueSlice(numbers)
-	}
-
-	//商品
-	local := db.
-		Model(&model.CompleteOrder{}).
-		Where(&model.CompleteOrder{
-			ShopId:         form.ShopId,
-			Number:         form.Number,
-			Line:           form.Line,
-			DeliveryMethod: form.DeliveryMethod,
-			ShopType:       form.ShopType,
-			Province:       form.Province,
-			City:           form.City,
-			District:       form.District,
-		})
-
-	if len(numbers) > 0 {
-		local.Where("number in (?)", numbers)
-	}
-
-	if form.IsRemark == 1 { //没有备注
-		local.Where("order_remark == ''")
-	} else if form.IsRemark == 2 { //有备注
-		local.Where("order_remark != ''")
-	}
-
-	if form.PayAt != "" {
-		t, err := time.ParseInLocation(timeutil.DateFormat, form.PayAt, time.Local)
-
-		if err != nil {
-			xsq_net.ErrorJSON(c, ecode.DataTransformationError)
-			return
-		}
-
-		local.Where("pay_at <= ", timeutil.GetLastTime(t))
-	}
-
-	result := local.Find(&completeOrder)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
+	err, res := dao.CompleteOrder(global.DB, form)
+	if err != nil {
 		return
 	}
-
-	res.Total = result.RowsAffected
-
-	result = local.Scopes(model.Paginate(form.Page, form.Size)).Find(&completeOrder)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	list := make([]rsp.CompleteOrder, 0, form.Size)
-
-	for _, o := range completeOrder {
-
-		list = append(list, rsp.CompleteOrder{
-			Number:         o.Number,
-			PayAt:          o.PayAt,
-			ShopCode:       o.ShopCode,
-			ShopName:       o.ShopName,
-			ShopType:       o.ShopType,
-			PayCount:       o.PayCount,
-			OutCount:       o.OutCount,
-			CloseCount:     o.CloseCount,
-			Line:           o.Line,
-			DeliveryMethod: o.DeliveryMethod,
-			Region:         fmt.Sprintf("%s-%s-%s", o.Province, o.City, o.District),
-			PickTime:       o.PickTime,
-			OrderRemark:    o.OrderRemark,
-		})
-	}
-
-	res.List = list
 
 	xsq_net.SucJson(c, res)
 }

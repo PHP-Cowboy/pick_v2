@@ -39,92 +39,95 @@ type PickGoodsJoinOrder struct {
 	ReviewNum int    `json:"review_num"`
 }
 
-func PickGoodsSave(db *gorm.DB, list *[]PickGoods) error {
-	result := db.Model(&PickGoods{}).Save(list)
-	return result.Error
+func PickGoodsSave(db *gorm.DB, list *[]PickGoods) (err error) {
+	err = db.Model(&PickGoods{}).Save(list).Error
+	return
 }
 
-func PickGoodsReplaceSave(db *gorm.DB, list *[]PickGoods, values []string) error {
+func PickGoodsReplaceSave(db *gorm.DB, list *[]PickGoods, values []string) (err error) {
 
-	result := db.Model(&PickGoods{}).
+	err = db.Model(&PickGoods{}).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns(values),
-		}).Save(list)
+		}).Save(list).
+		Error
 
-	return result.Error
+	return
 }
 
 func UpdatePickGoodsByIds(db *gorm.DB, ids []int, mp map[string]interface{}) (err error) {
-	result := db.Model(&PickGoods{}).Where("id in (?)", ids).Updates(mp)
-	return result.Error
+	err = db.Model(&PickGoods{}).Where("id in (?)", ids).Updates(mp).Error
+	return
 }
 
 // 根据pickId更新拣货池商品数据
 func UpdatePickGoodsByPickId(db *gorm.DB, pickId int, mp map[string]interface{}) (err error) {
-	result := db.Model(&PickGoods{}).Where("pick_id = ?", pickId).Updates(mp)
-	return result.Error
+	err = db.Model(&PickGoods{}).Where("pick_id = ?", pickId).Updates(mp).Error
+	return
 }
 
-func UpdatePickGoodsByPickIds(db *gorm.DB, pickIds []int, mp map[string]interface{}) error {
-	result := db.Model(&Pick{}).Where("pick_id in (?)", pickIds).Updates(mp)
+func UpdatePickGoodsByPickIds(db *gorm.DB, pickIds []int, mp map[string]interface{}) (err error) {
+	err = db.Model(&Pick{}).Where("pick_id in (?)", pickIds).Updates(mp).Error
 
-	return result.Error
+	return
 }
 
 func GetPickGoodsByIds(db *gorm.DB, ids []int) (err error, list []PickGoods) {
-	result := db.Model(&PickGoods{}).Where("id in (?)", ids).Find(&list)
+	err = db.Model(&PickGoods{}).Where("id in (?)", ids).Find(&list).Error
 
-	return result.Error, list
+	return
 }
 
 func GetPickGoodsByNumber(db *gorm.DB, numbers []string) (err error, list []PickGoods) {
-	result := db.Model(&PickGoods{}).Where("number in (?)", numbers).Find(&list)
+	err = db.Model(&PickGoods{}).Where("number in (?)", numbers).Find(&list).Error
 
-	return result.Error, list
+	return
 }
 
 // 根据拣货id查拣货池商品数据
 func GetPickGoodsByPickIds(db *gorm.DB, pickIds []int) (err error, list []PickGoods) {
-	result := db.Model(&PickGoods{}).Where("pick_id in (?)", pickIds).Find(&list)
+	err = db.Model(&PickGoods{}).Where("pick_id in (?)", pickIds).Find(&list).Error
 
-	return result.Error, list
+	return
 }
 
 // 根据拣货id查拣货池商品数据
 func GetPickGoodsByPickIdAndSku(db *gorm.DB, pickId int, skus []string) (err error, list []PickGoods) {
-	result := db.Model(&PickGoods{}).Where("pick_id = ? and sku in (?)", pickId, skus).Find(&list)
+	err = db.Model(&PickGoods{}).Where("pick_id = ? and sku in (?)", pickId, skus).Find(&list).Error
 
-	return result.Error, list
+	return
 }
 
 // 根据批次ID查询拣货商品数据
 func GetPickGoodsByBatchId(db *gorm.DB, batchId int) (err error, list []PickGoods) {
-	result := db.Model(&PickGoods{}).Where("batch_id = ?", batchId).Find(&list)
+	err = db.Model(&PickGoods{}).Where("batch_id = ?", batchId).Find(&list).Error
 
-	return result.Error, list
+	return
 }
 
 // 根据订单商品表订单编号查询拣货表数据
 func GetPickGoodsJoinPickByNumbers(db *gorm.DB, numbers []string) (err error, list []PickAndGoods) {
-	result := db.Table("t_pick_goods pg").
+	err = db.Table("t_pick_goods pg").
 		Select("p.id as pick_id,p.status,pg.number,p.pick_user").
 		Joins("left join t_pick p on pg.pick_id = p.id").
 		Where("number in (?)", numbers).
-		Find(&list)
+		Find(&list).
+		Error
 
-	return result.Error, list
+	return
 }
 
 // 根据拣货ID查询拣货池商品数据并获取相关订单数据
 func GetPickGoodsJoinOrderByPickId(db *gorm.DB, pickId int) (err error, list []PickGoodsJoinOrder) {
-	result := db.Table("t_pick_goods pg").
+	err = db.Table("t_pick_goods pg").
 		Select("shop_code,goods_name,goods_spe,unit,sku,pg.need_num,pg.review_num").
 		Where("pg.pick_id = ?", pickId).
 		Joins("left join t_pick_order po on po.number = pg.number").
-		Scan(&list)
+		Scan(&list).
+		Error
 
-	return result.Error, list
+	return
 }
 
 // 查询拣货池商品订单是否有已拣的
@@ -133,29 +136,33 @@ func GetFirstPickGoodsByNumbers(db *gorm.DB, numbers []string) (err error, exist
 	var pickGoods PickGoods
 
 	//
-	result := db.Model(&PickGoods{}).Where("number in (?) and complete_num >= 0", numbers).First(&pickGoods)
+	err = db.Model(&PickGoods{}).Where("number in (?) and complete_num >= 0", numbers).First(&pickGoods).Error
 
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+	if err != nil {
+		//未查到
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, false
 		}
 
-		return result.Error, true
+		//有错误
+		return
 	}
 
-	return nil, false
+	//查询到已有
+
+	return nil, true
 }
 
 // 统计集中拣货相关数量
 func CountPickByBatch(db *gorm.DB, batchIds []int) (err error, countCentralizedPick []CountPickNums) {
 
-	result := db.Model(&PickGoods{}).
+	err = db.Model(&PickGoods{}).
 		Select("batch_id,sum(need_num) as sum_need_num,sum(complete_num) as sum_complete_num,count(need_num) as count_need_num,count(complete_num) as count_complete_num").
 		Where("batch_id in (?)", batchIds).
 		Group("batch_id").
-		Find(&countCentralizedPick)
+		Find(&countCentralizedPick).Error
 
-	return result.Error, countCentralizedPick
+	return
 }
 
 type CountBatchNums struct {
@@ -181,13 +188,12 @@ func CountBatchNumsByBatchIds(db *gorm.DB, batchIds []int) (err error, mp map[in
 	mp = make(map[int]CountBatchNums, 0)
 
 	//预拣池商品表，统计各个批次 店铺数，订单数，商品数
-	result := db.Model(&PrePickGoods{}).
+	err = db.Model(&PrePickGoods{}).
 		Select("batch_id,count(distinct(shop_id)) as shop_num,count(distinct(number)) as order_num,sum(need_num) as goods_num").
 		Where("batch_id in (?)", batchIds).
 		Group("batch_id").
-		Find(&count)
-
-	err = result.Error
+		Find(&count).
+		Error
 
 	if err != nil {
 		return
@@ -198,13 +204,11 @@ func CountBatchNumsByBatchIds(db *gorm.DB, batchIds []int) (err error, mp map[in
 	}
 
 	//统计预拣池任务数量
-	result = db.Model(&PrePick{}).
+	err = db.Model(&PrePick{}).
 		Select("batch_id,count(1) as pre_pick_num").
 		Where("batch_id in (?) and status = ?", batchIds, PrePickStatusUnhandled).
 		Group("batch_id").
-		Find(&pickCount)
-
-	err = result.Error
+		Find(&pickCount).Error
 
 	if err != nil {
 		return
@@ -224,13 +228,12 @@ func CountBatchNumsByBatchIds(db *gorm.DB, batchIds []int) (err error, mp map[in
 	}
 
 	//统计拣货池 待拣货任务数 待复核任务数
-	result = db.Model(&Pick{}).
+	err = db.Model(&Pick{}).
 		Select("batch_id,status,count(1) as count").
 		Where("batch_id in (?) and status in (?)", batchIds, []int{ToBePickedStatus, ToBeReviewedStatus}).
 		Group("batch_id,status").
-		Find(&prePickCount)
-
-	err = result.Error
+		Find(&prePickCount).
+		Error
 
 	if err != nil {
 		return
@@ -284,13 +287,12 @@ func CountPickPoolNumsByPickIds(db *gorm.DB, pickIds []int, query string) (err e
 
 	mp = make(map[int]CountPickPoolNums, 0)
 
-	result := db.Model(&PickGoods{}).
+	err = db.Model(&PickGoods{}).
 		Select(query).
 		Where("pick_id in (?)", pickIds).
 		Group("pick_id").
-		Find(&count)
-
-	err = result.Error
+		Find(&count).
+		Error
 
 	if err != nil {
 		return

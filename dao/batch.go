@@ -130,10 +130,10 @@ func BatchSaveLogic(db *gorm.DB, form req.NewCreateBatchForm, claims *middleware
 		outboundTask model.OutboundTask
 	)
 	//获取出库任务信息
-	result := db.Model(&model.OutboundTask{}).First(&outboundTask, form.TaskId)
+	err, outboundTask = model.GetOutboundTaskById(db, form.TaskId)
 
-	if result.Error != nil {
-		return result.Error, batch
+	if err != nil {
+		return
 	}
 
 	//t_batch
@@ -155,7 +155,7 @@ func BatchSaveLogic(db *gorm.DB, form req.NewCreateBatchForm, claims *middleware
 	})
 
 	if err != nil {
-		return err, batch
+		return
 	}
 
 	return
@@ -200,6 +200,25 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 
 	if err != nil {
 		tx.Rollback()
+		return err
+	}
+
+	//构造更新 t_outbound_order 表 order_type 数据
+	outboundOrder := make([]model.OutboundOrder, 0, len(form.Number))
+
+	//根据传递过来的任务id和订单编号生成需要被变更order_type状态为拣货中的数据
+	for _, number := range form.Number {
+		outboundOrder = append(outboundOrder, model.OutboundOrder{
+			TaskId:    form.TaskId,
+			Number:    number,
+			OrderType: model.OutboundOrderTypePicking,
+		})
+	}
+
+	//批量更新 t_outbound_order 表 order_type 状态为拣货中
+	err = model.OutboundOrderReplaceSave(db, outboundOrder, []string{"order_type"})
+
+	if err != nil {
 		return err
 	}
 
@@ -306,7 +325,7 @@ func BatchList(db *gorm.DB, form req.GetBatchListForm) (err error, res rsp.GetBa
 		local.Where("status = ?", model.BatchClosedStatus)
 	}
 
-	local.Where(&model.Batch{DeliveryMethod: form.DeliveryMethod})
+	local.Where(&model.Batch{DeliveryMethod: form.DeliveryMethod, Typ: form.Typ})
 
 	result := local.Find(&batches)
 

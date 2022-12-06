@@ -47,34 +47,34 @@ const (
 	OutboundOrderTypeClose    //已关闭
 )
 
-func OutboundOrderBatchSave(db *gorm.DB, data []OutboundOrder) error {
+func OutboundOrderBatchSave(db *gorm.DB, list []OutboundOrder) (err error) {
 
-	result := db.Model(&OutboundOrder{}).CreateInBatches(&data, BatchSize)
+	err = db.Model(&OutboundOrder{}).CreateInBatches(&list, BatchSize).Error
 
-	return result.Error
+	return
 }
 
-func OutboundOrderReplaceSave(db *gorm.DB, list []OutboundOrder, values []string) error {
-	result := db.Model(&OutboundOrder{}).
+func OutboundOrderReplaceSave(db *gorm.DB, list []OutboundOrder, values []string) (err error) {
+	err = db.Model(&OutboundOrder{}).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "task_id,number"}},
 			DoUpdates: clause.AssignmentColumns(values),
 		}).
-		Save(&list)
+		Save(&list).Error
 
-	return result.Error
+	return
 }
 
-func OutboundOrderBatchUpdate(db *gorm.DB, where OutboundOrder, mp map[string]interface{}) error {
-	result := db.Model(&OutboundOrder{}).Where(&where).Updates(mp)
+func OutboundOrderBatchUpdate(db *gorm.DB, where OutboundOrder, mp map[string]interface{}) (err error) {
+	err = db.Model(&OutboundOrder{}).Where(&where).Updates(mp).Error
 
-	return result.Error
+	return
 }
 
-func UpdateOutboundOrderByTaskIdAndNumbers(db *gorm.DB, taskId int, numbers []string, mp map[string]interface{}) error {
-	result := db.Model(&OutboundOrder{}).Where("task_id = ? and number in (?)", taskId, numbers).Updates(mp)
+func UpdateOutboundOrderByTaskIdAndNumbers(db *gorm.DB, taskId int, numbers []string, mp map[string]interface{}) (err error) {
+	err = db.Model(&OutboundOrder{}).Where("task_id = ? and number in (?)", taskId, numbers).Updates(mp).Error
 
-	return result.Error
+	return err
 }
 
 func GetOutboundNumber(taskId int, number string) string {
@@ -82,34 +82,37 @@ func GetOutboundNumber(taskId int, number string) string {
 }
 
 func GetOutboundOrderByPk(db *gorm.DB, taskId int, number string) (err error, outboundOrder OutboundOrder) {
-	result := db.Model(&OutboundOrder{}).Where("task_id = ? and number = ?", taskId, number).Find(&outboundOrder)
-	return result.Error, outboundOrder
+	err = db.Model(&OutboundOrder{}).
+		Where("task_id = ? and number = ?", taskId, number).
+		Find(&outboundOrder).
+		Error
+	return
 }
 
 func GetOutboundOrderByTaskIdAndNumbers(db *gorm.DB, taskId int, numbers []string) (err error, list []OutboundOrder) {
-	result := db.Model(&OutboundOrder{}).Where("task_id = ? and number in (?)", taskId, numbers).Find(&list)
-	return result.Error, list
+	err = db.Model(&OutboundOrder{}).Where("task_id = ? and number in (?)", taskId, numbers).Find(&list).Error
+	return
 }
 
 // 根据status分组统计任务条数
 func OutboundOrderOrderTypeCount(db *gorm.DB, taskId int) (err error, count []OutboundOrderTypeCount) {
 
-	result := db.Model(&OutboundOrder{}).
+	err = db.Model(&OutboundOrder{}).
 		Select("count(1) as count, order_type").
 		Where("task_id = ? and order_type != ?", taskId, OutboundOrderTypeClose).
 		Group("order_type").
-		Find(&count)
+		Find(&count).
+		Error
 
-	if result.Error != nil {
-		return result.Error, nil
-	}
-
-	return nil, count
+	return
 }
 
 // 根据任务ID查询出库任务订单新订单类型数据
 func GetOutboundOrderByTaskId(db *gorm.DB, taskId int) (err error, list []OutboundOrder) {
-	result := db.Model(&OutboundOrder{}).Where("task_id = ? and order_type = ?", taskId, OutboundOrderTypeNew).Find(&list)
+	err = db.Model(&OutboundOrder{}).
+		Where("task_id = ? and order_type = ?", taskId, OutboundOrderTypeNew).
+		Find(&list).
+		Error
 
-	return result.Error, list
+	return
 }

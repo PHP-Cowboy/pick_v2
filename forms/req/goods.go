@@ -41,7 +41,7 @@ type ShippingRecordDetailReq struct {
 	Id int `json:"id" form:"id"`
 }
 
-type CompleteOrderReq struct {
+type CompleteOrderForm struct {
 	Paging
 	Number         string `json:"number"` //订单号
 	ShopId         int    `json:"shop_id"`

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"time"
@@ -56,85 +57,73 @@ const (
 	DistributionTypeFirst             // 5:首批物料|设备单
 )
 
-func OrderSave(db *gorm.DB, order *Order) error {
-	result := db.Model(&Order{}).Save(order)
-	return result.Error
+func OrderSave(db *gorm.DB, order *Order) (err error) {
+	err = db.Model(&Order{}).Save(order).Error
+	return
 }
 
-func OrderBatchSave(db *gorm.DB, list []Order) error {
-	result := db.Model(&Order{}).Save(&list)
-	return result.Error
+func OrderBatchSave(db *gorm.DB, list []Order) (err error) {
+	err = db.Model(&Order{}).Save(&list).Error
+	return
 }
 
-func OrderReplaceSave(db *gorm.DB, list []Order, values []string) error {
+func OrderReplaceSave(db *gorm.DB, list []Order, values []string) (err error) {
 	//[]string{"shop_id", "shop_name", "shop_type", "shop_code", "house_code", "line"}
 
-	result := db.Model(&Order{}).
+	err = db.Model(&Order{}).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns(values),
-		}).Save(&list)
+		}).
+		Save(&list).
+		Error
 
-	return result.Error
+	return
 }
 
-func UpdateOrderByIds(db *gorm.DB, ids []int, mp map[string]interface{}) error {
-	result := db.Model(&Order{}).Where("id in (?)", ids).Updates(mp)
+func UpdateOrderByIds(db *gorm.DB, ids []int, mp map[string]interface{}) (err error) {
+	err = db.Model(&Order{}).Where("id in (?)", ids).Updates(mp).Error
 
-	return result.Error
+	return
 }
 
-func UpdateOrderByNumbers(db *gorm.DB, numbers []string, mp map[string]interface{}) error {
-	result := db.Model(&Order{}).Where("number in (?)", numbers).Updates(mp)
+func UpdateOrderByNumbers(db *gorm.DB, numbers []string, mp map[string]interface{}) (err error) {
+	err = db.Model(&Order{}).Where("number in (?)", numbers).Updates(mp).Error
 
-	return result.Error
+	return
 }
 
-func DeleteOrderByNumbers(db *gorm.DB, numbers []string) error {
-	result := db.Delete(&Order{}, "number in (?)", numbers)
+func DeleteOrderByNumbers(db *gorm.DB, numbers []string) (err error) {
+	err = db.Delete(&Order{}, "number in (?)", numbers).Error
 
-	return result.Error
+	return
 }
 
-func DeleteOrderByIds(db *gorm.DB, ids []int) error {
-	result := db.Delete(&Order{}, "id in (?)", ids)
+func DeleteOrderByIds(db *gorm.DB, ids []int) (err error) {
+	err = db.Delete(&Order{}, "id in (?)", ids).Error
 
-	return result.Error
+	return
 }
 
-func OrderOrCompleteOrderExist(db *gorm.DB, ids []int, number string) (err error, exist bool) {
-	var (
-		order         []Order
-		completeOrder []CompleteOrder
-	)
+// 查询订单表中存在的ids的条数
+func FindOrderExistByIds(db *gorm.DB, ids []int) (err error, exist bool) {
+	var order Order
+	err = db.Model(&Order{}).Where("id in (?)", ids).First(&order).Error
 
-	// 查询是否已存在 存在的过滤掉
-	result := db.Where("id in (?)", ids).Find(&order)
-
-	if result.Error != nil {
-		return result.Error, false
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false
+		}
+		return
 	}
-
-	if len(order) > 0 {
-		return nil, true
-	}
-
-	//查看完成订单里有没有
-	result = db.Where("number = ?", number).Find(&completeOrder)
-
-	if result.Error != nil {
-		return result.Error, false
-	}
-
-	if len(completeOrder) > 0 {
-		return nil, true
-	}
-
-	return nil, false
+	//查询到了数据，即为存在
+	exist = true
+	return
 }
 
+// 根据订单编号查询订单数据
 func GetOrderListByNumbers(db *gorm.DB, numbers []string) (err error, list []Order) {
-	result := db.Model(&Order{}).Where("number in (?)", numbers).Find(&list)
+	err = db.Model(&Order{}).Where("number in (?)", numbers).Find(&list).Error
 
-	return result.Error, list
+	return
 }

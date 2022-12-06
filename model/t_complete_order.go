@@ -1,6 +1,9 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"errors"
+	"gorm.io/gorm"
+)
 
 // 完成订单表
 type CompleteOrder struct {
@@ -13,9 +16,6 @@ type CompleteOrder struct {
 	ShopCode       string  `gorm:"type:varchar(255);not null;comment:店铺编号"`
 	Line           string  `gorm:"type:varchar(255);not null;comment:线路"`
 	DeliveryMethod int     `gorm:"type:tinyint;not null;comment:配送方式"`
-	PayCount       int     `gorm:"comment:下单数量"`
-	CloseCount     int     `gorm:"type:int;comment:关闭数量"`
-	OutCount       int     `gorm:"type:int;comment:出库数量"`
 	Province       string  `gorm:"type:varchar(64);comment:省"`
 	City           string  `gorm:"type:varchar(64);comment:市"`
 	District       string  `gorm:"type:varchar(64);comment:区"`
@@ -23,14 +23,37 @@ type CompleteOrder struct {
 	PayAt          MyTime  `gorm:"type:datetime;comment:支付时间"`
 }
 
-func CompleteOrderSave(db *gorm.DB, list *CompleteOrder) error {
-	result := db.Model(&CompleteOrder{}).Save(list)
+func CompleteOrderSave(db *gorm.DB, list *CompleteOrder) (err error) {
+	err = db.Model(&CompleteOrder{}).Save(list).Error
 
-	return result.Error
+	return
 }
 
-func CompleteOrderBatchSave(db *gorm.DB, list *[]CompleteOrder) error {
-	result := db.Model(&CompleteOrder{}).Save(list)
+func CompleteOrderBatchSave(db *gorm.DB, list *[]CompleteOrder) (err error) {
+	err = db.Model(&CompleteOrder{}).Save(list).Error
 
-	return result.Error
+	return
+}
+
+func GetCompleteOrderList(db *gorm.DB, cond *CompleteOrder) (err error, list []CompleteOrder) {
+	err = db.Model(&CompleteOrder{}).Where(cond).Find(&list).Error
+	return
+}
+
+func FindCompleteOrderExist(db *gorm.DB, number string) (err error, exist bool) {
+
+	var completeOrder CompleteOrder
+
+	err = db.Model(&CompleteOrder{}).Where("number = ?", number).First(&completeOrder).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false
+		}
+		return
+	}
+	//查询到了数据，即为存在
+	exist = true
+
+	return
 }
