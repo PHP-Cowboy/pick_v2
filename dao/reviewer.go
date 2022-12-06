@@ -117,6 +117,7 @@ func ReviewList(db *gorm.DB, form req.ReviewListReq) (err error, res rsp.ReviewL
 	return
 }
 
+//确认出库
 func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 
 	var (
@@ -134,16 +135,19 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 		return
 	}
 
-	if pick.Status == 2 {
-		err = ecode.OrderHasBeenReviewedAndCompleted
+	//不是待复核状态
+	if pick.Status != model.ToBeReviewedStatus {
+		err = ecode.OrderNotToBeReviewed
 		return
 	}
 
+	//复核接单的人不是当前用户
 	if pick.ReviewUser != form.UserName {
 		err = ecode.DataNotExist
 		return
 	}
 
+	//获取批次数据
 	err, batch = model.GetBatchByPk(db, pick.BatchId)
 
 	if err != nil {
@@ -190,6 +194,7 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 		deliveryOrderNoArr model.GormList
 	}
 
+	//map[order_goods_id]OrderGoods
 	orderGoodsMp := make(map[int]OrderGoods, 0)
 
 	var (
@@ -332,7 +337,8 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 	}
 
 	var order []model.Order
-	//更新订单表 已拣 未拣
+
+	//根据订单编号获取订单数据
 	err, order = model.GetOrderListByNumbers(db, orderNumbers)
 
 	if err != nil {
@@ -341,7 +347,7 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 
 	tx := db.Begin()
 
-	//更新拣货单商品表数据
+	//更新出库任务商品表数据
 	err = model.OutboundGoodsReplaceSave(tx, outboundGoods, []string{"lack_count", "out_count", "status", "delivery_order_no"})
 	if err != nil {
 		tx.Rollback()
@@ -416,13 +422,13 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 			status, ok := pickStatusMp[ps.Id]
 
 			if ok {
-				ps.Status = status //刚更新的状态立即查询，mysql数据可能还在缓存中差不到，更新成map中保存的状态
+				ps.Status = status //刚更新的状态立即查询，mysql数据可能还在缓存中查不到，更新成map中保存的状态
 			}
 
 			if ps.Status < model.ReviewCompletedStatus {
 				//批次有未复核完成的拣货单
 				isSendMQ = false
-				continue
+				break
 			}
 		}
 
@@ -609,15 +615,15 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 	}
 
 	//更新拣货商品数据
-	result := tx.Save(&pickGoods)
+	err = model.PickGoodsReplaceSave(tx, &pickGoods, []string{"review_num"})
 
-	if result.Error != nil {
+	if err != nil {
 		tx.Rollback()
 		return
 	}
 
 	//拆单 -打印
-	for shopId, _ := range printChMp {
+	for shopId := range printChMp {
 		AddPrintJobMap(constant.JH_HUOSE_CODE, &global.PrintCh{
 			DeliveryOrderNo: deliveryOrderNo,
 			ShopId:          shopId,
@@ -625,8 +631,9 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 		})
 	}
 
-	result = db.First(&batch, pick.BatchId)
-	if result.Error != nil {
+	err, batch = model.GetBatchByPk(db, pick.BatchId)
+
+	if err != nil {
 		tx.Rollback()
 		return
 	}
