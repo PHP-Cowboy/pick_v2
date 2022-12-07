@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"gorm.io/gorm"
-
 	"pick_v2/forms/req"
+	"pick_v2/forms/rsp"
 	"pick_v2/middlewares"
 	"pick_v2/model"
 	"pick_v2/utils/cache"
@@ -227,6 +227,131 @@ func CreatePrePickLogic(
 			return
 		}
 	}
+
+	return
+}
+
+// 预拣货明细
+func GetPrePickDetail(db *gorm.DB, form req.GetPrePickDetailForm) (err error, res rsp.GetPrePickDetailRsp) {
+
+	var (
+		prePick       model.PrePick
+		prePickGoods  []model.PrePickGoods
+		prePickRemark []model.PrePickRemark
+	)
+
+	err, prePick = model.GetPrePickByPk(db, form.PrePickId)
+
+	if err != nil {
+		return
+	}
+
+	res.TaskName = prePick.ShopName
+	res.Line = prePick.Line
+
+	err, prePickGoods = model.GetPrePickGoodsByPrePickIdAndStatus(db, []int{form.PrePickId}, model.PrePickGoodsStatusUnhandled)
+
+	if err != nil {
+		return
+	}
+
+	prePickGoodsSkuMp := make(map[string]rsp.MergePrePickGoods, 0)
+
+	goodsNum := 0
+
+	orderNumMp := make(map[string]struct{}, 0)
+
+	//相同sku合并处理
+	for _, goods := range prePickGoods {
+
+		orderNumMp[goods.Number] = struct{}{}
+
+		goodsNum += goods.NeedNum
+
+		val, ok := prePickGoodsSkuMp[goods.Sku]
+
+		paramsId := rsp.ParamsId{
+			PickGoodsId:  goods.Id,
+			OrderGoodsId: goods.OrderGoodsId,
+		}
+
+		if !ok {
+
+			prePickGoodsSkuMp[goods.Sku] = rsp.MergePrePickGoods{
+				Id:        goods.Id,
+				Sku:       goods.Sku,
+				GoodsName: goods.GoodsName,
+				GoodsType: goods.GoodsType,
+				GoodsSpe:  goods.GoodsSpe,
+				Shelves:   goods.Shelves,
+				NeedNum:   goods.NeedNum,
+				Unit:      goods.Unit,
+				ParamsId:  []rsp.ParamsId{paramsId},
+			}
+		} else {
+			val.NeedNum += val.NeedNum
+			val.ParamsId = append(val.ParamsId, paramsId)
+			prePickGoodsSkuMp[goods.Sku] = val
+		}
+	}
+
+	//订单数
+	res.OrderNum = len(orderNumMp)
+
+	//商品数
+	res.GoodsNum = goodsNum
+
+	goodsMap := make(map[string][]rsp.MergePrePickGoods, 0)
+
+	for _, goods := range prePickGoodsSkuMp {
+
+		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.MergePrePickGoods{
+			Id:        goods.Id,
+			Sku:       goods.Sku,
+			GoodsName: goods.GoodsName,
+			GoodsType: goods.GoodsType,
+			GoodsSpe:  goods.GoodsSpe,
+			Shelves:   goods.Shelves,
+			NeedNum:   goods.NeedNum,
+			Unit:      goods.Unit,
+			ParamsId:  goods.ParamsId,
+		})
+	}
+
+	res.Goods = goodsMap
+
+	err, prePickRemark = model.GetPrePickRemarkByPrePickId(db, form.PrePickId)
+
+	if err != nil {
+		return
+	}
+
+	remarkMap := make(map[string]rsp.Remark, 0)
+
+	list := []rsp.Remark{}
+	for _, remark := range prePickRemark {
+		remarkMap[remark.Number] = rsp.Remark{
+			Number:      remark.Number,
+			OrderRemark: remark.OrderRemark,
+			GoodsRemark: remark.GoodsRemark,
+		}
+	}
+
+	for n := range orderNumMp {
+		remark, remarkMapOk := remarkMap[n]
+
+		if !remarkMapOk {
+			list = append(list, rsp.Remark{
+				Number:      n,
+				OrderRemark: "",
+				GoodsRemark: "",
+			})
+		} else {
+			list = append(list, remark)
+		}
+	}
+
+	res.RemarkList = list
 
 	return
 }

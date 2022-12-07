@@ -18,6 +18,11 @@ type PickRemark struct {
 }
 
 func PickRemarkBatchSave(db *gorm.DB, list *[]PickRemark) (err error) {
-	err = db.Model(&PickRemark{}).Save(list).Error
+	err = db.Model(&PickRemark{}).CreateInBatches(list, BatchSize).Error
+	return
+}
+
+func GetPickRemarkByPickId(db *gorm.DB, pickId int) (err error, list []PickRemark) {
+	err = db.Model(&PickRemark{}).Where("pick_id = ?", pickId).Find(&list).Error
 	return
 }

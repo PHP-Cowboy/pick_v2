@@ -482,7 +482,6 @@ func GetPrePickList(c *gin.Context) {
 func GetPrePickDetail(c *gin.Context) {
 	var (
 		form req.GetPrePickDetailForm
-		res  rsp.GetPrePickDetailRsp
 	)
 
 	if err := c.ShouldBind(&form); err != nil {
@@ -490,113 +489,12 @@ func GetPrePickDetail(c *gin.Context) {
 		return
 	}
 
-	var (
-		prePick       model.PrePick
-		prePickGoods  []model.PrePickGoods
-		prePickRemark []model.PrePickRemark
-	)
+	err, res := dao.GetPrePickDetail(global.DB, form)
 
-	db := global.DB
-
-	result := db.First(&prePick, form.PrePickId)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
-
-	res.TaskName = prePick.ShopName
-	res.Line = prePick.Line
-
-	result = db.Where("pre_pick_id = ? and status = 0", form.PrePickId).Find(&prePickGoods)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	prePickGoodsSkuMp := make(map[string]rsp.MergePrePickGoods, 0)
-
-	goodsNum := 0
-
-	orderNumMp := make(map[string]struct{}, 0)
-
-	//相同sku合并处理
-	for _, goods := range prePickGoods {
-
-		orderNumMp[goods.Number] = struct{}{}
-
-		goodsNum += goods.NeedNum
-
-		val, ok := prePickGoodsSkuMp[goods.Sku]
-
-		paramsId := rsp.ParamsId{
-			PickGoodsId:  goods.Id,
-			OrderGoodsId: goods.OrderGoodsId,
-		}
-
-		if !ok {
-
-			prePickGoodsSkuMp[goods.Sku] = rsp.MergePrePickGoods{
-				Id:        goods.Id,
-				Sku:       goods.Sku,
-				GoodsName: goods.GoodsName,
-				GoodsType: goods.GoodsType,
-				GoodsSpe:  goods.GoodsSpe,
-				Shelves:   goods.Shelves,
-				NeedNum:   goods.NeedNum,
-				Unit:      goods.Unit,
-				ParamsId:  []rsp.ParamsId{paramsId},
-			}
-		} else {
-			val.NeedNum += val.NeedNum
-			val.ParamsId = append(val.ParamsId, paramsId)
-			prePickGoodsSkuMp[goods.Sku] = val
-		}
-	}
-
-	//订单数
-	res.OrderNum = len(orderNumMp)
-
-	//商品数
-	res.GoodsNum = goodsNum
-
-	goodsMap := make(map[string][]rsp.MergePrePickGoods, 0)
-
-	for _, goods := range prePickGoodsSkuMp {
-
-		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.MergePrePickGoods{
-			Id:        goods.Id,
-			Sku:       goods.Sku,
-			GoodsName: goods.GoodsName,
-			GoodsType: goods.GoodsType,
-			GoodsSpe:  goods.GoodsSpe,
-			Shelves:   goods.Shelves,
-			NeedNum:   goods.NeedNum,
-			Unit:      goods.Unit,
-			ParamsId:  goods.ParamsId,
-		})
-	}
-
-	res.Goods = goodsMap
-
-	result = db.Where("pre_pick_id = ?", form.PrePickId).Find(&prePickRemark)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	list := []rsp.Remark{}
-	for _, remark := range prePickRemark {
-		list = append(list, rsp.Remark{
-			Number:      remark.Number,
-			OrderRemark: remark.OrderRemark,
-			GoodsRemark: remark.GoodsRemark,
-		})
-	}
-
-	res.RemarkList = list
 
 	xsq_net.SucJson(c, res)
 }
@@ -914,7 +812,7 @@ func PrintCallGet(c *gin.Context) {
 		if !item2ok {
 			item2val = rsp.CallGetGoodsView{
 				SaleNumber:  info.Number,
-				Date:        timeutil.FormatToDateTime(time.Time(info.PayAt)),
+				Date:        timeutil.FormatToDateTime(time.Time(*info.PayAt)),
 				OrderRemark: info.OrderRemark,
 			}
 		}

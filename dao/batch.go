@@ -3,7 +3,6 @@ package dao
 import (
 	"context"
 	"errors"
-	"pick_v2/utils/ecode"
 	"strconv"
 	"strings"
 
@@ -17,6 +16,7 @@ import (
 	"pick_v2/global"
 	"pick_v2/middlewares"
 	"pick_v2/model"
+	"pick_v2/utils/ecode"
 	"pick_v2/utils/helper"
 	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
@@ -136,8 +136,7 @@ func BatchSaveLogic(db *gorm.DB, form req.NewCreateBatchForm, claims *middleware
 		return
 	}
 
-	//t_batch
-	err, batch = model.BatchSave(db, model.Batch{
+	batch = model.Batch{
 		TaskId:            form.TaskId,
 		WarehouseId:       claims.WarehouseId,
 		BatchName:         form.BatchName,
@@ -152,7 +151,10 @@ func BatchSaveLogic(db *gorm.DB, form req.NewCreateBatchForm, claims *middleware
 		PayEndTime:        outboundTask.PayEndTime,
 		Version:           0,
 		Typ:               form.Typ,
-	})
+	}
+
+	//t_batch
+	err = model.BatchSave(db, &batch)
 
 	if err != nil {
 		return
@@ -259,23 +261,22 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 func GetBatchIdsFromPrePickGoods(db *gorm.DB, form req.GetBatchListForm) (err error, batchIds []int) {
 	var prePickGoods []model.PrePickGoods
 
-	result := global.DB.Model(&model.PrePickGoods{}).
+	err = db.Model(&model.PrePickGoods{}).
 		Where(model.PrePickGoods{
 			Sku:    form.Sku,
 			Number: form.Number,
 			ShopId: form.ShopId,
 		}).
 		Select("batch_id").
-		Find(&prePickGoods)
-
-	err = result.Error
+		Find(&prePickGoods).
+		Error
 
 	if err != nil {
 		return
 	}
 
 	//未找到，直接返回
-	if result.RowsAffected == 0 {
+	if len(prePickGoods) == 0 {
 		return
 	}
 
@@ -401,11 +402,11 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 	var (
 		batch          model.Batch
 		pickGoods      []model.PickGoods
-		picks          []model.Pick
 		orderJoinGoods []model.OrderJoinGoods
 	)
 
 	err, batch = model.GetBatchByPk(db, form.Id)
+
 	if err != nil {
 		return
 	}
@@ -415,17 +416,21 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 		return
 	}
 
+	tx := db.Begin()
+
 	//修改批次状态为已结束
-	err = model.UpdateBatchByPk(db, batch.Id, map[string]interface{}{"status": model.BatchClosedStatus})
+	err = model.UpdateBatchByPk(tx, batch.Id, map[string]interface{}{"status": model.BatchClosedStatus})
 
 	if err != nil {
+		tx.Rollback()
 		return
 	}
 
-	//// 根据批次id查询订单&&订单商品数据
+	// 根据批次id查询订单&&订单商品数据
 	err, orderJoinGoods = model.GetOrderGoodsJoinOrderByBatchId(db, batch.Id)
 
 	if err != nil {
+		tx.Rollback()
 		return
 	}
 
@@ -433,27 +438,10 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 	err, pickGoods = model.GetPickGoodsByBatchId(db, batch.Id)
 
 	if err != nil {
+		tx.Rollback()
 		err = errors.New("批次结束成功，但推送u8拣货数据查询失败:" + err.Error())
-		global.Logger["err"].Infof(err.Error())
 		return
 	}
-
-	err, picks = model.GetPickList(db, model.Pick{BatchId: batch.Id})
-
-	if err != nil {
-		err = errors.New("批次结束成功，但推送u8拣货数据查询失败:" + err.Error())
-		global.Logger["err"].Infof(err.Error())
-		return
-	}
-
-	//拣货表数据map
-	mpPick := make(map[int]model.Pick, 0)
-
-	for _, p := range picks {
-		mpPick[p.Id] = p
-	}
-
-	tx := global.DB.Begin()
 
 	err = YongYouLog(tx, pickGoods, orderJoinGoods, batch.Id)
 
@@ -462,8 +450,17 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 		return
 	}
 
-	//这里会删数据，要放在推u8之后处理，失败重试要加上这里的逻辑
-	err = UpdateCompleteOrder(tx, batch.Id, batch.TaskId, orderJoinGoods)
+	var orderNumbers = make([]string, 0, len(orderJoinGoods))
+
+	for _, good := range pickGoods {
+		orderNumbers = append(orderNumbers, good.Number)
+	}
+
+	orderNumbers = slice.UniqueSlice(orderNumbers)
+
+	//更新 OutboundOrder 为已完成
+	err = model.UpdateOutboundOrderByTaskIdAndNumbers(db, batch.TaskId, orderNumbers, map[string]interface{}{"order_type": model.OutboundOrderTypeComplete})
+
 	if err != nil {
 		tx.Rollback()
 		return
@@ -471,6 +468,102 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 
 	tx.Commit()
 
+	return
+}
+
+// 批次出库订单和商品明细
+func GetBatchOrderAndGoods(db *gorm.DB, form req.GetBatchOrderAndGoodsForm) (err error, res rsp.GetBatchOrderAndGoodsRsp) {
+	var (
+		batch         model.Batch
+		outboundOrder []model.OutboundOrder
+		outboundGoods []model.OutboundGoods
+		mp            = make(map[string][]rsp.OutGoods)
+		numbers       = make([]string, 0)
+	)
+
+	err, batch = model.GetBatchByPk(db, form.Id)
+
+	if err != nil {
+		return
+	}
+
+	//状态:0:进行中,1:已结束,2:暂停
+	if batch.Status != 1 {
+		err = errors.New("批次未结束")
+		return
+	}
+
+	err, outboundGoods = model.GetOutboundGoodsList(db, model.OutboundGoods{BatchId: batch.Id})
+	if err != nil {
+		return
+	}
+
+	totalGoodsNum := 0
+
+	for _, good := range outboundGoods {
+		//出库为0的不推送
+		if good.OutCount == 0 {
+			continue
+		}
+
+		totalGoodsNum++
+
+		//编号 ，查询订单
+		numbers = append(numbers, good.Number)
+
+		_, ok := mp[good.Number]
+
+		if !ok {
+			mp[good.Number] = make([]rsp.OutGoods, 0)
+		}
+
+		mp[good.Number] = append(mp[good.Number], rsp.OutGoods{
+			Id:            good.OrderGoodsId,
+			Name:          good.GoodsName,
+			Sku:           good.Sku,
+			GoodsType:     good.GoodsType,
+			GoodsSpe:      good.GoodsSpe,
+			DiscountPrice: good.DiscountPrice,
+			GoodsUnit:     good.GoodsUnit,
+			SaleUnit:      good.SaleUnit,
+			SaleCode:      good.SaleCode,
+			OutCount:      good.OutCount,
+			OutAt:         good.UpdateTime.Format(timeutil.TimeFormat),
+			Number:        good.Number,
+			CkNumber:      strings.Join(good.DeliveryOrderNo, ","),
+		})
+
+	}
+
+	numbers = slice.UniqueSlice(numbers)
+
+	err, outboundOrder = model.GetOutboundOrderByTaskIdAndNumbers(db, batch.TaskId, numbers)
+
+	if err != nil {
+		return
+	}
+
+	list := make([]rsp.OutOrder, 0, len(outboundOrder))
+
+	for _, order := range outboundOrder {
+		goodsInfo, ok := mp[order.Number]
+
+		if !ok {
+			err = ecode.DataQueryError
+			return
+		}
+
+		list = append(list, rsp.OutOrder{
+			DistributionType: order.DistributionType,
+			PayAt:            *order.PayAt,
+			OrderId:          order.OrderId,
+			GoodsInfo:        goodsInfo,
+		})
+	}
+
+	res.Count = totalGoodsNum
+
+	res.List = list
 	return
 }
 
@@ -714,100 +807,4 @@ func UpdateCompleteOrder(db *gorm.DB, batchId, taskId int, orderJoinGoods []mode
 	}
 
 	return nil
-}
-
-// 批次出库订单和商品明细
-func GetBatchOrderAndGoods(db *gorm.DB, form req.GetBatchOrderAndGoodsForm) (err error, res rsp.GetBatchOrderAndGoodsRsp) {
-	var (
-		batch         model.Batch
-		outboundOrder []model.OutboundOrder
-		outboundGoods []model.OutboundGoods
-		mp            = make(map[string][]rsp.OutGoods)
-		numbers       = make([]string, 0)
-	)
-
-	err, batch = model.GetBatchByPk(db, form.Id)
-
-	if err != nil {
-		return
-	}
-
-	//状态:0:进行中,1:已结束,2:暂停
-	if batch.Status != 1 {
-		err = errors.New("批次未结束")
-		return
-	}
-
-	err, outboundGoods = model.GetOutboundGoodsList(db, model.OutboundGoods{BatchId: batch.Id})
-	if err != nil {
-		return
-	}
-
-	totalGoodsNum := 0
-
-	for _, good := range outboundGoods {
-		//出库为0的不推送
-		if good.OutCount == 0 {
-			continue
-		}
-
-		totalGoodsNum++
-
-		//编号 ，查询订单
-		numbers = append(numbers, good.Number)
-
-		_, ok := mp[good.Number]
-
-		if !ok {
-			mp[good.Number] = make([]rsp.OutGoods, 0)
-		}
-
-		mp[good.Number] = append(mp[good.Number], rsp.OutGoods{
-			Id:            good.OrderGoodsId,
-			Name:          good.GoodsName,
-			Sku:           good.Sku,
-			GoodsType:     good.GoodsType,
-			GoodsSpe:      good.GoodsSpe,
-			DiscountPrice: good.DiscountPrice,
-			GoodsUnit:     good.GoodsUnit,
-			SaleUnit:      good.SaleUnit,
-			SaleCode:      good.SaleCode,
-			OutCount:      good.OutCount,
-			OutAt:         good.UpdateTime.Format(timeutil.TimeFormat),
-			Number:        good.Number,
-			CkNumber:      strings.Join(good.DeliveryOrderNo, ","),
-		})
-
-	}
-
-	numbers = slice.UniqueSlice(numbers)
-
-	err, outboundOrder = model.GetOutboundOrderByTaskIdAndNumbers(db, batch.TaskId, numbers)
-
-	if err != nil {
-		return
-	}
-
-	list := make([]rsp.OutOrder, 0, len(outboundOrder))
-
-	for _, order := range outboundOrder {
-		goodsInfo, ok := mp[order.Number]
-
-		if !ok {
-			err = ecode.DataQueryError
-			return
-		}
-
-		list = append(list, rsp.OutOrder{
-			DistributionType: order.DistributionType,
-			PayAt:            *order.PayAt,
-			OrderId:          order.OrderId,
-			GoodsInfo:        goodsInfo,
-		})
-	}
-
-	res.Count = totalGoodsNum
-
-	res.List = list
-	return
 }

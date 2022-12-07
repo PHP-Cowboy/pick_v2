@@ -22,7 +22,7 @@ type Order struct {
 	Line              string    `gorm:"type:varchar(255);not null;comment:线路"`
 	DistributionType  int       `gorm:"type:tinyint;comment:配送方式"`
 	OrderRemark       string    `gorm:"type:varchar(512);comment:订单备注"`
-	PayAt             MyTime    `gorm:"type:datetime;comment:支付时间"`
+	PayAt             *MyTime   `gorm:"type:datetime;comment:支付时间"`
 	DeliveryAt        MyTime    `gorm:"type:date;comment:配送时间"`
 	Province          string    `gorm:"type:varchar(64);comment:省"`
 	City              string    `gorm:"type:varchar(64);comment:市"`
@@ -63,7 +63,7 @@ func OrderSave(db *gorm.DB, order *Order) (err error) {
 }
 
 func OrderBatchSave(db *gorm.DB, list []Order) (err error) {
-	err = db.Model(&Order{}).Save(&list).Error
+	err = db.Model(&Order{}).CreateInBatches(&list, BatchSize).Error
 	return
 }
 
@@ -75,7 +75,7 @@ func OrderReplaceSave(db *gorm.DB, list []Order, values []string) (err error) {
 			Columns:   []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns(values),
 		}).
-		Save(&list).
+		CreateInBatches(&list, BatchSize).
 		Error
 
 	return

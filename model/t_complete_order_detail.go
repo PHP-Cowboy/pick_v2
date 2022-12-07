@@ -19,7 +19,7 @@ type CompleteOrderDetail struct {
 }
 
 func CompleteOrderDetailBatchSave(db *gorm.DB, list *[]CompleteOrderDetail) error {
-	result := db.Model(&CompleteOrderDetail{}).Save(list)
+	result := db.Model(&CompleteOrderDetail{}).CreateInBatches(list, BatchSize)
 
 	return result.Error
 }

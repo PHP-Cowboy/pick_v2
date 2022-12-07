@@ -25,7 +25,7 @@ const (
 )
 
 func PrePickRemarkBatchSave(db *gorm.DB, list *[]PrePickRemark) (err error) {
-	err = db.Model(&PrePickRemark{}).Save(list).Error
+	err = db.Model(&PrePickRemark{}).CreateInBatches(list, BatchSize).Error
 
 	return
 }
@@ -50,5 +50,11 @@ func UpdatePrePickRemarkByIds(db *gorm.DB, ids []int, mp map[string]interface{})
 
 func GetPrePickRemarkByOrderGoodsIds(db *gorm.DB, orderGoodsIds []int) (err error, prePickRemarks []PrePickRemark) {
 	err = db.Model(&PrePickRemark{}).Where("order_goods_id in (?)", orderGoodsIds).Find(&prePickRemarks).Error
+	return
+}
+
+func GetPrePickRemarkByPrePickId(db *gorm.DB, prePickId int) (err error, list []PrePickRemark) {
+	err = db.Where("pre_pick_id = ?", prePickId).Find(&list).Error
+
 	return
 }

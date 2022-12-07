@@ -55,7 +55,7 @@ type PickAndGoods struct {
 }
 
 func PickBatchSave(db *gorm.DB, picks *[]Pick) (err error) {
-	err = db.Model(&Pick{}).Save(picks).Error
+	err = db.Model(&Pick{}).CreateInBatches(picks, BatchSize).Error
 	return
 }
 
@@ -70,7 +70,7 @@ func PickReplaceSave(db *gorm.DB, list []Pick, values []string) (err error) {
 			Columns:   []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns(values),
 		}).
-		Save(&list).
+		CreateInBatches(&list, BatchSize).
 		Error
 
 	return

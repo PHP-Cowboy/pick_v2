@@ -233,6 +233,8 @@ func OutboundTaskCloseOrder(c *gin.Context) {
 		return
 	}
 
+	tx.Commit()
+
 	xsq_net.Success(c)
 }
 

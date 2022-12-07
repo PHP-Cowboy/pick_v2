@@ -72,7 +72,7 @@ const (
 )
 
 func PrePickGoodsBatchSave(db *gorm.DB, list *[]PrePickGoods) (err error) {
-	err = db.Model(&PrePickGoods{}).Save(list).Error
+	err = db.Model(&PrePickGoods{}).CreateInBatches(list, BatchSize).Error
 
 	return
 }

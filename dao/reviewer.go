@@ -3,6 +3,7 @@ package dao
 import (
 	"errors"
 	"pick_v2/forms/rsp"
+	"strconv"
 	"time"
 
 	"gorm.io/gorm"
@@ -117,14 +118,13 @@ func ReviewList(db *gorm.DB, form req.ReviewListReq) (err error, res rsp.ReviewL
 	return
 }
 
-//确认出库
+// 确认出库
 func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 
 	var (
 		pick           model.Pick
 		pickGoods      []model.PickGoods
 		batch          model.Batch
-		orderGoods     []model.OrderGoods
 		orderJoinGoods []model.OrderJoinGoods
 	)
 
@@ -186,24 +186,11 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 		return
 	}
 
-	//拣货表 id 和 拣货数量
-	mp := make(map[int]int, 0)
+	//拣货商品表 id 和 拣货复核数量
+	pickGoodsReviewNumMp := make(map[int]int, 0)
 
-	type OrderGoods struct {
-		OutCount           int
-		deliveryOrderNoArr model.GormList
-	}
-
-	//map[order_goods_id]OrderGoods
-	orderGoodsMp := make(map[int]OrderGoods, 0)
-
-	var (
-		pickGoodsIds []int
-		//出库订单商品
-		outboundGoods = make([]model.OutboundGoods, 0, len(orderJoinGoods))
-		//订单商品id
-		orderGoodsId []int
-	)
+	//出库订单商品
+	outboundGoods := make([]model.OutboundGoods, 0, len(orderJoinGoods))
 
 	//step: 构造 拣货商品表 id, 完成数量 并扣减 sku 完成数量
 	for _, info := range orderJoinGoods {
@@ -230,18 +217,13 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 			reviewCompleteNum = completeNum
 			skuCompleteNumMp[info.Sku] = 0
 		}
-		pickGoodsIds = append(pickGoodsIds, pickGoodsId)
-		mp[pickGoodsId] = reviewCompleteNum
+
+		pickGoodsReviewNumMp[pickGoodsId] = reviewCompleteNum
 
 		deliveryOrderNoArr := make(model.GormList, 0)
 
 		deliveryOrderNoArr = append(deliveryOrderNoArr, info.DeliveryOrderNo...)
 		deliveryOrderNoArr = append(deliveryOrderNoArr, deliveryOrderNo)
-
-		orderGoodsMp[info.Id] = OrderGoods{
-			OutCount:           reviewCompleteNum,
-			deliveryOrderNoArr: deliveryOrderNoArr,
-		}
 
 		//构造更新出库单商品表数据
 		outboundGoods = append(outboundGoods, model.OutboundGoods{
@@ -253,8 +235,6 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 			Status:          model.OutboundGoodsStatusOutboundDelivery,
 			DeliveryOrderNo: deliveryOrderNoArr,
 		})
-
-		orderGoodsId = append(orderGoodsId, info.Id)
 	}
 
 	//获取拣货商品数据
@@ -277,9 +257,9 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 			printChMp[pg.ShopId] = struct{}{}
 		}
 
-		completeNum, mpOk := mp[pg.Id]
+		completeNum, pickGoodsReviewNumMpOk := pickGoodsReviewNumMp[pg.Id]
 
-		if !mpOk {
+		if !pickGoodsReviewNumMpOk {
 			continue
 		}
 
@@ -291,12 +271,6 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 	}
 
 	orderNumbers = slice.UniqueSlice(orderNumbers)
-
-	//order_goods 这里会被mysql排序
-	err, orderGoods = model.GetOrderGoodsListByIds(db, orderGoodsIds)
-	if err != nil {
-		return
-	}
 
 	//当前时间
 	now := time.Now()
@@ -313,49 +287,10 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 		})
 	}
 
-	orderPickMp := make(map[string]int)
-
-	for i, good := range orderGoods {
-
-		val, ok := orderGoodsMp[good.Id]
-
-		if !ok {
-			continue
-		}
-
-		_, ogMpOk := orderPickMp[good.Number]
-
-		if !ogMpOk {
-			orderPickMp[good.Number] = val.OutCount
-		} else {
-			orderPickMp[good.Number] += val.OutCount
-		}
-
-		orderGoods[i].LackCount = good.LackCount - val.OutCount
-		orderGoods[i].OutCount = val.OutCount
-		orderGoods[i].DeliveryOrderNo = val.deliveryOrderNoArr
-	}
-
-	var order []model.Order
-
-	//根据订单编号获取订单数据
-	err, order = model.GetOrderListByNumbers(db, orderNumbers)
-
-	if err != nil {
-		return
-	}
-
 	tx := db.Begin()
 
 	//更新出库任务商品表数据
 	err = model.OutboundGoodsReplaceSave(tx, outboundGoods, []string{"lack_count", "out_count", "status", "delivery_order_no"})
-	if err != nil {
-		tx.Rollback()
-		return
-	}
-
-	//更新订单商品数据
-	err = model.OrderGoodsReplaceSave(db, &orderGoods, []string{"lack_count", "out_count", "delivery_order_no"})
 	if err != nil {
 		tx.Rollback()
 		return
@@ -392,228 +327,6 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 		return
 	}
 
-	//前边更新的 pick.Id的 status 后面查询还未生效
-	pickStatusMp := make(map[int]int, 1)
-	pickStatusMp[pick.Id] = model.ReviewCompletedStatus
-
-	lackNumberMp := make(map[string]struct{}, 0) //要被更新为欠货的 number map
-
-	//批次已结束的
-	if batch.Status == model.BatchClosedStatus {
-		// 欠货逻辑 查出当前出库的所有商品 number ，这些number如果还有未复核完成状态的就不更新为欠货
-		var (
-			picks          []model.Pick
-			isSendMQ       = true
-			pickNumbers    = make([]string, 0) //当前出库的所有商品 number
-			pickAndGoods   []model.PickAndGoods
-			pendingNumbers []string
-			diffSlice      []string
-		)
-		//查出当前批次拣货池数据，如果有未完成复核的，就不发送mq消息
-		err, picks = model.GetPickList(db, model.Pick{BatchId: batch.Id})
-
-		if err != nil {
-			tx.Rollback()
-			return
-		}
-
-		for _, ps := range picks {
-
-			status, ok := pickStatusMp[ps.Id]
-
-			if ok {
-				ps.Status = status //刚更新的状态立即查询，mysql数据可能还在缓存中查不到，更新成map中保存的状态
-			}
-
-			if ps.Status < model.ReviewCompletedStatus {
-				//批次有未复核完成的拣货单
-				isSendMQ = false
-				break
-			}
-		}
-
-		//获取当前出库的所有商品 number
-		for _, good := range pickGoods {
-			pickNumbers = append(pickNumbers, good.Number)
-		}
-
-		pickNumbers = slice.UniqueSlice(pickNumbers)
-
-		//获取欠货的订单number是否有在拣货池中未复核完成的数据，如果有，过滤掉欠货的订单number
-		err, pickAndGoods = model.GetPickGoodsJoinPickByNumbers(db, pickNumbers)
-		if err != nil {
-			tx.Rollback()
-			return
-		}
-
-		//获取拣货id，根据拣货id查出 拣货单中 未复核完成状态的订单，不更新为欠货，
-		//且 有未复核完成的订单 不发送到mq中，完成后再发送到mq中
-		for _, p := range pickAndGoods {
-			status, ok := pickStatusMp[p.PickId]
-
-			if ok {
-				p.Status = status //刚更新的状态立即查询，mysql数据可能还在缓存中差不到，更新成map中保存的状态
-			}
-
-			if p.Status < model.ReviewCompletedStatus {
-				pendingNumbers = append(pendingNumbers, p.Number)
-				isSendMQ = false
-			}
-		}
-
-		pendingNumbers = slice.UniqueSlice(pendingNumbers)
-
-		diffSlice = slice.StrDiff(pickNumbers, pendingNumbers) // 在 pickNumbers 不在 pendingNumbers 中的
-
-		if len(diffSlice) > 0 {
-			//构造 更新为欠货 number map
-			for _, s := range diffSlice {
-				lackNumberMp[s] = struct{}{}
-			}
-		}
-
-		if isSendMQ {
-			//mq 存入 批次id
-			err = SyncBatch(batch.Id)
-			if err != nil {
-				tx.Rollback()
-				return
-			}
-		}
-	}
-
-	//更新完成订单
-	var (
-		completeOrder  []model.CompleteOrder
-		completeNumber []string // 查询&&删除 完成订单详情使用
-		numsMp         = make(map[string]model.OrderGoodsNumsStatistical, 0)
-	)
-
-	query := "number,sum(lack_count) as lack_count"
-
-	err, numsMp = model.OrderGoodsNumsStatisticalByNumbers(db, query, orderNumbers)
-
-	if err != nil {
-		tx.Rollback()
-		return
-	}
-
-	//如果是批次结束时 还在拣货池中的单的出库，且拣货池中没有未复核的商品，要更新 order_type
-	for i, o := range order {
-		picked, ogMpOk := orderPickMp[o.Number]
-
-		if !ogMpOk {
-			continue
-		}
-
-		nums, numsOk := numsMp[o.Number]
-
-		if !numsOk {
-			err = errors.New("订单欠货数量统计异常")
-			tx.Rollback()
-			return
-		}
-
-		order[i].LatestPickingTime = (*model.MyTime)(&now)
-
-		_, ok := lackNumberMp[o.Number]
-
-		if ok {
-			order[i].OrderType = model.LackOrderType //更新为欠货
-		}
-
-		//之前的订单欠货数，减去本次订单拣货数 为0的 且 批次结束 改成 完成订单
-		if nums.LackCount-picked == 0 && batch.Status == model.BatchClosedStatus {
-
-			completeNumber = append(completeNumber, o.Number)
-
-			//完成订单
-			completeOrder = append(completeOrder, model.CompleteOrder{
-				Number:         o.Number,
-				OrderRemark:    o.OrderRemark,
-				ShopId:         o.ShopId,
-				ShopName:       o.ShopName,
-				ShopType:       o.ShopType,
-				ShopCode:       o.ShopCode,
-				Line:           o.Line,
-				DeliveryMethod: o.DistributionType,
-				Province:       o.Province,
-				City:           o.City,
-				District:       o.District,
-				PickTime:       o.LatestPickingTime,
-				PayAt:          o.PayAt,
-			})
-		}
-	}
-
-	//更新订单数据
-	err = model.OrderReplaceSave(tx, order, []string{"shop_id", "shop_name", "shop_type", "shop_code", "house_code", "line", "order_type", "latest_picking_time"})
-
-	if err != nil {
-		tx.Rollback()
-		return
-	}
-
-	if len(completeNumber) > 0 {
-		//保存完成订单
-		err = model.CompleteOrderBatchSave(tx, &completeOrder)
-
-		if err != nil {
-			tx.Rollback()
-			return
-		}
-
-		//根据条件重新查询完成订单详情
-		err, orderGoods = model.GetOrderGoodsListByNumbers(db, completeNumber)
-
-		if err != nil {
-			tx.Rollback()
-			return
-		}
-
-		var completeOrderDetail []model.CompleteOrderDetail
-
-		//保存完成订单详情
-		for _, good := range orderGoods {
-			completeOrderDetail = append(completeOrderDetail, model.CompleteOrderDetail{
-				Number:          good.Number,
-				GoodsName:       good.GoodsName,
-				Sku:             good.Sku,
-				GoodsSpe:        good.GoodsSpe,
-				GoodsType:       good.GoodsType,
-				Shelves:         good.Shelves,
-				PayCount:        good.PayCount,
-				CloseCount:      good.CloseCount,
-				ReviewCount:     good.OutCount,
-				GoodsRemark:     good.GoodsRemark,
-				DeliveryOrderNo: good.DeliveryOrderNo,
-			})
-		}
-
-		err = model.CompleteOrderDetailBatchSave(tx, &completeOrderDetail)
-
-		if err != nil {
-			tx.Rollback()
-			return
-		}
-
-		//删除完成订单
-		err = model.DeleteOrderByNumbers(tx, completeNumber)
-
-		if err != nil {
-			tx.Rollback()
-			return
-		}
-
-		//删除完成订单详情
-		err = model.DeleteOrderGoodsByNumbers(tx, completeNumber)
-
-		if err != nil {
-			tx.Rollback()
-			return
-		}
-	}
-
 	//更新拣货商品数据
 	err = model.PickGoodsReplaceSave(tx, &pickGoods, []string{"review_num"})
 
@@ -631,17 +344,11 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 		})
 	}
 
-	err, batch = model.GetBatchByPk(db, pick.BatchId)
-
-	if err != nil {
-		tx.Rollback()
-		return
-	}
-
-	//批次已结束,这个不能往前移，里面有commit，移到前面去如果进入commit，后面的又有失败的，事务无法保证一致性了
+	//批次已结束的复核出库要单独推u8
 	if batch.Status == model.BatchClosedStatus {
 		err = YongYouLog(tx, pickGoods, orderJoinGoods, pick.BatchId)
 		if err != nil {
+			err = errors.New("出库成功，但是推送u8失败:" + strconv.Itoa(form.Id))
 			tx.Commit() // u8推送失败不能影响仓库出货，只提示，业务继续
 			return
 		}

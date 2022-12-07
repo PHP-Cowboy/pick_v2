@@ -2,7 +2,9 @@ package dao
 
 import (
 	"errors"
+	"pick_v2/forms/rsp"
 	"pick_v2/utils/slice"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -439,4 +441,152 @@ func MergePickByParams(db *gorm.DB, form req.MergePickForm, taskId int) (err err
 	tx.Commit()
 
 	return nil
+}
+
+func GetPickDetail(db *gorm.DB, form req.GetPickDetailForm) (err error, res rsp.GetPickDetailRsp) {
+
+	var (
+		pick       model.Pick
+		pickGoods  []model.PickGoods
+		pickRemark []model.PickRemark
+	)
+
+	err, pick = model.GetPickByPk(db, form.PickId)
+
+	if err != nil {
+		return
+	}
+
+	query := "pick_id,count(distinct(shop_id)) as shop_num,count(distinct(number)) as order_num,sum(need_num) as need_num"
+
+	err, numsMp := model.CountPickPoolNumsByPickIds(db, []int{form.PickId}, query)
+
+	if err != nil {
+		return
+	}
+
+	nums, _ := numsMp[form.PickId]
+
+	res.BatchId = pick.BatchId
+	res.PickId = pick.Id
+	res.TaskName = pick.TaskName
+	res.ShopCode = pick.ShopCode
+	res.ShopNum = nums.ShopNum
+	res.OrderNum = nums.OrderNum
+	res.GoodsNum = nums.NeedNum
+	res.PickUser = pick.PickUser
+	res.TakeOrdersTime = pick.TakeOrdersTime
+
+	err, pickGoods = model.GetPickGoodsByPickIds(db, []int{form.PickId})
+
+	if err != nil {
+		return
+	}
+
+	orderNumbers := make([]string, 0, nums.OrderNum)
+
+	pickGoodsSkuMp := make(map[string]rsp.MergePickGoods, 0)
+	//相同sku合并处理
+	for _, goods := range pickGoods {
+		orderNumbers = append(orderNumbers, goods.Number)
+
+		val, ok := pickGoodsSkuMp[goods.Sku]
+
+		paramsId := rsp.ParamsId{
+			PickGoodsId:  goods.Id,
+			OrderGoodsId: goods.OrderGoodsId,
+		}
+
+		if !ok {
+
+			pickGoodsSkuMp[goods.Sku] = rsp.MergePickGoods{
+				Id:          goods.Id,
+				Sku:         goods.Sku,
+				GoodsName:   goods.GoodsName,
+				GoodsType:   goods.GoodsType,
+				GoodsSpe:    goods.GoodsSpe,
+				Shelves:     goods.Shelves,
+				NeedNum:     goods.NeedNum,
+				CompleteNum: goods.CompleteNum,
+				ReviewNum:   goods.ReviewNum,
+				Unit:        goods.Unit,
+				ParamsId:    []rsp.ParamsId{paramsId},
+			}
+		} else {
+			val.NeedNum += goods.NeedNum
+			val.CompleteNum += goods.CompleteNum
+			val.ReviewNum += goods.ReviewNum
+			val.ParamsId = append(val.ParamsId, paramsId)
+			pickGoodsSkuMp[goods.Sku] = val
+		}
+	}
+
+	//去重
+	orderNumbers = slice.UniqueSlice(orderNumbers)
+
+	goodsMap := make(map[string][]rsp.MergePickGoods, 0)
+
+	for _, goods := range pickGoodsSkuMp {
+
+		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.MergePickGoods{
+			Id:          goods.Id,
+			Sku:         goods.Sku,
+			GoodsName:   goods.GoodsName,
+			GoodsType:   goods.GoodsType,
+			GoodsSpe:    goods.GoodsSpe,
+			Shelves:     goods.Shelves,
+			NeedNum:     goods.NeedNum,
+			CompleteNum: goods.CompleteNum,
+			ReviewNum:   goods.ReviewNum,
+			Unit:        goods.Unit,
+			ParamsId:    goods.ParamsId,
+		})
+	}
+
+	//按货架号排序
+	for s, goods := range goodsMap {
+
+		ret := rsp.MyMergePickGoods(goods)
+
+		sort.Sort(ret)
+
+		goodsMap[s] = ret
+	}
+
+	res.Goods = goodsMap
+
+	err, pickRemark = model.GetPickRemarkByPickId(db, form.PickId)
+
+	if err != nil {
+		return
+	}
+
+	remarkMap := make(map[string]rsp.PickRemark, 0)
+
+	list := []rsp.PickRemark{}
+	for _, remark := range pickRemark {
+		remarkMap[remark.Number] = rsp.PickRemark{
+			Number:      remark.Number,
+			OrderRemark: remark.OrderRemark,
+			GoodsRemark: remark.GoodsRemark,
+		}
+	}
+
+	for _, n := range orderNumbers {
+		remark, remarkMapOk := remarkMap[n]
+
+		if !remarkMapOk {
+			list = append(list, rsp.PickRemark{
+				Number:      n,
+				OrderRemark: "",
+				GoodsRemark: "",
+			})
+		} else {
+			list = append(list, remark)
+		}
+	}
+
+	res.RemarkList = list
+
+	return
 }

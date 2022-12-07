@@ -40,7 +40,7 @@ type PickGoodsJoinOrder struct {
 }
 
 func PickGoodsSave(db *gorm.DB, list *[]PickGoods) (err error) {
-	err = db.Model(&PickGoods{}).Save(list).Error
+	err = db.Model(&PickGoods{}).CreateInBatches(list, BatchSize).Error
 	return
 }
 
@@ -50,7 +50,7 @@ func PickGoodsReplaceSave(db *gorm.DB, list *[]PickGoods, values []string) (err 
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns(values),
-		}).Save(list).
+		}).CreateInBatches(list, BatchSize).
 		Error
 
 	return

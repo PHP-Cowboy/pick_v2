@@ -52,8 +52,9 @@ func GetDeliveryMethod(method int) string {
 		2: "用户自提",
 		3: "三方物流",
 		4: "快递配送",
-		5: "首批物料|设备单",
+		5: "首批物料",
 		6: "无需出库",
+		7: "首批设备",
 	}
 
 	s, ok := methodMp[method]
@@ -65,9 +66,9 @@ func GetDeliveryMethod(method int) string {
 	return s
 }
 
-func BatchSave(db *gorm.DB, batch Batch) (err error, b Batch) {
+func BatchSave(db *gorm.DB, batch *Batch) (err error) {
 
-	err = db.Model(&Batch{}).Save(&batch).Error
+	err = db.Model(&Batch{}).Save(batch).Error
 
 	return
 }

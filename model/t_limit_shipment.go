@@ -26,7 +26,7 @@ const (
 )
 
 func LimitShipmentSave(db *gorm.DB, list []LimitShipment) (err error) {
-	err = db.Model(&LimitShipment{}).Save(&list).Error
+	err = db.Model(&LimitShipment{}).CreateInBatches(&list, BatchSize).Error
 	return
 }
 

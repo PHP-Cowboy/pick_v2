@@ -313,7 +313,7 @@ func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderJoinGoods []model
 		pgv.SaleNumber = order.Number
 		pgv.ShopId = int64(order.ShopId)
 		pgv.ShopName = order.ShopName
-		pgv.Date = timeutil.FormatToDateTime(time.Time(order.PayAt))
+		pgv.Date = timeutil.FormatToDateTime(time.Time(*order.PayAt))
 		pgv.Remark = order.OrderRemark
 		pgv.DeliveryType = order.DistributionType //配送方式
 		pgv.Line = order.Line

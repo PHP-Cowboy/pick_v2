@@ -60,7 +60,7 @@ func OutboundOrderReplaceSave(db *gorm.DB, list []OutboundOrder, values []string
 			Columns:   []clause.Column{{Name: "task_id,number"}},
 			DoUpdates: clause.AssignmentColumns(values),
 		}).
-		Save(&list).Error
+		CreateInBatches(&list, BatchSize).Error
 
 	return
 }

@@ -36,6 +36,7 @@ type OutboundGoods struct {
 type OutboundGoodsJoinOrder struct {
 	TaskId            int      `gorm:"primaryKey;type:int(11);not null;comment:t_outbound_task表ID"`
 	Number            string   `gorm:"primaryKey;type:varchar(64);index;comment:订单编号"`
+	OrderId           int      `gorm:"type:int(11);comment:订单id"`
 	PayAt             *MyTime  `gorm:"type:datetime;comment:支付时间"`
 	ShopId            int      `gorm:"type:int(11);not null;comment:店铺id"`
 	ShopName          string   `gorm:"type:varchar(64);not null;comment:店铺名称"`
@@ -97,7 +98,7 @@ func OutboundGoodsReplaceSave(db *gorm.DB, list []OutboundGoods, values []string
 			Columns:   []clause.Column{{Name: "task_id,number,sku"}},
 			DoUpdates: clause.AssignmentColumns(values),
 		}).
-		Save(&list).
+		CreateInBatches(&list, BatchSize).
 		Error
 
 	return
@@ -139,6 +140,18 @@ func GetOutboundGoodsJoinOrderListByNumbers(db *gorm.DB, number []string) (err e
 		Select("*").
 		Joins("left join t_outbound_order oo on og.task_id = oo.task_id and og.number = oo.number").
 		Where("oo.number in (?)", number).
+		Find(&list).
+		Error
+
+	return
+}
+
+// 根据任务ID查询出库任务订单&&订单商品数据
+func GetOutboundGoodsJoinOrderListByTaskId(db *gorm.DB, taskId int) (err error, list []OutboundGoodsJoinOrder) {
+	err = db.Table("t_outbound_goods og").
+		Select("*").
+		Joins("left join t_outbound_order oo on og.task_id = oo.task_id and og.number = oo.number").
+		Where("oo.task_id = ? ", taskId).
 		Find(&list).
 		Error
 

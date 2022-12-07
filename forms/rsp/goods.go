@@ -9,7 +9,7 @@ type GoodsListRsp struct {
 
 type Order struct {
 	Number            string        `json:"number"`
-	PayAt             model.MyTime  `json:"pay_time"`
+	PayAt             *model.MyTime `json:"pay_time"`
 	ShopCode          string        `json:"shop_code"`
 	ShopName          string        `json:"shop_name"`
 	ShopType          string        `json:"shop_type"`
@@ -106,7 +106,7 @@ type OrderList struct {
 
 type OrderDetail struct {
 	Number          string             `json:"number"`
-	PayAt           model.MyTime       `json:"pay_time"`
+	PayAt           *model.MyTime      `json:"pay_time"`
 	ShopCode        string             `json:"shop_code"`
 	ShopName        string             `json:"shop_name"`
 	OrderRemark     string             `json:"order_remark"` //订单备注
@@ -157,7 +157,7 @@ type CompleteOrderRsp struct {
 
 type CompleteOrder struct {
 	Number         string        `json:"number"`
-	PayAt          model.MyTime  `json:"pay_at"`
+	PayAt          *model.MyTime `json:"pay_at"`
 	ShopCode       string        `json:"shop_code"`
 	ShopName       string        `json:"shop_name"`
 	ShopType       string        `json:"shop_type"`

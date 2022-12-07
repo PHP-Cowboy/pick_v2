@@ -16,7 +16,6 @@ import (
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
-	"sort"
 	"strings"
 	"time"
 )
@@ -192,7 +191,6 @@ func CentralizedAndSecondaryList(c *gin.Context) {
 func GetPickDetail(c *gin.Context) {
 	var (
 		form req.GetPickDetailForm
-		res  rsp.GetPickDetailRsp
 	)
 
 	if err := c.ShouldBind(&form); err != nil {
@@ -200,132 +198,11 @@ func GetPickDetail(c *gin.Context) {
 		return
 	}
 
-	var (
-		pick       model.Pick
-		pickGoods  []model.PickGoods
-		pickRemark []model.PickRemark
-	)
-
-	db := global.DB
-
-	result := db.Where("id = ?", form.PickId).Find(&pick)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	query := "pick_id,count(distinct(shop_id)) as shop_num,count(distinct(number)) as order_num,sum(need_num) as need_num"
-
-	err, numsMp := model.CountPickPoolNumsByPickIds(db, []int{form.PickId}, query)
+	err, res := dao.GetPickDetail(global.DB, form)
 
 	if err != nil {
-		xsq_net.ErrorJSON(c, err)
 		return
 	}
-
-	nums, _ := numsMp[form.PickId]
-
-	res.BatchId = pick.BatchId
-	res.PickId = pick.Id
-	res.TaskName = pick.TaskName
-	res.ShopCode = pick.ShopCode
-	res.ShopNum = nums.ShopNum
-	res.OrderNum = nums.OrderNum
-	res.GoodsNum = nums.NeedNum
-	res.PickUser = pick.PickUser
-	res.TakeOrdersTime = pick.TakeOrdersTime
-
-	result = db.Where("pick_id = ?", form.PickId).Find(&pickGoods)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	pickGoodsSkuMp := make(map[string]rsp.MergePickGoods, 0)
-	//相同sku合并处理
-	for _, goods := range pickGoods {
-		val, ok := pickGoodsSkuMp[goods.Sku]
-
-		paramsId := rsp.ParamsId{
-			PickGoodsId:  goods.Id,
-			OrderGoodsId: goods.OrderGoodsId,
-		}
-
-		if !ok {
-
-			pickGoodsSkuMp[goods.Sku] = rsp.MergePickGoods{
-				Id:          goods.Id,
-				Sku:         goods.Sku,
-				GoodsName:   goods.GoodsName,
-				GoodsType:   goods.GoodsType,
-				GoodsSpe:    goods.GoodsSpe,
-				Shelves:     goods.Shelves,
-				NeedNum:     goods.NeedNum,
-				CompleteNum: goods.CompleteNum,
-				ReviewNum:   goods.ReviewNum,
-				Unit:        goods.Unit,
-				ParamsId:    []rsp.ParamsId{paramsId},
-			}
-		} else {
-			val.NeedNum += goods.NeedNum
-			val.CompleteNum += goods.CompleteNum
-			val.ReviewNum += goods.ReviewNum
-			val.ParamsId = append(val.ParamsId, paramsId)
-			pickGoodsSkuMp[goods.Sku] = val
-		}
-	}
-
-	goodsMap := make(map[string][]rsp.MergePickGoods, 0)
-
-	for _, goods := range pickGoodsSkuMp {
-
-		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.MergePickGoods{
-			Id:          goods.Id,
-			Sku:         goods.Sku,
-			GoodsName:   goods.GoodsName,
-			GoodsType:   goods.GoodsType,
-			GoodsSpe:    goods.GoodsSpe,
-			Shelves:     goods.Shelves,
-			NeedNum:     goods.NeedNum,
-			CompleteNum: goods.CompleteNum,
-			ReviewNum:   goods.ReviewNum,
-			Unit:        goods.Unit,
-			ParamsId:    goods.ParamsId,
-		})
-	}
-
-	//按货架号排序
-	for s, goods := range goodsMap {
-
-		ret := rsp.MyMergePickGoods(goods)
-
-		sort.Sort(ret)
-
-		goodsMap[s] = ret
-	}
-
-	res.Goods = goodsMap
-
-	result = db.Where("pick_id = ?", form.PickId).Find(&pickRemark)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	list := []rsp.PickRemark{}
-	//这里订单号会重复，但是sku是不一致的，待确认
-	for _, remark := range pickRemark {
-		list = append(list, rsp.PickRemark{
-			Number:      remark.Number,
-			OrderRemark: remark.OrderRemark,
-			GoodsRemark: remark.GoodsRemark,
-		})
-	}
-
-	res.RemarkList = list
 
 	xsq_net.SucJson(c, res)
 }

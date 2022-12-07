@@ -50,6 +50,6 @@ type LogDetailRsp struct {
 	TakeOrdersTime *model.MyTime `json:"take_orders_time"`
 	ReviewUser     string        `json:"review_user"`
 	ReviewTime     *model.MyTime `json:"review_time"`
-	PayAt          model.MyTime  `json:"pay_at"`
+	PayAt          *model.MyTime `json:"pay_at"`
 	List           []LogDetail   `json:"list"`
 }

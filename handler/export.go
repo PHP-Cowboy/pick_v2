@@ -305,7 +305,7 @@ func Lack(c *gin.Context) {
 	type orderInfo struct {
 		Number   string
 		ShopId   int
-		PayAt    model.MyTime
+		PayAt    *model.MyTime
 		ShopName string
 	}
 

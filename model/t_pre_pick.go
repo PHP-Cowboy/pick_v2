@@ -1,6 +1,10 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"errors"
+	"gorm.io/gorm"
+	"pick_v2/utils/ecode"
+)
 
 // 预拣货列表
 type PrePick struct {
@@ -23,7 +27,7 @@ const (
 )
 
 func PrePickBatchSave(db *gorm.DB, list *[]PrePick) (err error) {
-	err = db.Model(&PrePick{}).Save(list).Error
+	err = db.Model(&PrePick{}).CreateInBatches(list, BatchSize).Error
 
 	return
 }
@@ -42,6 +46,20 @@ func UpdatePrePickByIds(db *gorm.DB, ids []int, mp map[string]interface{}) (err 
 		Where("id in (?)", ids).
 		Updates(mp).
 		Error
+
+	return
+}
+
+// 根据id和status状态获取拣货池数据
+func GetPrePickByPk(db *gorm.DB, id int) (err error, prePick PrePick) {
+
+	err = db.Model(&PrePick{}).First(&prePick, id).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = ecode.DataNotExist
+		}
+	}
 
 	return
 }

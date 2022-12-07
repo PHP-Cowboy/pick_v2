@@ -44,7 +44,7 @@ type OrderJoinGoods struct {
 	Line              string   `json:"line"`
 	DistributionType  int      `json:"distribution_type"`
 	OrderRemark       string   `json:"order_remark"`
-	PayAt             MyTime   `json:"pay_at"`
+	PayAt             *MyTime  `json:"pay_at"`
 	PayTotal          int      `json:"pay_total"`
 	Picked            int      `json:"picked"`
 	UnPicked          int      `json:"un_picked"`
@@ -110,7 +110,7 @@ func OrderGoodsReplaceSave(db *gorm.DB, list *[]OrderGoods, values []string) (er
 			Columns:   []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns(values),
 		}).
-		Save(list).
+		CreateInBatches(list, BatchSize).
 		Error
 
 	return
@@ -180,6 +180,11 @@ func UpdateOrderGoodsStatus(db *gorm.DB, list []OrderGoods, values []string) (er
 
 func DeleteOrderGoodsByNumbers(db *gorm.DB, numbers []string) (err error) {
 	err = db.Delete(&OrderGoods{}, "number in (?)", numbers).Error
+	return
+}
+
+func DeleteOrderGoodsByIds(db *gorm.DB, ids []int) (err error) {
+	err = db.Delete(&OrderGoods{}, "id in (?)", ids).Error
 	return
 }
 
