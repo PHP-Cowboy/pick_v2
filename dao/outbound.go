@@ -639,7 +639,7 @@ func EndOutboundTask(db *gorm.DB, form req.EndOutboundTaskForm) (err error) {
 
 	tx := db.Begin()
 
-	err = model.UpdateOutboundTaskStatusById(tx, form.TaskId)
+	err = model.UpdateOutboundTaskStatusById(tx, form.TaskId, model.OutboundTaskStatusClosed)
 	if err != nil {
 		tx.Rollback()
 		return
@@ -966,8 +966,7 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 				GoodsRemark:     goodsJoinOrder.GoodsRemark,
 				DeliveryOrderNo: deliveryOrderNoArr,
 			})
-			//完成订单id，删除订单表完成订单
-			completeIds = append(completeIds, goodsJoinOrder.OrderId)
+
 			//完成订单商品id，删除完成订单商品数据
 			completeOrderGoodsIds = append(completeOrderGoodsIds, goodsJoinOrder.OrderGoodsId)
 
@@ -976,6 +975,9 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 			if completeOrderMpOk {
 				continue
 			}
+
+			//完成订单id，删除订单表完成订单
+			completeIds = append(completeIds, goodsJoinOrder.OrderId)
 
 			//完成订单
 			completeOrder = append(completeOrder, model.CompleteOrder{
@@ -998,7 +1000,7 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 		}
 	}
 
-	completeIds = slice.UniqueSlice(completeIds)
+	//todo 判断有没有再更新 写在model里
 
 	//更新订单欠货数据
 	err = model.OrderReplaceSave(tx, lackOrder, []string{"shop_id", "shop_name", "shop_type", "shop_code", "house_code", "line", "order_type", "latest_picking_time"})

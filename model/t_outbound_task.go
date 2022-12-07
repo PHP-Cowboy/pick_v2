@@ -33,10 +33,10 @@ func OutboundTaskCreate(db *gorm.DB, task *OutboundTask) (err error) {
 	return
 }
 
-func UpdateOutboundTaskStatusById(db *gorm.DB, taskId int) (err error) {
+func UpdateOutboundTaskStatusById(db *gorm.DB, taskId int, status int) (err error) {
 	err = db.Model(&OutboundTask{}).
 		Where("id = ?", taskId).
-		Update("status", OutboundTaskStatusClosed).
+		Update("status", status).
 		Error
 
 	return

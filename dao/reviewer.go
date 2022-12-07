@@ -352,6 +352,8 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 			tx.Commit() // u8推送失败不能影响仓库出货，只提示，业务继续
 			return
 		}
+
+		//todo 如果出库任务已结束，则需要更新订单和订单商品表&&完成订单和完成订单表状态&&推送订货系统【前面已经更新了出库单相关数据】
 	}
 
 	tx.Commit()
