@@ -100,11 +100,17 @@ func CloseOrderGoods(c *gin.Context) {
 		orderGoods model.OrderGoods
 	)
 
+	//todo 直接判断订单状态，处理中不允许关
+
 	db := global.DB
 
 	err, outboundGoods := model.GetOutboundGoodsFirstByOrderGoodsIdSortByTaskId(db, form.GoodsId)
 
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			//没查到，直接返回成功，可关闭 todo 更新订单商品为关闭
+			xsq_net.Success(c)
+		}
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
@@ -112,6 +118,7 @@ func CloseOrderGoods(c *gin.Context) {
 	tx := db.Begin()
 	//查到数据
 	if outboundGoods.Status != model.OutboundGoodsStatusUnhandled {
+		//todo 查本次出库任务对应的拣货任务是否完成。没有则不允许关闭 已完成则说明
 		xsq_net.ErrorJSON(c, errors.New("当前商品不允许关闭"))
 		return
 	}
