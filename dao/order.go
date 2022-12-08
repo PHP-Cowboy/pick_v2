@@ -65,7 +65,7 @@ func Shipping(db *gorm.DB, form req.PurchaseOrderForm, info rsp.OrderInfo) (cons
 
 	tx := db.Begin()
 
-	err = model.OrderSave(tx, &model.Order{
+	err = model.OrderCreate(tx, &model.Order{
 		Id:               info.OrderID,
 		ShopId:           info.ShopID,
 		ShopName:         info.ShopName,

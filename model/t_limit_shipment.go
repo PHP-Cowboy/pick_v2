@@ -1,6 +1,9 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
 
 type LimitShipment struct {
 	TaskId    int    `gorm:"primaryKey;type:int(11);not null;comment:t_outbound_task表ID" json:"task_id"`
@@ -27,6 +30,17 @@ const (
 
 func LimitShipmentSave(db *gorm.DB, list []LimitShipment) (err error) {
 	err = db.Model(&LimitShipment{}).CreateInBatches(&list, BatchSize).Error
+	return
+}
+
+func LimitShipmentReplaceSave(db *gorm.DB, list []LimitShipment, values []string) (err error) {
+	err = db.Model(&LimitShipment{}).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "task_id,number,sku"}},
+			DoUpdates: clause.AssignmentColumns(values),
+		}).
+		CreateInBatches(&list, BatchSize).
+		Error
 	return
 }
 

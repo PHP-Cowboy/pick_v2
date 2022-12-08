@@ -168,3 +168,12 @@ func GetPrePickGoodsByPrePickIdAndStatus(db *gorm.DB, ids []int, status int) (er
 
 	return
 }
+
+func GetPrePickGoodsByPrePickIdAndStatusAndGoodsType(db *gorm.DB, ids []int, status int, goodsType []string) (err error, list []PrePickGoods) {
+	err = db.Model(&PrePickGoods{}).
+		Where("pre_pick_id in (?) and status = ? and goods_type in (?)", ids, status, goodsType).
+		Find(&list).
+		Error
+
+	return
+}

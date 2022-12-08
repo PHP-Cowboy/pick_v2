@@ -35,7 +35,7 @@ func main() {
 	}
 
 	p, _ := rocketmq.NewProducer(
-		producer.WithNsResolver(primitive.NewPassthroughResolver([]string{"127.0.0.1:10007"})), // 127.0.0.1:10007 192.168.1.40:9876
+		producer.WithNsResolver(primitive.NewPassthroughResolver([]string{"192.168.1.40:9876"})), // 127.0.0.1:10007 192.168.1.40:9876
 		producer.WithRetry(2),
 	)
 

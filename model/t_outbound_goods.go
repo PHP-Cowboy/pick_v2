@@ -1,8 +1,10 @@
 package model
 
 import (
+	"errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"pick_v2/utils/ecode"
 	"time"
 )
 
@@ -119,6 +121,19 @@ func GetOutboundGoodsListByTaskIdAndNumber(db *gorm.DB, taskId int, number strin
 // 根据 order_goods_id 获取出库任务商品列表
 func GetOutboundGoodsListByOrderGoodsIdAndTaskId(db *gorm.DB, orderGoodsIds []int, taskId int) (err error, list []OutboundGoods) {
 	err = db.Model(&OutboundGoods{}).Where("order_goods_id in (?) and task_id = ?", orderGoodsIds, taskId).Find(&list).Error
+	return
+}
+
+// 根据 order_goods_id 获取出库任务商品列表
+func GetOutboundGoodsFirstByOrderGoodsIdSortByTaskId(db *gorm.DB, orderGoodsIds int) (err error, first OutboundGoods) {
+	err = db.Model(&OutboundGoods{}).Where("order_goods_id = ? ", orderGoodsIds).Order("task_id desc").First(&first).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = ecode.DataNotExist
+		}
+	}
+
 	return
 }
 

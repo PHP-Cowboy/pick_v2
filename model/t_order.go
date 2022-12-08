@@ -57,6 +57,11 @@ const (
 	DistributionTypeFirst             // 5:首批物料|设备单
 )
 
+func OrderCreate(db *gorm.DB, order *Order) (err error) {
+	err = db.Model(&Order{}).CreateInBatches(order, BatchSize).Error
+	return
+}
+
 func OrderSave(db *gorm.DB, order *Order) (err error) {
 	err = db.Model(&Order{}).Save(order).Error
 	return
@@ -67,15 +72,19 @@ func OrderBatchSave(db *gorm.DB, list []Order) (err error) {
 	return
 }
 
-func OrderReplaceSave(db *gorm.DB, list []Order, values []string) (err error) {
+func OrderReplaceSave(db *gorm.DB, list *[]Order, values []string) (err error) {
 	//[]string{"shop_id", "shop_name", "shop_type", "shop_code", "house_code", "line"}
+
+	if len(*list) == 0 {
+		return
+	}
 
 	err = db.Model(&Order{}).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns(values),
 		}).
-		CreateInBatches(&list, BatchSize).
+		CreateInBatches(list, BatchSize).
 		Error
 
 	return
@@ -100,6 +109,10 @@ func DeleteOrderByNumbers(db *gorm.DB, numbers []string) (err error) {
 }
 
 func DeleteOrderByIds(db *gorm.DB, ids []int) (err error) {
+	if len(ids) == 0 {
+		return
+	}
+
 	err = db.Delete(&Order{}, "id in (?)", ids).Error
 
 	return

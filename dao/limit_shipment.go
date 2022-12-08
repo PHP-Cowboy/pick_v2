@@ -82,7 +82,7 @@ func OrderLimit(db *gorm.DB, form req.OrderLimitForm) (err error) {
 
 	tx := db.Begin()
 
-	err = model.LimitShipmentSave(tx, limitShipment)
+	err = model.LimitShipmentReplaceSave(tx, limitShipment, []string{"limit_num", "status"})
 
 	if err != nil {
 		tx.Rollback()
@@ -163,7 +163,7 @@ func TaskLimit(db *gorm.DB, form req.TaskLimitForm) error {
 
 	tx := db.Begin()
 
-	err := model.LimitShipmentSave(tx, limitShipment)
+	err := model.LimitShipmentReplaceSave(tx, limitShipment, []string{"limit_num", "status"})
 
 	if err != nil {
 		tx.Rollback()

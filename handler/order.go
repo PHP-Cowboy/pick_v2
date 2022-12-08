@@ -96,61 +96,57 @@ func CloseOrderGoods(c *gin.Context) {
 	}
 
 	var (
-		order          model.Order
-		orderGoods     model.OrderGoods
-		pickOrderGoods model.PickOrderGoods
+		order      model.Order
+		orderGoods model.OrderGoods
 	)
 
 	db := global.DB
 
-	result := db.Model(&model.PickOrderGoods{}).Where("order_goods_id = ?", form.GoodsId).Order("id desc").First(&pickOrderGoods)
+	err, outboundGoods := model.GetOutboundGoodsFirstByOrderGoodsIdSortByTaskId(db, form.GoodsId)
 
-	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		xsq_net.ErrorJSON(c, result.Error)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
 	tx := db.Begin()
 	//查到数据
-	if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-
-		if pickOrderGoods.Status != 0 {
-			xsq_net.ErrorJSON(c, errors.New("当前商品不允许关闭"))
-			return
-		}
-
-		if pickOrderGoods.LackCount < form.CloseNum {
-			xsq_net.ErrorJSON(c, errors.New("关闭数量大于欠货数量"))
-			return
-		}
-
-		// 增加关闭数量 && 扣减发货数量
-		result = tx.Model(&model.PickOrderGoods{}).
-			Where("id = ?", pickOrderGoods.Id).
-			Updates(map[string]interface{}{
-				"close_count": gorm.Expr("close_count + ?", form.CloseNum),
-				"lack_count":  gorm.Expr("lack_count - ?", form.CloseNum),
-			})
-
-		if result.Error != nil {
-			tx.Rollback()
-			xsq_net.ErrorJSON(c, result.Error)
-			return
-		}
-
-		result = tx.Model(&model.PickOrder{}).
-			Where("number = ?", pickOrderGoods.Number).
-			Updates(map[string]interface{}{
-				"close_count":   gorm.Expr("close_count + ?", form.CloseNum),
-				"shipments_num": gorm.Expr("shipments_num - ?", form.CloseNum),
-			})
-
-		if result.Error != nil {
-			tx.Rollback()
-			xsq_net.ErrorJSON(c, result.Error)
-			return
-		}
+	if outboundGoods.Status != model.OutboundGoodsStatusUnhandled {
+		xsq_net.ErrorJSON(c, errors.New("当前商品不允许关闭"))
+		return
 	}
+
+	if outboundGoods.LackCount < form.CloseNum {
+		xsq_net.ErrorJSON(c, errors.New("关闭数量大于欠货数量"))
+		return
+	}
+
+	// 增加关闭数量 && 扣减发货数量
+	result := tx.Model(&model.OutboundGoods{}).
+		Where("task_id = ? and number = ? and sku = ?", outboundGoods.TaskId, outboundGoods.Number, outboundGoods.Sku).
+		Updates(map[string]interface{}{
+			"close_count": gorm.Expr("close_count + ?", form.CloseNum),
+			"lack_count":  gorm.Expr("lack_count - ?", form.CloseNum),
+		})
+
+	if result.Error != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, result.Error)
+		return
+	}
+
+	//result = tx.Model(&model.OutboundOrder{}).
+	//	Where("task_id = ? and number = ?", outboundGoods.TaskId, outboundGoods.Number).
+	//	Updates(map[string]interface{}{
+	//		"close_count":   gorm.Expr("close_count + ?", form.CloseNum),
+	//		"shipments_num": gorm.Expr("shipments_num - ?", form.CloseNum),
+	//	})
+	//
+	//if result.Error != nil {
+	//	tx.Rollback()
+	//	xsq_net.ErrorJSON(c, result.Error)
+	//	return
+	//}
 
 	result = db.Model(&model.OrderGoods{}).First(&orderGoods, form.GoodsId)
 

@@ -105,6 +105,10 @@ func OrderGoodsBatchSave(db *gorm.DB, list *[]OrderGoods) (err error) {
 
 func OrderGoodsReplaceSave(db *gorm.DB, list *[]OrderGoods, values []string) (err error) {
 
+	if len(*list) == 0 {
+		return
+	}
+
 	err = db.Model(&OrderGoods{}).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
@@ -184,11 +188,14 @@ func DeleteOrderGoodsByNumbers(db *gorm.DB, numbers []string) (err error) {
 }
 
 func DeleteOrderGoodsByIds(db *gorm.DB, ids []int) (err error) {
+	if len(ids) == 0 {
+		return
+	}
+
 	err = db.Delete(&OrderGoods{}, "id in (?)", ids).Error
 	return
 }
 
-// 临时加单
 // 订单&&商品信息
 func GetOrderJoinGoodsListByNumbers(db *gorm.DB, number []string) (err error, list []OrderJoinGoods) {
 	err = db.Table("t_order_goods og").

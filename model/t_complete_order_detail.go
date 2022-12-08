@@ -18,10 +18,14 @@ type CompleteOrderDetail struct {
 	DeliveryOrderNo GormList `gorm:"type:varchar(255);comment:出库单号"`
 }
 
-func CompleteOrderDetailBatchSave(db *gorm.DB, list *[]CompleteOrderDetail) error {
-	result := db.Model(&CompleteOrderDetail{}).CreateInBatches(list, BatchSize)
+func CompleteOrderDetailBatchSave(db *gorm.DB, list *[]CompleteOrderDetail) (err error) {
+	if len(*list) == 0 {
+		return
+	}
 
-	return result.Error
+	err = db.Model(&CompleteOrderDetail{}).CreateInBatches(list, BatchSize).Error
+
+	return
 }
 
 func GetCompleteOrderDetailBySku(db *gorm.DB, sku string) (err error, list []CompleteOrderDetail) {

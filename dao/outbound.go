@@ -1000,30 +1000,54 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 		}
 	}
 
-	//todo 判断有没有再更新 写在model里
+	//欠货订单更新字段
+	lackOrderValues := []string{"shop_id", "shop_name", "shop_type", "shop_code", "house_code", "line", "order_type", "latest_picking_time"}
+
+	//欠货商品更新字段
+	lackGoodsValues := []string{"lack_count", "out_count", "delivery_order_no", "status"}
+
+	//结束任务更新订单数据
+	err = UpdateOrders(tx, &lackOrder, &lackGoods, lackOrderValues, lackGoodsValues, &completeOrder, &completeOrderDetail, completeIds, completeOrderGoodsIds)
+
+	return
+}
+
+// 结束任务或复核完成更新订单数据
+func UpdateOrders(
+	tx *gorm.DB,
+	lackOrder *[]model.Order,
+	lackGoods *[]model.OrderGoods,
+	lackOrderValues,
+	lackGoodsValues []string,
+	completeOrder *[]model.CompleteOrder,
+	completeOrderDetail *[]model.CompleteOrderDetail,
+	completeIds,
+	completeOrderGoodsIds []int,
+) (err error) {
+	// 在model里判断了是否为空才更新
 
 	//更新订单欠货数据
-	err = model.OrderReplaceSave(tx, lackOrder, []string{"shop_id", "shop_name", "shop_type", "shop_code", "house_code", "line", "order_type", "latest_picking_time"})
+	err = model.OrderReplaceSave(tx, lackOrder, lackOrderValues)
 
 	if err != nil {
 		return
 	}
 
 	//更新订单商品数据
-	err = model.OrderGoodsReplaceSave(tx, &lackGoods, []string{"lack_count", "out_count", "delivery_order_no", "status"})
+	err = model.OrderGoodsReplaceSave(tx, lackGoods, lackGoodsValues)
 	if err != nil {
 		return
 	}
 
 	//完成订单保存
-	err = model.CompleteOrderBatchSave(tx, &completeOrder)
+	err = model.CompleteOrderBatchSave(tx, completeOrder)
 
 	if err != nil {
 		return
 	}
 
 	//完成订单商品数据保存
-	err = model.CompleteOrderDetailBatchSave(tx, &completeOrderDetail)
+	err = model.CompleteOrderDetailBatchSave(tx, completeOrderDetail)
 
 	if err != nil {
 		return
@@ -1042,5 +1066,5 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 		return
 	}
 
-	return nil
+	return
 }

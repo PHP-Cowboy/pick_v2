@@ -30,6 +30,10 @@ func CompleteOrderSave(db *gorm.DB, list *CompleteOrder) (err error) {
 }
 
 func CompleteOrderBatchSave(db *gorm.DB, list *[]CompleteOrder) (err error) {
+	if len(*list) == 0 {
+		return
+	}
+
 	err = db.Model(&CompleteOrder{}).CreateInBatches(list, BatchSize).Error
 
 	return
