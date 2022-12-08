@@ -336,9 +336,13 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 
 	//批次已结束的复核出库要单独推u8
 	if batch.Status == model.BatchClosedStatus {
+
+		//如果出库任务已结束，则需要更新订单和订单商品表&&完成订单和完成订单表状态&&推送订货系统【前面已经更新了出库单相关数据】
+
 		var outboundTask model.OutboundTask
 
-		//如果出库任务也已结束，则需要更新订单和订单商品表&&完成订单和完成订单表状态&&推送订货系统【前面已经更新了出库单相关数据】
+		//如果出库任务也结束了 则需要更新 订单和订单商品表&&完成订单和完成订单表状态
+		//出库任务的关闭必须要所有批次被关闭，所以这个可以写在批次结束判断内部
 		err, outboundTask = model.GetOutboundTaskById(db, pick.TaskId)
 
 		if err != nil {
@@ -349,12 +353,14 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 		if outboundTask.Status == model.OutboundTaskStatusClosed {
 
 			//任务结束时出库更新订单
-			err = TaskIsEndDeliveryUpdateOrders(tx, orderNumbers, pickGoods, no)
+			err = TaskEndDeliveryUpdateOrders(tx, orderNumbers, pickGoods, no)
 			if err != nil {
 				tx.Rollback()
 				return
 			}
 		}
+
+		SendBatchMsgToPurchase(db, batch.Id, pick.Id)
 
 		err = YongYouLog(tx, pickGoods, orderJoinGoods, pick.BatchId)
 		if err != nil {
@@ -380,7 +386,7 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 }
 
 // 任务结束时出库更新订单
-func TaskIsEndDeliveryUpdateOrders(
+func TaskEndDeliveryUpdateOrders(
 	tx *gorm.DB,
 	orderNumbers []string,
 	pickGoods []model.PickGoods,

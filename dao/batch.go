@@ -434,12 +434,12 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 		return
 	}
 
-	//查询批次下全部订单
+	//查询批次下全部订单商品数据
 	err, pickGoods = model.GetPickGoodsByBatchId(db, batch.Id)
 
 	if err != nil {
 		tx.Rollback()
-		err = errors.New("批次结束成功，但推送u8拣货数据查询失败:" + err.Error())
+		err = errors.New("推送u8拣货数据查询失败:" + err.Error())
 		return
 	}
 
@@ -465,6 +465,8 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 		tx.Rollback()
 		return
 	}
+
+	err = SendBatchMsgToPurchase(db, batch.Id, 0)
 
 	tx.Commit()
 
@@ -607,204 +609,35 @@ func SyncBatch(batchId int) error {
 	return nil
 }
 
-// 结束批次更新订单，出库任务相关
-func UpdateCompleteOrder(db *gorm.DB, batchId, taskId int, orderJoinGoods []model.OrderJoinGoods) (err error) {
+//批次结束 || 确认出库 订货系统MQ交互逻辑
+func SendBatchMsgToPurchase(tx *gorm.DB, batchId int, pickId int) (err error) {
+	var picks []model.Pick
 
-	var (
-		orderGoods []model.OrderGoods
-		isSendMQ   = true
-	)
-
-	var (
-		//完成订单map
-		//key => number
-		completeMp          = make(map[string]interface{}, 0)
-		completeNumbers     []string
-		deleteIds           []int    //待删除订单表id
-		deleteNumbers       []string //删除订单商品表
-		completeOrder       = make([]model.CompleteOrder, 0)
-		completeOrderDetail = make([]model.CompleteOrderDetail, 0)
-		lackNumbers         []string //待更新为欠货订单表number
-		numsMp              = make(map[string]model.OrderGoodsNumsStatistical, 0)
-		orderNumbers        []string
-	)
-
-	for _, good := range orderJoinGoods {
-		orderNumbers = append(orderNumbers, good.Number)
-	}
-
-	query := "number,sum(lack_count) as lack_count"
-
-	err, numsMp = model.OrderGoodsNumsStatisticalByNumbers(db, query, orderNumbers)
+	err, picks = model.GetPickList(tx, model.Pick{BatchId: batchId})
 
 	if err != nil {
 		return
 	}
 
-	for _, o := range orderJoinGoods {
+	var isSend = true
 
-		nums, numsOk := numsMp[o.Number]
-
-		if !numsOk {
-			err = errors.New("订单欠货数量统计异常")
-			return
-		}
-
-		//还有欠货 [这里需要保证每次出库(复核完成)时，都更新了商品订单欠货数]
-		if nums.LackCount > 0 {
-			lackNumbers = append(lackNumbers, o.Number)
+	for _, ps := range picks {
+		//确认出库中刚更新的数据立即查询可能数据还在缓存中，那边传递拣货ID过来，直接跳过，认为时拣货复核完成的。
+		//批次中传0
+		if ps.Id == pickId {
 			continue
 		}
 
-		deleteIds = append(deleteIds, o.Id)
-
-		completeMp[o.Number] = struct{}{}
-
-		//完成订单订单号
-		completeNumbers = append(completeNumbers, o.Number)
-
-		//完成的订单在订单表中删除
-		deleteNumbers = append(deleteNumbers, o.Number)
-
-		//完成订单
-		completeOrder = append(completeOrder, model.CompleteOrder{
-			Number:         o.Number,
-			OrderRemark:    o.OrderRemark,
-			ShopId:         o.ShopId,
-			ShopName:       o.ShopName,
-			ShopType:       o.ShopType,
-			ShopCode:       o.ShopCode,
-			Line:           o.Line,
-			DeliveryMethod: o.DistributionType,
-			Province:       o.Province,
-			City:           o.City,
-			District:       o.District,
-			PickTime:       o.LatestPickingTime,
-			PayAt:          o.PayAt,
-		})
-	}
-
-	if len(completeNumbers) > 0 {
-		//如果有完成订单重新查询订单商品，因为这批商品可能是多个批次拣的，根据批次查的商品不全
-		err, orderGoods = model.GetOrderGoodsListByNumbers(db, completeNumbers)
-
-		if err != nil {
-			return
-		}
-
-		for _, og := range orderGoods {
-			//完成订单map中不存在订单的跳过
-			_, ok := completeMp[og.Number]
-
-			if !ok {
-				continue
-			}
-			//完成订单详情
-			completeOrderDetail = append(completeOrderDetail, model.CompleteOrderDetail{
-				Number:          og.Number,
-				GoodsName:       og.GoodsName,
-				Sku:             og.Sku,
-				GoodsSpe:        og.GoodsSpe,
-				GoodsType:       og.GoodsType,
-				Shelves:         og.Shelves,
-				PayCount:        og.PayCount,
-				CloseCount:      og.CloseCount,
-				ReviewCount:     og.OutCount,
-				GoodsRemark:     og.GoodsRemark,
-				DeliveryOrderNo: og.DeliveryOrderNo,
-			})
+		//拣货池有被接单且状态不是复核完成状态，则不发送msg，确认出库时再验证是否发送
+		if ps.PickUser != "" && ps.Status < model.ReviewCompletedStatus {
+			isSend = false
+			break
 		}
 	}
 
-	if len(deleteIds) > 0 {
-		err = model.DeleteOrderByIds(db, deleteIds)
-
-		if err != nil {
-			return
-		}
-	}
-
-	if len(deleteNumbers) > 0 {
-		deleteNumbers = slice.UniqueSlice(deleteNumbers)
-
-		err = model.DeleteOrderGoodsByNumbers(db, deleteNumbers)
-
-		if err != nil {
-			return
-		}
-	}
-
-	// 欠货的单 拣货池还有未完成的，不更新为欠货
-	if len(lackNumbers) > 0 {
-		var (
-			pickAndGoods   []model.PickAndGoods
-			pendingNumbers []string
-			diffSlice      []string
-		)
-
-		//获取欠货的订单number是否有在拣货池中未复核完成的数据，如果有，过滤掉欠货的订单number
-		err, pickAndGoods = model.GetPickGoodsJoinPickByNumbers(db, lackNumbers)
-
-		if err != nil {
-			return
-		}
-
-		//获取拣货id，根据拣货id查出 拣货单中 未复核完成的订单，不更新为欠货，
-		//且 有未复核完成的订单 不发送到mq中，完成后再发送到mq中
-		for _, p := range pickAndGoods {
-			//已经被接单，且未完成复核
-			if p.Status < model.ReviewCompletedStatus && p.PickUser != "" {
-				pendingNumbers = append(pendingNumbers, p.Number)
-				isSendMQ = false
-			}
-		}
-
-		pendingNumbers = slice.UniqueSlice(pendingNumbers)
-
-		diffSlice = slice.StrDiff(lackNumbers, pendingNumbers) // 在 lackNumbers 不在 pendingNumbers 中的
-
-		if len(diffSlice) > 0 {
-			//更新为欠货
-			err = model.UpdateOrderByNumbers(db, diffSlice, map[string]interface{}{"order_type": model.LackOrderType})
-			if err != nil {
-				return
-			}
-		}
-
-	}
-
-	//保存完成订单
-	if len(completeOrder) > 0 {
-		err = model.CompleteOrderBatchSave(db, &completeOrder)
-		if err != nil {
-			return
-		}
-	}
-
-	//保存完成订单详情
-	if len(completeOrderDetail) > 0 {
-		err = model.CompleteOrderDetailBatchSave(db, &completeOrderDetail)
-
-		if err != nil {
-			return
-		}
-	}
-
-	//更新 OutboundOrder 为已完成
-	err = model.UpdateOutboundOrderByTaskIdAndNumbers(db, taskId, orderNumbers, map[string]interface{}{"order_type": model.OutboundOrderTypeComplete})
-
-	if err != nil {
-
-		return
-	}
-
-	if isSendMQ {
-		//mq 存入 批次id
+	if isSend {
 		err = SyncBatch(batchId)
-		if err != nil {
-			return errors.New("写入mq失败")
-		}
 	}
 
-	return nil
+	return
 }
