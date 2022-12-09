@@ -89,6 +89,15 @@ func GetOutboundOrderByPk(db *gorm.DB, taskId int, number string) (err error, ou
 	return
 }
 
+func GetOutboundOrderByNumberFirstSortByTaskId(db *gorm.DB, number string) (err error, outboundOrder OutboundOrder) {
+	err = db.Model(&OutboundOrder{}).
+		Where("number = ?", number).
+		Order("task_id desc").
+		First(&outboundOrder).
+		Error
+	return
+}
+
 func GetOutboundOrderByTaskIdAndNumbers(db *gorm.DB, taskId int, numbers []string) (err error, list []OutboundOrder) {
 	err = db.Model(&OutboundOrder{}).Where("task_id = ? and number in (?)", taskId, numbers).Find(&list).Error
 	return

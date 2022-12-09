@@ -51,6 +51,8 @@ func InitRouter() *gin.Engine {
 	router.InvTaskRoute(group)
 	//配置
 	router.ConfigRoute(group)
+	//关闭订单
+	router.CloseOrderRoute(group)
 
 	return r
 }

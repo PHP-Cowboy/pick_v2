@@ -108,4 +108,8 @@ func main() {
 
 	_ = db.Set(model.TableOptions, model.GetOptions("出库单商品表")).AutoMigrate(&model.OutboundGoods{})
 
+	_ = db.Set(model.TableOptions, model.GetOptions("关闭订单表")).AutoMigrate(&model.CloseOrder{})
+
+	_ = db.Set(model.TableOptions, model.GetOptions("关闭订单商品表")).AutoMigrate(&model.CloseGoods{})
+
 }

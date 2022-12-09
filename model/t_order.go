@@ -134,6 +134,12 @@ func FindOrderExistByIds(db *gorm.DB, ids []int) (err error, exist bool) {
 	return
 }
 
+// 根据订单ID查询订单数据
+func GetOrderByPk(db *gorm.DB, id int) (err error, first Order) {
+	err = db.Model(&Order{}).First(&first, id).Error
+	return
+}
+
 // 根据订单编号查询订单数据
 func GetOrderListByNumbers(db *gorm.DB, numbers []string) (err error, list []Order) {
 	err = db.Model(&Order{}).Where("number in (?)", numbers).Find(&list).Error

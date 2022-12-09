@@ -6,11 +6,16 @@ import (
 	"errors"
 	"github.com/apache/rocketmq-client-go/v2/consumer"
 	"github.com/apache/rocketmq-client-go/v2/primitive"
+	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"pick_v2/dao"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
+	"pick_v2/model"
+	"pick_v2/utils/ecode"
 	"pick_v2/utils/request"
+	"pick_v2/utils/xsq_net"
 )
 
 func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.ConsumeResult, error) {
@@ -70,4 +75,132 @@ func GetOrderInfo(responseData interface{}) (rsp.OrderRsp, error) {
 	}
 
 	return result, nil
+}
+
+func TestCall(c *gin.Context) {
+	var (
+		form   req.PurchaseOrderForm
+		result rsp.OrderRsp
+	)
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err := request.Call("api/v1/remote/get/goods/by/id", form, &result)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+	xsq_net.SucJson(c, result.Data)
+}
+
+func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (consumeRes consumer.ConsumeResult, err error) {
+
+	var (
+		number string
+		form   req.CloseOrderInfo
+		result rsp.CloseOrderRsp
+	)
+
+	for i := range messages {
+		err = json.Unmarshal(messages[i].Body, &number)
+		if err != nil {
+			global.Logger["err"].Infof("解析json失败:%s", err.Error())
+			return consumer.ConsumeRetryLater, nil
+		}
+		form.Number = append(form.Number, number)
+	}
+
+	//调用订货系统接口
+	err = request.Call("api/v1/close/info", form, &result)
+
+	if err != nil {
+		global.Logger["err"].Infof("接口调用失败:%s", err.Error())
+		return consumer.ConsumeRetryLater, nil
+	}
+
+	closeOrder := result.Data
+
+	if closeOrder.Number == "" {
+		return consumer.ConsumeSuccess, errors.New("订货系统查询订单数据不存在")
+	}
+
+	if len(closeOrder.GoodsInfo) == 0 {
+		return consumer.ConsumeSuccess, errors.New("订货系统查询订单商品数据不存在")
+	}
+
+	closeTotal := GetCloseTotal(closeOrder.GoodsInfo)
+
+	modelCloseOrder := GetModelCloseOrderData(closeOrder, closeTotal)
+
+	tx := global.DB.Begin()
+
+	//需关闭总数
+	err = model.SaveCloseOrder(tx, modelCloseOrder)
+
+	if err != nil {
+		tx.Rollback()
+		return consumer.ConsumeRetryLater, err
+	}
+
+	closeGoodsInfo := GetModelCloseOrderGoodsData(closeOrder.GoodsInfo, modelCloseOrder.Id)
+
+	err = model.BatchSaveCloseGoods(tx, &closeGoodsInfo)
+
+	if err != nil {
+		tx.Rollback()
+		return consumer.ConsumeRetryLater, err
+	}
+
+	tx.Commit()
+
+	return
+}
+
+func GetModelCloseOrderData(closeOrder rsp.CloseOrder, closeTotal int) (modelCloseOrder *model.CloseOrder) {
+	modelCloseOrder = &model.CloseOrder{
+		Number:           closeOrder.Number,
+		ShopName:         closeOrder.ShopName,
+		ShopType:         closeOrder.ShopType,
+		DistributionType: closeOrder.DistributionType,
+		OrderRemark:      closeOrder.OrderRemark,
+		PayAt:            closeOrder.PayAt,
+		PayTotal:         closeOrder.PayTotal,
+		NeedCloseTotal:   closeTotal,
+		Province:         closeOrder.Province,
+		City:             closeOrder.City,
+		District:         closeOrder.District,
+	}
+
+	return
+}
+
+func GetCloseTotal(closeGoodsInfo []rsp.CloseGoodsInfo) (closeTotal int) {
+	for _, info := range closeGoodsInfo {
+		//需关闭总数
+		closeTotal += info.NeedCloseCount
+	}
+	return
+}
+
+func GetModelCloseOrderGoodsData(closeGoodsInfo []rsp.CloseGoodsInfo, closeOrderId int) (modelCloseOrderGoods []model.CloseGoods) {
+	for _, info := range closeGoodsInfo {
+		modelCloseOrderGoods = append(modelCloseOrderGoods, model.CloseGoods{
+			CloseOrderId:   closeOrderId,
+			OrderGoodsId:   info.ID,
+			GoodsName:      info.Name,
+			Sku:            info.Sku,
+			GoodsSpe:       info.GoodsSpe,
+			PayCount:       info.PayCount,
+			CloseCount:     info.CloseCount,
+			NeedCloseCount: info.NeedCloseCount,
+			GoodsRemark:    info.GoodsRemark,
+		})
+	}
+
+	return
 }

@@ -3,18 +3,22 @@ package request
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"reflect"
+	"strings"
+
 	"pick_v2/global"
 	"pick_v2/middlewares"
-	"strings"
 )
 
-type Rsp struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
+type HttpRsp struct {
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data"`
 }
 
 func PostTest() {
@@ -138,4 +142,68 @@ func TestGet() ([]byte, error) {
 		return nil, err
 	}
 	return body, nil
+}
+
+func Call(uri string, params interface{}, res interface{}) (err error) {
+	var (
+		body []byte
+	)
+
+	body, err = Post(uri, params)
+
+	if err != nil {
+		return
+	}
+
+	err = json.Unmarshal(body, &res)
+
+	if err != nil {
+		return
+	}
+
+	rspCode, rspMsg := getRspCode(res)
+
+	if rspCode != 200 {
+		return errors.New(rspMsg)
+	}
+
+	return
+}
+
+func getRspCode(rsp interface{}) (code int, msg string) {
+	code = -1
+	msg = "未知错误"
+
+	if rsp == nil {
+		return
+	}
+	v := reflect.ValueOf(rsp)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+		//最多取两层
+		if v.Kind() == reflect.Ptr {
+			v = v.Elem()
+		}
+	}
+	//kind := v.Kind()
+	// 判断是否是结构体
+	if v.Kind() != reflect.Struct {
+		return
+	}
+	codeValue := v.FieldByName("Code")
+	if !codeValue.IsValid() {
+		return
+	}
+
+	msgValue := v.FieldByName("Msg")
+
+	if !codeValue.IsValid() {
+		return
+	}
+
+	code = int(codeValue.Int())
+
+	msg = msgValue.String()
+
+	return
 }

@@ -66,6 +66,7 @@ type CloseOrderForm struct {
 }
 
 type CloseOrderGoodsForm struct {
+	OrderId  int `json:"order_id" binding:"required"`
 	GoodsId  int `json:"goods_id" binding:"required"`
 	CloseNum int `json:"close_num" binding:"required"`
 }

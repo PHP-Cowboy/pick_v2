@@ -10,6 +10,7 @@ func OpenRoute(g *gin.RouterGroup) {
 	group := g.Group("open")
 	{
 		group.POST("/test", handler.Test)
+		group.POST("/testCall", handler.TestCall)
 	}
 
 	openGroup := g.Group("open", middlewares.SignAuth())

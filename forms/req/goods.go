@@ -5,6 +5,10 @@ type PurchaseOrderForm struct {
 	OrderId []int `json:"order_id"`
 }
 
+type CloseOrderInfo struct {
+	Number []string `json:"number"`
+}
+
 type GoodsListForm struct {
 	Paging
 	OrderType        int    `json:"order_type" form:"order_type" binding:"oneof=0 1 2 3"`
