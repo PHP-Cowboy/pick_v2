@@ -609,7 +609,7 @@ func SyncBatch(batchId int) error {
 	return nil
 }
 
-//批次结束 || 确认出库 订货系统MQ交互逻辑
+// 批次结束 || 确认出库 订货系统MQ交互逻辑
 func SendBatchMsgToPurchase(tx *gorm.DB, batchId int, pickId int) (err error) {
 	var picks []model.Pick
 
@@ -637,6 +637,53 @@ func SendBatchMsgToPurchase(tx *gorm.DB, batchId int, pickId int) (err error) {
 
 	if isSend {
 		err = SyncBatch(batchId)
+	}
+
+	return
+}
+
+// 批量变更批次状态为 暂停||进行中
+func BatchCloseBatch(tx *gorm.DB, status int) (err error) {
+	var (
+		batchList []model.Batch
+		batchIds  []int
+		statusMp  = make(map[int]int, 0)
+	)
+
+	err, batchList = model.GetBatchList(tx, model.Batch{Status: status})
+
+	if err != nil {
+		return
+	}
+
+	if len(batchList) == 0 {
+		err = errors.New("没有可以被暂停或开启的批次数据")
+		return
+	}
+
+	//状态相互转换
+	statusMp = map[int]int{
+		model.BatchOngoingStatus: model.BatchSuspendStatus,
+		model.BatchSuspendStatus: model.BatchOngoingStatus,
+	}
+
+	statusVal, statusOk := statusMp[status]
+
+	if !statusOk {
+		err = errors.New("状态异常")
+		return
+	}
+
+	//批次id
+	for _, batch := range batchList {
+		batchIds = append(batchIds, batch.Id)
+	}
+
+	//变更状态
+	err = model.UpdateBatchByIds(tx, batchIds, map[string]interface{}{"status": statusVal})
+
+	if err != nil {
+		return
 	}
 
 	return

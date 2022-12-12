@@ -860,10 +860,11 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 		if o.LackCount > 0 {
 			lackNumbersMap[o.Number] = struct{}{}
 		}
+
 	}
 
-	//历史出库单号map
-	orderGoodsDeliveryNumberMp := make(map[int]model.GormList, 0)
+	//订单历史出库数据map
+	orderGoodsHistoryMp := make(map[int]model.HistoryOrderGoods, 0)
 
 	err, orderGoods = model.GetOrderGoodsListByIds(tx, orderGoodsIds)
 
@@ -873,7 +874,10 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 
 	//获取订单商品历史出库单数据
 	for _, good := range orderGoods {
-		orderGoodsDeliveryNumberMp[good.Id] = good.DeliveryOrderNo
+		orderGoodsHistoryMp[good.Id] = model.HistoryOrderGoods{
+			DeliveryNumber: good.DeliveryOrderNo,
+			OutCount:       good.OutCount,
+		}
 	}
 
 	var (
@@ -896,10 +900,13 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 		}
 
 		//历史出库订单
-		historyDeliveryOrderNoArr, orderGoodsDeliveryNumberMpOk := orderGoodsDeliveryNumberMp[goodsJoinOrder.OrderGoodsId]
+		//historyDeliveryOrderNoArr, orderGoodsDeliveryNumberMpOk := orderGoodsDeliveryNumberMp[goodsJoinOrder.OrderGoodsId]
+		orderGoodsHistory, orderGoodsHistoryMpOk := orderGoodsHistoryMp[goodsJoinOrder.OrderGoodsId]
 
-		if !orderGoodsDeliveryNumberMpOk {
-			historyDeliveryOrderNoArr = []string{}
+		historyDeliveryOrderNoArr := []string{}
+
+		if orderGoodsHistoryMpOk {
+			historyDeliveryOrderNoArr = orderGoodsHistory.DeliveryNumber
 		}
 
 		deliveryOrderNoArr := make(model.GormList, 0)
@@ -907,17 +914,19 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 		deliveryOrderNoArr = append(deliveryOrderNoArr, goodsJoinOrder.DeliveryOrderNo...)
 		deliveryOrderNoArr = append(deliveryOrderNoArr, historyDeliveryOrderNoArr...)
 
+		/*
+			出库任务中订单数据只有本次出库数量
+			历史出库数量在订单商品表数据中，这里先给他加进来
+			欠货数量不用处理，订单第一次进入任务只后再进入时，欠货数量已经是最新欠货数量了
+		*/
+
+		//订单商品出货数量 = 历史出货数量 + 本次出货数量
+		goodsJoinOrder.OutCount += orderGoodsHistory.OutCount
+
 		//是否欠货单
 		_, lackNumbersMapOk := lackNumbersMap[goodsJoinOrder.Number]
 
 		if lackNumbersMapOk {
-
-			status := model.OrderGoodsProcessingStatus
-
-			if goodsJoinOrder.LackCount > 0 {
-				//如果商品欠货，则更新成待处理，下次再进入拣货池
-				status = model.OrderGoodsUnhandledStatus
-			}
 
 			//欠货订单商品相关更新
 			lackGoods = append(lackGoods, model.OrderGoods{
@@ -925,7 +934,7 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 				Number:          goodsJoinOrder.Number,
 				LackCount:       goodsJoinOrder.LackCount,
 				OutCount:        goodsJoinOrder.OutCount,
-				Status:          status, //如果它欠货，则更新成未处理
+				Status:          model.OrderGoodsUnhandledStatus, //欠货，更新成未处理
 				DeliveryOrderNo: deliveryOrderNoArr,
 			})
 

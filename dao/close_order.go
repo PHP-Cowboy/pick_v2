@@ -131,3 +131,13 @@ func CloseOrderDetail(db *gorm.DB, form req.CloseOrderDetailForm) (err error, re
 
 	return
 }
+
+// 关闭订单列表&&详情
+
+func CloseOrderExec(db *gorm.DB, form req.CloseOrder) (err error) {
+	//MQ 处理新订单关闭
+	//校验是否所有批次全部暂停
+	//map[number]taskId
+
+	return
+}

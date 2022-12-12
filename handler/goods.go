@@ -287,7 +287,6 @@ func CommodityList(c *gin.Context) {
 func OrderShippingRecord(c *gin.Context) {
 	var (
 		form req.OrderShippingRecordReq
-		res  rsp.OrderShippingRecordRsp
 	)
 
 	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
@@ -297,30 +296,12 @@ func OrderShippingRecord(c *gin.Context) {
 		return
 	}
 
-	var pick []model.Pick
+	err, res := dao.OrderShippingRecord(global.DB, form)
 
-	result := global.DB.Where("delivery_no in (?)", form.DeliveryOrderNo).Find(&pick)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
-
-	list := make([]rsp.OrderShippingRecord, 0, result.RowsAffected)
-
-	for _, p := range pick {
-		list = append(list, rsp.OrderShippingRecord{
-			Id:              p.Id,
-			TakeOrdersTime:  p.TakeOrdersTime,
-			PickUser:        p.PickUser,
-			ReviewUser:      p.ReviewUser,
-			ReviewTime:      p.ReviewTime,
-			ReviewNum:       p.ReviewNum,
-			DeliveryOrderNo: p.DeliveryOrderNo,
-		})
-	}
-
-	res.List = list
 
 	xsq_net.SucJson(c, res)
 }

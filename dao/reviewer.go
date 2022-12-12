@@ -3,7 +3,6 @@ package dao
 import (
 	"errors"
 	"pick_v2/forms/rsp"
-	"strconv"
 	"time"
 
 	"gorm.io/gorm"
@@ -338,7 +337,6 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 	if batch.Status == model.BatchClosedStatus {
 
 		//如果出库任务已结束，则需要更新订单和订单商品表&&完成订单和完成订单表状态&&推送订货系统【前面已经更新了出库单相关数据】
-
 		var outboundTask model.OutboundTask
 
 		//如果出库任务也结束了 则需要更新 订单和订单商品表&&完成订单和完成订单表状态
@@ -350,8 +348,8 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 			return
 		}
 
+		//任务是否结束
 		if outboundTask.Status == model.OutboundTaskStatusClosed {
-
 			//任务结束时出库更新订单
 			err = TaskEndDeliveryUpdateOrders(tx, orderNumbers, pickGoods, no)
 			if err != nil {
@@ -360,12 +358,14 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 			}
 		}
 
-		SendBatchMsgToPurchase(db, batch.Id, pick.Id)
-
 		err = YongYouLog(tx, pickGoods, orderJoinGoods, pick.BatchId)
 		if err != nil {
-			err = errors.New("出库成功，但是推送u8失败:" + strconv.Itoa(form.Id))
-			tx.Commit() // u8推送失败不能影响仓库出货，只提示，业务继续
+			tx.Rollback()
+			return
+		}
+
+		err = SendBatchMsgToPurchase(db, batch.Id, pick.Id)
+		if err != nil {
 			return
 		}
 
@@ -421,7 +421,7 @@ func TaskEndDeliveryUpdateOrders(
 	}
 
 	//构造欠货订单map数据
-	for _, good := range orderJoinGoods {
+	for i, good := range orderJoinGoods {
 		orderGoodsReviewNum, orderGoodsReviewMpOk := orderGoodsReviewMp[good.OrderGoodsId]
 
 		lackCount := good.LackCount
@@ -430,6 +430,12 @@ func TaskEndDeliveryUpdateOrders(
 			//本次拣了这个品，欠货数量 -= 本次单品复核数量
 			lackCount -= orderGoodsReviewNum
 		}
+
+		//订单商品欠货数量
+		orderJoinGoods[i].LackCount = lackCount
+
+		//订单商品出货数量 = 历史出货数量 + 本次出货数量
+		orderJoinGoods[i].OutCount = good.OutCount + orderGoodsReviewNum
 
 		//商品还有欠货，即订单为欠货单
 		if lackCount > 0 {
@@ -454,23 +460,17 @@ func TaskEndDeliveryUpdateOrders(
 
 		if lackNumbersMapOk {
 
-			status := model.OrderGoodsProcessingStatus
-
-			if goodsJoinOrder.LackCount > 0 {
-				//如果商品欠货，则更新成待处理，下次再进入拣货池
-				status = model.OrderGoodsUnhandledStatus
-			}
-
 			//欠货订单商品相关更新
 			lackGoods = append(lackGoods, model.OrderGoods{
 				Id:              goodsJoinOrder.OrderGoodsId,
 				Number:          goodsJoinOrder.Number,
-				LackCount:       goodsJoinOrder.LackCount,
-				OutCount:        goodsJoinOrder.OutCount,
-				Status:          status, //如果它欠货，则更新成未处理
+				LackCount:       goodsJoinOrder.LackCount,        //在上一次循环已经变更成 历史欠货数量 - 本次欠货数量了
+				OutCount:        goodsJoinOrder.OutCount,         //在上一次循环已经变更成 历史出库数量 + 本次出库数量了
+				Status:          model.OrderGoodsUnhandledStatus, //欠货，更新成未处理
 				DeliveryOrderNo: deliveryOrderNoArr,
 			})
 
+			//欠货订单去重
 			_, lackOrderMpOk := lackOrderMp[goodsJoinOrder.OrderId]
 
 			if lackOrderMpOk {

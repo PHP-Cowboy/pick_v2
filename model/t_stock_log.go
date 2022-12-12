@@ -1,5 +1,7 @@
 package model
 
+import "gorm.io/gorm"
+
 // u8 推送日志
 type StockLog struct {
 	Base
@@ -20,3 +22,8 @@ const (
 	StockLogPushFailedStatus                 //推送失败
 	StockLogManualReplenishmentStatus        //手工补单
 )
+
+func BatchSaveStockLog(db *gorm.DB, list *[]StockLog) (err error) {
+	err = db.Model(&StockLog{}).CreateInBatches(list, BatchSize).Error
+	return
+}

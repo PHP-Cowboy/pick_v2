@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"pick_v2/dao"
 	"pick_v2/forms/req"
 	"pick_v2/global"
@@ -57,4 +58,25 @@ func CloseOrderDetail(c *gin.Context) {
 	}
 
 	xsq_net.SucJson(c, res)
+}
+
+// 关闭订单
+func CloseOrderExec(c *gin.Context) {
+	var form req.CloseOrder
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err := dao.CloseOrderExec(global.DB, form)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
 }

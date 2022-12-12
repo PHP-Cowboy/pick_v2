@@ -9,3 +9,6 @@ type CloseOrderListForm struct {
 type CloseOrderDetailForm struct {
 	Id int `json:"id" form:"id" binding:"required"`
 }
+
+type CloseOrder struct {
+}

@@ -615,74 +615,6 @@ func BatchPick(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-// todo 废弃
-func UpdateBatchPickNums(tx *gorm.DB, batchId int) error {
-
-	//更新批次 预拣货单 拣货单 复核单 数
-	var (
-		prePickNum int64 //预拣货单
-		pickNum    int
-		reviewNum  int
-	)
-
-	result := tx.Model(&model.PrePick{}).Select("id").Where("batch_id = ? and status = 0", batchId).Count(&prePickNum)
-
-	if result.Error != nil {
-		return result.Error
-	}
-
-	type Count struct {
-		Count  int `json:"count"`
-		Status int `json:"status"`
-	}
-
-	var ct []Count
-
-	result = tx.Model(&model.Pick{}).
-		Select("count(id) as count,status").
-		Where("batch_id = ? and status in (0,1)", batchId).
-		Find(&ct)
-
-	if result.Error != nil {
-		tx.Rollback()
-		return result.Error
-	}
-
-	for _, c := range ct {
-		switch c.Status {
-		case 0:
-			pickNum += c.Count
-			break
-		case 1:
-			reviewNum += c.Count
-			break
-		}
-	}
-
-	var batch model.Batch
-
-	result = tx.First(&batch, batchId)
-
-	if result.Error != nil {
-		tx.Rollback()
-		return result.Error
-	}
-
-	result = tx.Model(&model.Batch{}).Where("id = ? and version = ?", batchId, batch.Version).Updates(map[string]interface{}{
-		"pre_pick_num":      prePickNum,
-		"pick_num":          pickNum,
-		"recheck_sheet_num": reviewNum,
-		"version":           gorm.Expr("version + ?", 1),
-	})
-
-	if result.Error != nil {
-		tx.Rollback()
-		return errors.New("更新批次拣货单数等失败，请重试.错误:" + result.Error.Error())
-	}
-
-	return nil
-}
-
 // 合并拣货
 func MergePick(c *gin.Context) {
 	var form req.MergePickForm
@@ -701,6 +633,30 @@ func MergePick(c *gin.Context) {
 	err := dao.MergePick(global.DB, form)
 
 	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+}
+
+// 批量变更批次状态为 暂停||进行中
+func BatchCloseBatch(c *gin.Context) {
+	var form req.BatchCloseBatchForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	tx := global.DB.Begin()
+
+	err := dao.BatchCloseBatch(tx, form.Status)
+
+	if err != nil {
+		tx.Rollback()
 		xsq_net.ErrorJSON(c, err)
 		return
 	}

@@ -89,6 +89,12 @@ type OrderGoodsNumsStatistical struct {
 	LackCount  int    `json:"lack_count"`
 }
 
+// 历史订单商品
+type HistoryOrderGoods struct {
+	DeliveryNumber GormList `json:"delivery_number"` //出库单号
+	OutCount       int      `json:"out_count"`       //出库数量
+}
+
 // 状态
 const (
 	OrderGoodsDefaultStatus    = iota

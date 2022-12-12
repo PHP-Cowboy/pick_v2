@@ -126,3 +126,9 @@ func GetPickListByPickUserAndNotReviewCompleted(db *gorm.DB, userName string, ty
 
 	return
 }
+
+// 根据出库单号查询拣货数据
+func GetPickListByDeliveryNo(db *gorm.DB, deliveryNo []string) (err error, list []Pick) {
+	err = db.Model(&Pick{}).Where("delivery_no in (?)", deliveryNo).Find(&list).Error
+	return
+}

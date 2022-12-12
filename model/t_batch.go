@@ -73,6 +73,12 @@ func BatchSave(db *gorm.DB, batch *Batch) (err error) {
 	return
 }
 
+// 根据主键批量更新批次数据
+func UpdateBatchByIds(db *gorm.DB, ids []int, mp map[string]interface{}) (err error) {
+	err = db.Model(&Batch{}).Where("id in (?)", ids).Updates(mp).Error
+	return
+}
+
 // 根据主键更新批次数据
 func UpdateBatchByPk(db *gorm.DB, pk int, mp map[string]interface{}) (err error) {
 	err = db.Model(&Batch{}).Where("id = ?", pk).Updates(mp).Error

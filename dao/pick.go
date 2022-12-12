@@ -28,7 +28,16 @@ func BatchPick(db *gorm.DB, form req.BatchPickForm) (err error) {
 		return
 	}
 
-	err = BatchPickByParams(db, form, nil, nil, nil)
+	tx := db.Begin()
+
+	err = BatchPickByParams(tx, form, nil, nil, nil)
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	tx.Commit()
 
 	return
 }
@@ -117,7 +126,7 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, prePicks []model.Pre
 		pickId, prePickIdsMpOk := prePickIdsMp[goods.PrePickId]
 
 		if !prePickIdsMpOk {
-			return errors.New("pick_id不存在")
+			return errors.New("商品中pick_id不存在")
 		}
 
 		orderGoodsIds = append(orderGoodsIds, goods.OrderGoodsId)
@@ -146,10 +155,10 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, prePicks []model.Pre
 	}
 
 	if form.Typ == 1 {
-		result := db.Where("order_goods_id in (?)", orderGoodsIds).Find(&prePickRemarks)
+		err, prePickRemarks = model.GetPrePickRemarkByPrePickIdAndOrderGoodsIds(db, form.Ids, orderGoodsIds)
 
-		if result.Error != nil {
-			return result.Error
+		if err != nil {
+			return
 		}
 	}
 
@@ -157,7 +166,7 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, prePicks []model.Pre
 		pickId, prePickIdsMpOk := prePickIdsMp[remark.PrePickId]
 
 		if !prePickIdsMpOk {
-			return errors.New("pick_id不存在")
+			return errors.New("备注中pick_id不存在")
 		}
 
 		//更新 prePickRemarks 使用
@@ -209,9 +218,10 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, prePicks []model.Pre
 			prePickIds = form.Ids
 		} else {
 			//0:未处理,1:已进入拣货池
-			result = db.Model(&model.PrePickGoods{}).Where("pre_pick_id in (?) and status = 0", form.Ids).Find(&prePickGoods)
-			if result.Error != nil {
-				return result.Error
+			err, prePickGoods = model.GetPrePickGoodsByPrePickIdAndStatus(db, form.Ids, model.PrePickGoodsStatusUnhandled)
+
+			if err != nil {
+				return
 			}
 
 			//将传过来的id转换成map
@@ -399,7 +409,7 @@ func MergePickByParams(db *gorm.DB, form req.MergePickForm, taskId int) (err err
 		}
 	}
 
-	err, prePickRemarks = model.GetPrePickRemarkByOrderGoodsIds(db, orderGoodsIds)
+	err, prePickRemarks = model.GetPrePickRemarkByPrePickIdAndOrderGoodsIds(db, form.Ids, orderGoodsIds)
 
 	if err != nil {
 		tx.Rollback()

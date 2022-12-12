@@ -309,3 +309,53 @@ func OrderOrCompleteOrderExist(db *gorm.DB, ids []int, number string) (err error
 
 	return
 }
+
+// 订单出货记录
+func OrderShippingRecord(db *gorm.DB, form req.OrderShippingRecordReq) (err error, res rsp.OrderShippingRecordRsp) {
+	var (
+		picks   []model.Pick
+		pickIds []int
+	)
+
+	//根据出库单号获取出库记录数据
+	err, picks = model.GetPickListByDeliveryNo(db, form.DeliveryOrderNo)
+
+	if err != nil {
+		return
+	}
+
+	list := make([]rsp.OrderShippingRecord, 0, len(picks))
+
+	for _, pk := range picks {
+		pickIds = append(pickIds, pk.Id)
+	}
+
+	query := "pick_id,sum(review_num) as review_num"
+
+	err, numsMp := model.CountPickPoolNumsByPickIds(db, pickIds, query)
+	if err != nil {
+		return
+	}
+
+	for _, p := range picks {
+		nums, numsMpOk := numsMp[p.Id]
+
+		if !numsMpOk {
+			err = errors.New("拣货相关数量统计有误")
+		}
+
+		list = append(list, rsp.OrderShippingRecord{
+			Id:              p.Id,
+			TakeOrdersTime:  p.TakeOrdersTime,
+			PickUser:        p.PickUser,
+			ReviewUser:      p.ReviewUser,
+			ReviewTime:      p.ReviewTime,
+			ReviewNum:       nums.ReviewNum,
+			DeliveryOrderNo: p.DeliveryOrderNo,
+		})
+	}
+
+	res.List = list
+
+	return
+}

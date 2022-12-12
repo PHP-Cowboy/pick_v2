@@ -12,6 +12,7 @@ type CloseGoods struct {
 	GoodsName      string `gorm:"type:varchar(64);comment:商品名称"`
 	Sku            string `gorm:"type:varchar(64);index:number_sku_idx;comment:sku"`
 	GoodsSpe       string `gorm:"type:varchar(128);comment:商品规格"`
+	GoodsUnit      string `gorm:"type:varchar(64);comment:商品单位"`
 	PayCount       int    `gorm:"comment:下单数量"`
 	CloseCount     int    `gorm:"type:int;default:0;comment:已关闭数量"`
 	NeedCloseCount int    `gorm:"type:int;default:0;comment:需关闭数量"`

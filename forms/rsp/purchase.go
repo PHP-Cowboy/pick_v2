@@ -52,29 +52,29 @@ type CloseOrderRsp struct {
 }
 
 type CloseOrder struct {
-	Number           string           `json:"number"`
-	ShopName         string           `json:"shop_name"`
-	ShopType         string           `json:"shop_type"`
-	DistributionType int              `json:"distribution_type"`
-	OrderRemark      string           `json:"order_remark"`
-	PayAt            *model.MyTime    `json:"pay_at"`
-	PayTotal         int              `json:"pay_total"`
-	Province         string           `json:"province"`
-	City             string           `json:"city"`
-	District         string           `json:"district"`
-	GoodsInfo        []CloseGoodsInfo `json:"goods_info"`
+	Number           string           `json:"number"`            //订单编号
+	ShopName         string           `json:"shop_name"`         //店铺名称
+	ShopType         string           `json:"shop_type"`         //店铺类型
+	DistributionType int              `json:"distribution_type"` //配送方式
+	OrderRemark      string           `json:"order_remark"`      //订单备注
+	PayAt            *model.MyTime    `json:"pay_at"`            //支付时间
+	PayTotal         int              `json:"pay_total"`         //下单总数
+	Province         string           `json:"province"`          //省
+	City             string           `json:"city"`              //市
+	District         string           `json:"district"`          //区
+	GoodsInfo        []CloseGoodsInfo `json:"goods_info"`        //被关闭商品明细
 }
 
 type CloseGoodsInfo struct {
-	ID             int    `json:"id"`
-	Name           string `json:"name"`
-	Sku            string `json:"sku"`
-	GoodsSpe       string `json:"goods_spe"`
-	GoodsUnit      string `json:"goods_unit"`
-	PayCount       int    `json:"pay_count"`
-	CloseCount     int    `json:"close_count"`
-	NeedCloseCount int    `json:"need_close_count"`
-	GoodsRemark    string `json:"goods_remark"`
+	ID             int    `json:"id"`               //订单明细表ID
+	Name           string `json:"name"`             //商品名称
+	Sku            string `json:"sku"`              //sku
+	GoodsSpe       string `json:"goods_spe"`        //商品规格
+	GoodsUnit      string `json:"goods_unit"`       //商品单位
+	PayCount       int    `json:"pay_count"`        //下单数量
+	CloseCount     int    `json:"close_count"`      //已关闭数量
+	NeedCloseCount int    `json:"need_close_count"` //需关闭数量
+	GoodsRemark    string `json:"goods_remark"`     //商品备注
 }
 
 type GetBatchOrderAndGoodsRsp struct {

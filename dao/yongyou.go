@@ -281,7 +281,7 @@ func SubKeepNum(a string, b string, num int32) string {
 }
 
 // 推送u8 日志记录生成
-func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderJoinGoods []model.OrderJoinGoods, batchId int) error {
+func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderJoinGoods []model.OrderJoinGoods, batchId int) (err error) {
 	mpOrderAndGoods := make(map[int]model.OrderJoinGoods, 0)
 
 	for _, order := range orderJoinGoods {
@@ -350,9 +350,10 @@ func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderJoinGoods []model
 	}
 
 	if len(stockLogs) > 0 {
-		result := tx.Save(&stockLogs)
-		if result.Error != nil {
-			return result.Error
+		err = model.BatchSaveStockLog(tx, &stockLogs)
+
+		if err != nil {
+			return
 		}
 
 		for _, log := range stockLogs {
@@ -360,5 +361,5 @@ func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderJoinGoods []model
 		}
 	}
 
-	return nil
+	return
 }
