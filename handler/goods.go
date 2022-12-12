@@ -189,7 +189,7 @@ func GetOrderDetail(c *gin.Context) {
 		return
 	}
 
-	mp, err := cache.GetClassification()
+	classMp, err := cache.GetClassification()
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
@@ -211,9 +211,9 @@ func GetOrderDetail(c *gin.Context) {
 
 		deliveryOrderNoArr = append(deliveryOrderNoArr, og.DeliveryOrderNo...)
 
-		goodsType, ok := mp[og.GoodsType]
+		goodsType, classMpOk := classMp[og.GoodsType]
 
-		if !ok {
+		if !classMpOk {
 			xsq_net.ErrorJSON(c, errors.New("商品类型:"+og.GoodsType+"数据未同步"))
 			return
 		}
@@ -399,27 +399,51 @@ func CompleteOrderDetail(c *gin.Context) {
 		return
 	}
 
-	goodsMap := make(map[string][]rsp.PrePickGoods, 0)
+	classMp, err := cache.GetClassification()
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	detailMap := make(map[string]*rsp.Detail, 0)
 
 	deliveryOrderNoArr := make(model.GormList, 0)
 
 	for _, goods := range completeOrderDetail {
-		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.PrePickGoods{
-			GoodsName:   goods.GoodsName,
+
+		goodsType, classMpOk := classMp[goods.GoodsType]
+
+		if !classMpOk {
+			xsq_net.ErrorJSON(c, errors.New("商品类型:"+goods.GoodsType+"数据未同步"))
+			return
+		}
+
+		if _, detailOk := detailMap[goodsType]; !detailOk {
+			detailMap[goodsType] = &rsp.Detail{
+				Total: 0,
+				List:  make([]*rsp.GoodsDetail, 0),
+			}
+		}
+
+		detailMap[goodsType].Total += goods.PayCount
+
+		detailMap[goodsType].List = append(detailMap[goodsType].List, &rsp.GoodsDetail{
+			Name:        goods.GoodsName,
 			GoodsSpe:    goods.GoodsSpe,
 			Shelves:     goods.Shelves,
-			NeedNum:     goods.PayCount,
-			CloseNum:    goods.CloseCount,
+			PayCount:    goods.PayCount,
+			CloseCount:  goods.CloseCount,
 			OutCount:    goods.ReviewCount,
-			NeedOutNum:  goods.PayCount,
 			GoodsRemark: goods.GoodsRemark,
 		})
+
 		deliveryOrderNoArr = append(deliveryOrderNoArr, goods.DeliveryOrderNo...)
 	}
 
 	deliveryOrderNoArr = slice.UniqueSlice(deliveryOrderNoArr)
 
-	res.Goods = goodsMap
+	res.Goods = detailMap
 
 	res.ShopName = completeOrder.ShopName
 	res.ShopCode = completeOrder.ShopCode
