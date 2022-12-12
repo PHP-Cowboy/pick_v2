@@ -2,6 +2,7 @@ package dao
 
 import (
 	"errors"
+	"fmt"
 
 	"gorm.io/gorm"
 
@@ -88,6 +89,66 @@ func CompletePick(db *gorm.DB, form req.CompletePickForm) (err error) {
 	err, orderJoinGoods = model.GetOrderGoodsJoinOrderByIds(db, orderGoodsIds)
 
 	if err != nil {
+		return
+	}
+
+	type CloseGoodsInfo struct {
+		Name string `json:"name"`
+		Num  int    `json:"num"`
+	}
+
+	//订单商品需拣数量按sku累计
+	//1.防止拣货数量大于需拣数量
+	//2.关单或关品后拣货员未刷新提示拣货数量大于需拣数量
+	skuNeedPickGoodsInfoMp := make(map[string]CloseGoodsInfo, 0)
+
+	for _, good := range orderJoinGoods {
+		//需拣数量
+		needPickGoodsInfo, skuNeedPickGoodsInfoMpOk := skuNeedPickGoodsInfoMp[good.Sku]
+
+		if !skuNeedPickGoodsInfoMpOk {
+			needPickGoodsInfo = CloseGoodsInfo{
+				Num:  0,
+				Name: good.GoodsName,
+			}
+		}
+
+		needPickGoodsInfo.Num += good.LackCount
+
+		skuNeedPickGoodsInfoMp[good.Sku] = needPickGoodsInfo
+	}
+
+	//关闭商品map
+	closeMp := make(map[string]CloseGoodsInfo, 0)
+
+	for sku, needPickGoodsInfo := range skuNeedPickGoodsInfoMp {
+		completeNum, skuCompleteNumMpOk := skuCompleteNumMp[sku]
+
+		if !skuCompleteNumMpOk {
+			err = errors.New("需拣数量完成数量对比异常")
+			return
+		}
+
+		needPickNum := needPickGoodsInfo.Num
+
+		if completeNum > needPickNum {
+			closeMp[sku] = CloseGoodsInfo{
+				Name: needPickGoodsInfo.Name,
+				Num:  completeNum - needPickNum,
+			}
+			continue
+		}
+	}
+
+	if len(closeMp) > 0 {
+		errStr := "请注意，有商品关闭，"
+
+		for _, cl := range closeMp {
+			errStr += fmt.Sprintf("%s，关闭%d件", cl.Name, cl.Num)
+		}
+
+		err = errors.New(errStr)
+
 		return
 	}
 
