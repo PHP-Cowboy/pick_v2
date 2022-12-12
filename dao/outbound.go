@@ -543,7 +543,7 @@ func OutboundOrderDetail(db *gorm.DB, form req.OutboundOrderDetailForm) (err err
 		return result.Error, res
 	}
 
-	mp, err := cache.GetClassification()
+	classMp, err := cache.GetClassification()
 
 	if err != nil {
 		return err, res
@@ -554,7 +554,7 @@ func OutboundOrderDetail(db *gorm.DB, form req.OutboundOrderDetailForm) (err err
 	deliveryOrderNoArr := make(model.GormList, 0)
 
 	for _, goods := range outboundGoods {
-		goodsType, ok := mp[goods.GoodsType]
+		goodsType, ok := classMp[goods.GoodsType]
 
 		if !ok {
 			return errors.New("商品类型:" + goods.GoodsType + "数据未同步"), res

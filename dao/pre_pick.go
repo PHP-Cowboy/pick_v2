@@ -33,7 +33,7 @@ func CreatePrePickLogic(
 	prePickRemarks []model.PrePickRemark,
 ) {
 
-	mp, err := cache.GetClassification()
+	classMp, err := cache.GetClassification()
 
 	if err != nil {
 		return
@@ -141,9 +141,9 @@ func CreatePrePickLogic(
 		}
 
 		//商品类型
-		goodsType, mpOk := mp[og.GoodsType]
+		goodsType, classMpOk := classMp[og.GoodsType]
 
-		if !mpOk {
+		if !classMpOk {
 			err = errors.New("商品类型:" + og.GoodsType + "数据未同步")
 			return
 		}

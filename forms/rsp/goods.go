@@ -172,15 +172,15 @@ type CompleteOrder struct {
 }
 
 type CompleteOrderDetailRsp struct {
-	ShopName        string                    `json:"shop_name"`
-	ShopCode        string                    `json:"shop_code"`
-	Line            string                    `json:"line"`
-	Region          string                    `json:"regin"`
-	ShopType        string                    `json:"shop_type"`
-	Number          string                    `json:"number"`
-	OrderRemark     string                    `json:"order_remark"`
-	DeliveryOrderNo model.GormList            `json:"delivery_order_no"`
-	Goods           map[string][]PrePickGoods `json:"goods"`
+	ShopName        string             `json:"shop_name"`
+	ShopCode        string             `json:"shop_code"`
+	Line            string             `json:"line"`
+	Region          string             `json:"regin"`
+	ShopType        string             `json:"shop_type"`
+	Number          string             `json:"number"`
+	OrderRemark     string             `json:"order_remark"`
+	DeliveryOrderNo model.GormList     `json:"delivery_order_no"`
+	Goods           map[string]*Detail `json:"goods"`
 }
 
 type CountRes struct {
