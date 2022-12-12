@@ -147,7 +147,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 		return consumer.ConsumeRetryLater, err
 	}
 
-	closeGoodsInfo := GetModelCloseOrderGoodsData(closeOrder.GoodsInfo, modelCloseOrder.Id)
+	closeGoodsInfo := GetModelCloseOrderGoodsData(closeOrder.GoodsInfo, modelCloseOrder.Id, modelCloseOrder.Number)
 
 	err = model.BatchSaveCloseGoods(tx, &closeGoodsInfo)
 
@@ -187,11 +187,12 @@ func GetCloseTotal(closeGoodsInfo []rsp.CloseGoodsInfo) (closeTotal int) {
 	return
 }
 
-func GetModelCloseOrderGoodsData(closeGoodsInfo []rsp.CloseGoodsInfo, closeOrderId int) (modelCloseOrderGoods []model.CloseGoods) {
+func GetModelCloseOrderGoodsData(closeGoodsInfo []rsp.CloseGoodsInfo, closeOrderId int, number string) (modelCloseOrderGoods []model.CloseGoods) {
 	for _, info := range closeGoodsInfo {
 		modelCloseOrderGoods = append(modelCloseOrderGoods, model.CloseGoods{
 			CloseOrderId:   closeOrderId,
 			OrderGoodsId:   info.ID,
+			Number:         number,
 			GoodsName:      info.Name,
 			Sku:            info.Sku,
 			GoodsSpe:       info.GoodsSpe,

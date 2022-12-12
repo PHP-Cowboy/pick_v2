@@ -11,4 +11,5 @@ type CloseOrderDetailForm struct {
 }
 
 type CloseOrder struct {
+	Number []string `json:"number"`
 }

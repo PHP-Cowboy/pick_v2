@@ -9,6 +9,7 @@ type CloseGoods struct {
 	Base
 	CloseOrderId   int    `gorm:"type:int;index;default:0;comment:关闭订单表ID"`
 	OrderGoodsId   int    `gorm:"type:int(11) unsigned;comment:订单商品ID"`
+	Number         string `gorm:"type:varchar(64);comment:订单编号"`
 	GoodsName      string `gorm:"type:varchar(64);comment:商品名称"`
 	Sku            string `gorm:"type:varchar(64);index:number_sku_idx;comment:sku"`
 	GoodsSpe       string `gorm:"type:varchar(128);comment:商品规格"`
@@ -26,5 +27,10 @@ func BatchSaveCloseGoods(db *gorm.DB, list *[]CloseGoods) (err error) {
 
 func GetCloseGoodsListByCond(db *gorm.DB, cond CloseGoods) (err error, list []CloseGoods) {
 	err = db.Model(&CloseGoods{}).Where(&cond).Find(&list).Error
+	return
+}
+
+func GetCloseGoodsListByNumbers(db *gorm.DB, number []string) (err error, list []CloseGoods) {
+	err = db.Model(&CloseGoods{}).Where("number in (?)", number).Find(&list).Error
 	return
 }

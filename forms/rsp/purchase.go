@@ -62,6 +62,7 @@ type CloseOrder struct {
 	Province         string           `json:"province"`          //省
 	City             string           `json:"city"`              //市
 	District         string           `json:"district"`          //区
+	Typ              int              `json:"typ"`               //1.部分关闭,2.全单关闭,
 	GoodsInfo        []CloseGoodsInfo `json:"goods_info"`        //被关闭商品明细
 }
 

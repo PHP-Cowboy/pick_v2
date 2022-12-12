@@ -103,6 +103,11 @@ func GetOutboundOrderByTaskIdAndNumbers(db *gorm.DB, taskId int, numbers []strin
 	return
 }
 
+func GetOutboundOrderByNumbers(db *gorm.DB, numbers []string) (err error, list []OutboundOrder) {
+	err = db.Model(&OutboundOrder{}).Where("number in (?)", numbers).Find(&list).Error
+	return
+}
+
 // 根据status分组统计任务条数
 func OutboundOrderOrderTypeCount(db *gorm.DB, taskId int) (err error, count []OutboundOrderTypeCount) {
 

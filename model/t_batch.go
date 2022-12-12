@@ -99,6 +99,12 @@ func GetBatchByPk(db *gorm.DB, pk int) (err error, batch Batch) {
 	return
 }
 
+// 根据条件查找第一条数据
+func GetBatchFirst(db *gorm.DB, cond Batch) (err error, batch *Batch) {
+	err = db.Model(&Batch{}).Where(cond).First(batch).Error
+	return
+}
+
 // 根据出库任务获取批次列表
 func GetBatchListByTaskId(db *gorm.DB, taskId int) (err error, list []Batch) {
 

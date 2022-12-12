@@ -1,6 +1,7 @@
 package dao
 
 import (
+	"errors"
 	"gorm.io/gorm"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
@@ -135,9 +136,74 @@ func CloseOrderDetail(db *gorm.DB, form req.CloseOrderDetailForm) (err error, re
 // 关闭订单列表&&详情
 
 func CloseOrderExec(db *gorm.DB, form req.CloseOrder) (err error) {
-	//MQ 处理新订单关闭
+	var (
+		outboundOrders []model.OutboundOrder
+		closeOrders    []model.CloseOrder
+		closeGoods     []model.CloseGoods
+		taskNumberNew  []string //任务中的新订单
+	)
+
 	//校验是否所有批次全部暂停
+	//查询是否有进行中的批次
+	err, _ = model.GetBatchFirst(db, model.Batch{Status: model.BatchOngoingStatus})
+
+	//err 不是未找到数据
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return
+	}
+
+	//MQ 中 处理新订单关闭 [包括订单中的新订单和任务中的新订单][关闭订单任务加异常状态]
+	err, outboundOrders = model.GetOutboundOrderByNumbers(db, form.Number)
+
+	if err != nil {
+		return
+	}
+
+	//关闭订单数据
+	err, closeOrders = model.GetCloseOrderByNumbers(db, form.Number)
+
+	if err != nil {
+		return
+	}
+
+	closeOrderMp := make(map[string]int, 0)
+
+	for _, order := range closeOrders {
+		closeOrderMp[order.Number] = order.Typ
+	}
+
+	//关闭订单商品数据
+	err, closeGoods = model.GetCloseGoodsListByNumbers(db, form.Number)
+
+	if err != nil {
+		return
+	}
+
+	closeGoodsMp := make(map[string][]model.CloseGoods, 0)
+
+	for _, good := range closeGoods {
+		closeGoodsMp[good.Number] = append(closeGoodsMp[good.Number], good)
+	}
+
 	//map[number]taskId
+	numberTaskMp := make(map[string]int, 0)
+
+	for _, order := range outboundOrders {
+		//任务中的新订单，直接关闭
+		if order.OrderType == model.OutboundOrderTypeNew {
+			taskNumberNew = append(taskNumberNew, order.Number)
+		}
+
+		taskId, numberTaskMpOk := numberTaskMp[order.Number]
+
+		//利用主键自增，找到订单号对应的最大批次
+		//订单每次只能在一个任务中，任务结束后变为欠货单才能重新进入下一个任务中
+		if numberTaskMpOk && order.TaskId > taskId {
+			numberTaskMp[order.Number] = order.TaskId
+		}
+	}
+
+	//构造新订单查询更新数据
 
 	return
 }

@@ -16,7 +16,8 @@ type CloseOrder struct {
 	City             string  `gorm:"type:varchar(64);comment:市"`
 	District         string  `gorm:"type:varchar(64);comment:区"`
 	OrderRemark      string  `gorm:"type:varchar(512);comment:订单备注"`
-	Status           int     `gorm:"type:tinyint;default:1;comment:状态:1:处理中,2:已完成"`
+	Typ              int     `gorm:"type:tinyint;default:1;comment:状态:1:部分关闭,2:全单关闭"`
+	Status           int     `gorm:"type:tinyint;default:1;comment:状态:1:处理中,2:已完成,3:异常"`
 }
 
 const (
@@ -42,6 +43,11 @@ func GetCloseOrderList(db *gorm.DB, cond CloseOrder) (err error, list []CloseOrd
 
 func GetCloseOrderPageList(db *gorm.DB, cond CloseOrder, page, size int) (err error, list []CloseOrder) {
 	err = db.Model(&CloseOrder{}).Where(&cond).Scopes(Paginate(page, size)).Find(&list).Error
+	return
+}
+
+func GetCloseOrderByNumbers(db *gorm.DB, numbers []string) (err error, list []CloseOrder) {
+	err = db.Model(&CloseOrder{}).Where("number in (?)", numbers).Find(&list).Error
 	return
 }
 
