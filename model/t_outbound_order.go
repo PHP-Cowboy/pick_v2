@@ -103,6 +103,11 @@ func GetOutboundOrderByTaskIdAndNumbers(db *gorm.DB, taskId int, numbers []strin
 	return
 }
 
+func GetOutboundOrderInMultiColumn(db *gorm.DB, multiColumn [][]interface{}) (err error, list []OutboundOrder) {
+	err = db.Model(&OutboundOrder{}).Where("(task_id , number ) IN ?", multiColumn).Find(&list).Error
+	return
+}
+
 func GetOutboundOrderByNumbers(db *gorm.DB, numbers []string) (err error, list []OutboundOrder) {
 	err = db.Model(&OutboundOrder{}).Where("number in (?)", numbers).Find(&list).Error
 	return

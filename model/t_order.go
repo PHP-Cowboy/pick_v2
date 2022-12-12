@@ -140,6 +140,12 @@ func GetOrderByPk(db *gorm.DB, id int) (err error, first Order) {
 	return
 }
 
+//根据订单号查询订单
+func GetOrderByNumber(db *gorm.DB, number string) (err error, first Order) {
+	err = db.Model(&Order{}).Where("number = ?", number).First(&first).Error
+	return
+}
+
 // 根据订单编号查询订单数据
 func GetOrderListByNumbers(db *gorm.DB, numbers []string) (err error, list []Order) {
 	err = db.Model(&Order{}).Where("number in (?)", numbers).Find(&list).Error

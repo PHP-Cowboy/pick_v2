@@ -129,6 +129,11 @@ func GetOutboundGoodsFirstByOrderGoodsIdSortByTaskId(db *gorm.DB, orderGoodsIds 
 	return
 }
 
+func GetOutboundGoodsInMultiColumn(db *gorm.DB, multiColumn [][]interface{}) (err error, list []OutboundGoods) {
+	err = db.Model(&OutboundGoods{}).Where("(task_id , number, sku ) IN ?", multiColumn).Find(&list).Error
+	return
+}
+
 func GetOutboundGoodsJoinOrderList(db *gorm.DB, taskId int, number []string) (err error, list []OutboundGoodsJoinOrder) {
 
 	err = db.Table("t_outbound_goods og").

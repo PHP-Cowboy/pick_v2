@@ -125,19 +125,115 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 
 	closeOrder := result.Data
 
+	goodsInfo := closeOrder.GoodsInfo
+
 	if closeOrder.Number == "" {
 		return consumer.ConsumeSuccess, errors.New("订货系统查询订单数据不存在")
 	}
 
-	if len(closeOrder.GoodsInfo) == 0 {
+	if len(goodsInfo) == 0 {
 		return consumer.ConsumeSuccess, errors.New("订货系统查询订单商品数据不存在")
 	}
 
-	closeTotal := GetCloseTotal(closeOrder.GoodsInfo)
-
-	modelCloseOrder := GetModelCloseOrderData(closeOrder, closeTotal)
+	var (
+		order model.Order
+	)
 
 	tx := global.DB.Begin()
+
+	//订单状态
+	err, order = model.GetOrderByNumber(tx, closeOrder.Number)
+
+	if err != nil {
+		return
+	}
+
+	var status = 1
+
+	//如果是新订单
+	if order.OrderType == model.NewOrderType {
+		//完成状态
+		status = 2
+
+		var closeGoods []rsp.CloseGoods
+
+		for _, g := range goodsInfo {
+			closeGoods = append(closeGoods, rsp.CloseGoods{
+				OrderGoodsId: g.ID,
+				CloseCount:   g.CloseCount,
+				Sku:          g.Sku,
+			})
+		}
+
+		closeOrderNumberAndTyp := make([]rsp.CloseOrderNumberTyp, 0, 1)
+
+		closeOrderNumberAndTyp = append(closeOrderNumberAndTyp, rsp.CloseOrderNumberTyp{
+			Number: closeOrder.Number,
+			Typ:    closeOrder.Typ,
+		})
+
+		//关闭订单逻辑处理
+		err = dao.CloseOrderAndGoods(tx, closeOrderNumberAndTyp, closeGoods, nil, nil)
+		if err != nil {
+			tx.Rollback()
+			return consumer.ConsumeRetryLater, err
+		}
+
+	} else {
+		//不是新订单,查询是否在任务中是新订单
+
+		var outboundOrder model.OutboundOrder
+
+		err, outboundOrder = model.GetOutboundOrderByNumberFirstSortByTaskId(tx, closeOrder.Number)
+
+		if err != nil {
+			return
+		}
+
+		//在任务中是新订单
+		if outboundOrder.OrderType == model.OutboundOrderTypeNew {
+			//完成状态
+			status = 2
+
+			var closeGoods []rsp.CloseGoods
+
+			for _, g := range goodsInfo {
+				closeGoods = append(closeGoods, rsp.CloseGoods{
+					OrderGoodsId: g.ID,
+					CloseCount:   g.CloseCount,
+					Sku:          g.Sku,
+				})
+			}
+
+			closeOrderNumberAndTyp := make([]rsp.CloseOrderNumberTyp, 0, 1)
+
+			closeOrderNumberAndTyp = append(closeOrderNumberAndTyp, rsp.CloseOrderNumberTyp{
+				Number: closeOrder.Number,
+				Typ:    closeOrder.Typ,
+			})
+
+			taskOrderCond := [][]interface{}{{outboundOrder.TaskId, closeOrder.Number}}
+
+			taskOrderSkuCond := [][]interface{}{}
+
+			for _, info := range goodsInfo {
+				cond := []interface{}{outboundOrder.TaskId, closeOrder.Number, info.Sku}
+				taskOrderSkuCond = append(taskOrderSkuCond, cond)
+			}
+
+			//关闭订单逻辑处理
+			err = dao.CloseOrderAndGoods(tx, closeOrderNumberAndTyp, closeGoods, taskOrderCond, taskOrderSkuCond)
+			if err != nil {
+				tx.Rollback()
+				return consumer.ConsumeRetryLater, err
+			}
+
+		}
+	}
+
+	closeTotal := GetCloseTotal(goodsInfo)
+
+	modelCloseOrder := GetModelCloseOrderData(closeOrder, closeTotal, status)
 
 	//需关闭总数
 	err = model.SaveCloseOrder(tx, modelCloseOrder)
@@ -147,7 +243,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 		return consumer.ConsumeRetryLater, err
 	}
 
-	closeGoodsInfo := GetModelCloseOrderGoodsData(closeOrder.GoodsInfo, modelCloseOrder.Id, modelCloseOrder.Number)
+	closeGoodsInfo := GetModelCloseOrderGoodsData(goodsInfo, modelCloseOrder.Id, modelCloseOrder.Number)
 
 	err = model.BatchSaveCloseGoods(tx, &closeGoodsInfo)
 
@@ -161,7 +257,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 	return
 }
 
-func GetModelCloseOrderData(closeOrder rsp.CloseOrder, closeTotal int) (modelCloseOrder *model.CloseOrder) {
+func GetModelCloseOrderData(closeOrder rsp.CloseOrder, closeTotal, status int) (modelCloseOrder *model.CloseOrder) {
 	modelCloseOrder = &model.CloseOrder{
 		Number:           closeOrder.Number,
 		ShopName:         closeOrder.ShopName,
@@ -174,6 +270,7 @@ func GetModelCloseOrderData(closeOrder rsp.CloseOrder, closeTotal int) (modelClo
 		Province:         closeOrder.Province,
 		City:             closeOrder.City,
 		District:         closeOrder.District,
+		Status:           status,
 	}
 
 	return

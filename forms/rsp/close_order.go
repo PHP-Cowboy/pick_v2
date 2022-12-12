@@ -46,3 +46,15 @@ type OrderGoodsList struct {
 	NeedCloseCount int    `json:"need_close_count"` //需关闭数量
 	GoodsRemark    string `gorm:"type:varchar(255);comment:商品备注"`
 }
+
+type CloseGoods struct {
+	OrderGoodsId int
+	CloseCount   int
+	Sku          string
+}
+
+//关闭订单 订单号和类型
+type CloseOrderNumberTyp struct {
+	Number string
+	Typ    int
+}

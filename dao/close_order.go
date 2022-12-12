@@ -189,7 +189,7 @@ func CloseOrderExec(db *gorm.DB, form req.CloseOrder) (err error) {
 	numberTaskMp := make(map[string]int, 0)
 
 	for _, order := range outboundOrders {
-		//任务中的新订单，直接关闭
+		//任务中的新订单，在关闭订单消息中处理掉
 		if order.OrderType == model.OutboundOrderTypeNew {
 			taskNumberNew = append(taskNumberNew, order.Number)
 		}
@@ -204,6 +204,151 @@ func CloseOrderExec(db *gorm.DB, form req.CloseOrder) (err error) {
 	}
 
 	//构造新订单查询更新数据
+
+	return
+}
+
+//订单&&订单商品关闭
+func CloseOrderAndGoods(tx *gorm.DB, closeOrderNumberTyp []rsp.CloseOrderNumberTyp, closeGoods []rsp.CloseGoods, taskOrderCond, taskOrderSkuCond [][]interface{}) (err error) {
+	if len(closeGoods) == 0 {
+		err = errors.New("被关闭商品不能为空")
+		return
+	}
+
+	var (
+		closeGoodsNums = len(closeGoods)
+		orderGoods     []model.OrderGoods
+		orderGoodsIds  = make([]int, 0, closeGoodsNums)
+		closeGoodsMp   = make(map[int]rsp.CloseGoods, 0)
+	)
+
+	for _, cgs := range closeGoods {
+		orderGoodsIds = append(orderGoodsIds, cgs.OrderGoodsId)
+		closeGoodsMp[cgs.OrderGoodsId] = cgs
+	}
+
+	err, orderGoods = model.GetOrderGoodsListByIds(tx, orderGoodsIds)
+
+	if err != nil {
+		return
+	}
+
+	for i, og := range orderGoods {
+		cgs, closeGoodsMpOk := closeGoodsMp[og.Id]
+
+		if !closeGoodsMpOk {
+			err = errors.New("订单商品map异常")
+			return
+		}
+
+		closeCount := cgs.CloseCount
+
+		if og.LackCount < closeCount {
+			err = errors.New("欠货数量小于关闭数量")
+			return
+		}
+
+		orderGoods[i].CloseCount += closeCount
+		orderGoods[i].LackCount -= closeCount
+	}
+
+	err = model.OrderGoodsReplaceSave(tx, &orderGoods, []string{"update_time", "lack_count", "close_count"})
+
+	if err != nil {
+		return
+	}
+
+	//全单关闭订单号
+	var (
+		closeOrderNumbers   []string
+		closeOrderNumbersMp = make(map[string]struct{}, 0)
+	)
+
+	for _, nt := range closeOrderNumberTyp {
+		if nt.Typ == 2 {
+			closeOrderNumbers = append(closeOrderNumbers, nt.Number)
+			closeOrderNumbersMp[nt.Number] = struct{}{}
+		}
+	}
+
+	//全单关闭
+	if len(closeOrderNumbers) == 0 {
+		err = model.UpdateOrderByNumbers(tx, closeOrderNumbers, map[string]interface{}{"order_type": model.CloseOrderType})
+		if err != nil {
+			return
+		}
+	}
+
+	//不需要处理任务数据
+	if taskOrderCond == nil {
+		return
+	}
+
+	var (
+		outboundOrder       []model.OutboundOrder
+		outboundOrderUpdate []model.OutboundOrder
+	)
+
+	err, outboundOrder = model.GetOutboundOrderInMultiColumn(tx, taskOrderCond)
+	if err != nil {
+		return
+	}
+
+	if len(outboundOrder) == 0 {
+		err = errors.New("任务订单未找到")
+		return
+	}
+
+	for _, order := range outboundOrder {
+		_, closeOrderNumbersMpOk := closeOrderNumbersMp[order.Number]
+
+		if closeOrderNumbersMpOk {
+			outboundOrderUpdate = append(outboundOrderUpdate, order)
+		}
+	}
+
+	if len(outboundOrderUpdate) > 0 {
+		err = model.OutboundOrderReplaceSave(tx, outboundOrderUpdate, []string{"order_type"})
+
+		if err != nil {
+			return
+		}
+	}
+
+	var (
+		outboundGoods []model.OutboundGoods
+	)
+
+	err, outboundGoods = model.GetOutboundGoodsInMultiColumn(tx, taskOrderSkuCond)
+
+	if err != nil {
+		return
+	}
+
+	for i, good := range outboundGoods {
+		cgs, closeGoodsMpOk := closeGoodsMp[good.OrderGoodsId]
+
+		if !closeGoodsMpOk {
+			err = errors.New("订单商品map异常")
+			return
+		}
+
+		closeCount := cgs.CloseCount
+
+		if good.LackCount < closeCount {
+			err = errors.New("欠货数量小于关闭数量")
+			return
+		}
+
+		outboundGoods[i].CloseCount += closeCount
+		outboundGoods[i].LackCount -= closeCount
+	}
+
+	err = model.OutboundGoodsReplaceSave(tx, outboundGoods, []string{"lack_count", "out_count"})
+
+	if err != nil {
+		return
+	}
 
 	return
 }
