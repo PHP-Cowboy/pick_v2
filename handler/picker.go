@@ -15,7 +15,6 @@ import (
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"sort"
-	"time"
 )
 
 func getPick(pick []model.Pick) (res rsp.ReceivingOrdersRsp, err error) {
@@ -89,21 +88,15 @@ func getPick(pick []model.Pick) (res rsp.ReceivingOrdersRsp, err error) {
 func ReceivingOrders(c *gin.Context) {
 
 	var (
-		form    req.ReceivingOrdersForm
-		res     rsp.ReceivingOrdersRsp
-		pick    []model.Pick
-		err     error
-		batches []model.Batch
+		form req.ReceivingOrdersForm
 	)
 
 	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
 
-	if err = c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
-
-	db := global.DB
 
 	userInfo := GetUserInfo(c)
 
@@ -112,91 +105,16 @@ func ReceivingOrders(c *gin.Context) {
 		return
 	}
 
-	// 先查询是否有当前拣货员被分配的任务或已经接单且未完成拣货的数据,如果被分配多条，第一按批次优先级，第二按拣货池优先级 优先拣货
-	result := db.Model(&model.Pick{}).Where("pick_user = ? and status = 0 and typ = ?", userInfo.Name, form.Typ).Find(&pick)
+	form.UserName = userInfo.Name
 
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
+	err, res := dao.ReceivingOrders(global.DB, form)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
-	now := time.Now()
+	xsq_net.SucJson(c, res)
 
-	//有分配的拣货任务
-	if result.RowsAffected > 0 {
-		res, err = getPick(pick)
-		if err != nil {
-			xsq_net.ErrorJSON(c, err)
-			return
-		}
-		//后台分配的单没有接单时间,更新接单时间
-		if res.TakeOrdersTime == nil {
-			result = db.Model(&model.Pick{}).Where("id = ?", res.Id).Update("take_orders_time", &now)
-
-			if result.Error != nil {
-				xsq_net.ErrorJSON(c, result.Error)
-				return
-			}
-		}
-		xsq_net.SucJson(c, res)
-		return
-	}
-
-	//进行中的批次
-	result = db.Model(&model.Batch{}).Where("status = 0 and typ = ?", form.Typ).Find(&batches)
-
-	batchIds := make([]int, 0)
-
-	for _, b := range batches {
-		batchIds = append(batchIds, b.Id)
-	}
-
-	if len(batchIds) == 0 {
-		xsq_net.ErrorJSON(c, errors.New("没有进行中的批次,无法接单"))
-		return
-	}
-
-	//查询未被接单的拣货池数据
-	result = db.Model(&model.Pick{}).Where("batch_id in (?) and pick_user = '' and status = 0 and typ = ?", batchIds, form.Typ).Find(&pick)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	//拣货池有未接单的数据
-	if result.RowsAffected > 0 {
-
-		res, err = getPick(pick)
-		if err != nil {
-			xsq_net.ErrorJSON(c, err)
-		}
-
-		tx := db.Begin()
-
-		//更新拣货池 + version 防并发
-		result = tx.Model(&model.Pick{}).
-			Where("id = ? and version = ?", res.Id, res.Version).
-			Updates(map[string]interface{}{
-				"pick_user":        userInfo.Name,
-				"take_orders_time": &now,
-				"version":          gorm.Expr("version + ?", 1),
-			})
-
-		if result.Error != nil {
-			tx.Rollback()
-			xsq_net.ErrorJSON(c, ecode.DataSaveError)
-			return
-		}
-
-		tx.Commit()
-
-		xsq_net.SucJson(c, res)
-		return
-	} else {
-		xsq_net.ErrorJSON(c, errors.New("暂无拣货单"))
-		return
-	}
 }
 
 // 集中拣货接单

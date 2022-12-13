@@ -613,7 +613,7 @@ func SyncBatch(batchId int) error {
 func SendBatchMsgToPurchase(tx *gorm.DB, batchId int, pickId int) (err error) {
 	var picks []model.Pick
 
-	err, picks = model.GetPickList(tx, model.Pick{BatchId: batchId})
+	err, picks = model.GetPickList(tx, &model.Pick{BatchId: batchId})
 
 	if err != nil {
 		return
@@ -650,7 +650,7 @@ func BatchCloseBatch(tx *gorm.DB, status int) (err error) {
 		statusMp  = make(map[int]int, 0)
 	)
 
-	err, batchList = model.GetBatchList(tx, model.Batch{Status: status})
+	err, batchList = model.GetBatchList(tx, &model.Batch{Status: status})
 
 	if err != nil {
 		return

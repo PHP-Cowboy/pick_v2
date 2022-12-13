@@ -248,7 +248,7 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 	localDb := db.Table("t_order_goods og").
 		Joins("left join t_order o on og.number = o.number").
 		Select("og.*,og.id as order_goods_id,o.*,o.id as order_id").
-		Where("o.distribution_type = ? and o.pay_at <= ? and o.delivery_at <= ? ", form.DistributionType, form.PayTime, form.DeliveryEndTime)
+		Where("o.order_type = ? and o.distribution_type = ? and o.pay_at <= ? and o.delivery_at <= ? ", model.NewOrderType, form.DistributionType, form.PayTime, form.DeliveryEndTime)
 
 	if form.DeliveryStartTime != "" {
 		localDb = localDb.Where("o.delivery_at >= ?", form.DeliveryStartTime)
@@ -318,7 +318,7 @@ func OutboundOrderBatchSaveLogic(db *gorm.DB, taskId int, orderJoinGoods []model
 				ConsigneeTel:      goods.ConsigneeTel,
 				OrderType:         model.OutboundOrderTypeNew,
 				LatestPickingTime: nil,
-				HasRemark:         0,
+				HasRemark:         goods.HasRemark,
 				OrderRemark:       goods.OrderRemark,
 			}
 
@@ -370,9 +370,9 @@ func OutboundOrderBatchSaveLogic(db *gorm.DB, taskId int, orderJoinGoods []model
 		_, ok := remarkMp[s]
 
 		if ok {
-			oo.HasRemark = 1
+			oo.HasRemark = 2
 		} else {
-			oo.HasRemark = 0
+			oo.HasRemark = 1
 		}
 
 		outboundOrders = append(outboundOrders, oo)
@@ -440,6 +440,7 @@ func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, 
 		Province:         form.Province,
 		City:             form.City,
 		District:         form.District,
+		HasRemark:        form.HasRemark,
 	})
 
 	if form.OrderType > 0 {
@@ -447,10 +448,6 @@ func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, 
 	} else {
 		//全部订单不显示已关闭的
 		localDb.Where("order_type != ?", model.OutboundOrderTypeClose)
-	}
-
-	if form.HasRemark != nil {
-		localDb.Where("has_remark = ?", *form.HasRemark)
 	}
 
 	result := localDb.Find(&outboundOrders)
@@ -836,6 +833,7 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 
 	var (
 		outboundGoodsJoinOrder []model.OutboundGoodsJoinOrder
+		outboundNumbers        []string //出库任务订单
 		orderGoods             []model.OrderGoods
 	)
 
@@ -860,6 +858,8 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 		if o.LackCount > 0 {
 			lackNumbersMap[o.Number] = struct{}{}
 		}
+
+		outboundNumbers = append(outboundNumbers, o.Number)
 
 	}
 
@@ -1009,6 +1009,12 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 		}
 	}
 
+	//更新出库任务订单为已完成
+	err = model.UpdateOutboundOrderByTaskIdAndNumbers(tx, taskId, outboundNumbers, map[string]interface{}{"order_type": model.OutboundOrderTypeComplete})
+	if err != nil {
+		return
+	}
+
 	//欠货订单更新字段
 	lackOrderValues := []string{"shop_id", "shop_name", "shop_type", "shop_code", "house_code", "line", "order_type", "latest_picking_time"}
 
@@ -1017,6 +1023,10 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 
 	//结束任务更新订单数据
 	err = UpdateOrders(tx, &lackOrder, &lackGoods, lackOrderValues, lackGoodsValues, &completeOrder, &completeOrderDetail, completeIds, completeOrderGoodsIds)
+
+	if err != nil {
+		return
+	}
 
 	return
 }

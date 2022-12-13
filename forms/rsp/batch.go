@@ -163,6 +163,7 @@ type MergePrePickGoods struct {
 	GoodsSpe  string     `json:"goods_spe"`
 	Shelves   string     `json:"shelves"`
 	NeedNum   int        `json:"need_num"`
+	CloseNum  int        `json:"close_num"`
 	Unit      string     `json:"unit"`
 	ParamsId  []ParamsId `json:"params_id"`
 }

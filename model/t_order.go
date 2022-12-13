@@ -31,7 +31,7 @@ type Order struct {
 	ConsigneeName     string    `gorm:"type:varchar(64);comment:收货人名称"`
 	ConsigneeTel      string    `gorm:"type:varchar(64);comment:收货人电话"`
 	OrderType         int       `gorm:"type:tinyint;default:1;comment:订单类型:1:新订单,2:拣货中,3:欠货单,4:已关闭"`
-	HasRemark         int       `gorm:"type:tinyint;default:0;comment:是否备注:0:否,1:是"`
+	HasRemark         int       `gorm:"type:tinyint;default:1;comment:是否备注:1:否,2:是"`
 	LatestPickingTime *MyTime   `gorm:"type:datetime;default:null;comment:最近拣货时间"`
 
 	//PayTotal          int       `gorm:"type:int;default:0;comment:支付商品总数"`
