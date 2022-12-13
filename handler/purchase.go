@@ -155,15 +155,10 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 		//完成状态
 		status = 2
 
-		var closeGoods []rsp.CloseGoods
-
-		for _, g := range goodsInfo {
-			closeGoods = append(closeGoods, rsp.CloseGoods{
-				OrderGoodsId: g.ID,
-				CloseCount:   g.CloseCount,
-				Sku:          g.Sku,
-			})
-		}
+		var (
+			orderGoodsIds []int
+			closeGoodsMp  = make(map[int]int, 0)
+		)
 
 		closeOrderNumberAndTyp := make([]rsp.CloseOrderNumberTyp, 0, 1)
 
@@ -172,8 +167,15 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 			Typ:    closeOrder.Typ,
 		})
 
+		for _, info := range goodsInfo {
+
+			orderGoodsIds = append(orderGoodsIds, info.ID)
+
+			closeGoodsMp[info.ID] = info.CloseCount
+		}
+
 		//关闭订单逻辑处理
-		err = dao.CloseOrderAndGoods(tx, closeOrderNumberAndTyp, closeGoods, nil, nil)
+		err = dao.CloseOrderAndGoods(tx, closeOrderNumberAndTyp, orderGoodsIds, closeGoodsMp, nil, nil)
 		if err != nil {
 			tx.Rollback()
 			return consumer.ConsumeRetryLater, err
@@ -195,15 +197,10 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 			//完成状态
 			status = 2
 
-			var closeGoods []rsp.CloseGoods
-
-			for _, g := range goodsInfo {
-				closeGoods = append(closeGoods, rsp.CloseGoods{
-					OrderGoodsId: g.ID,
-					CloseCount:   g.CloseCount,
-					Sku:          g.Sku,
-				})
-			}
+			var (
+				orderGoodsIds []int
+				closeGoodsMp  = make(map[int]int, 0)
+			)
 
 			closeOrderNumberAndTyp := make([]rsp.CloseOrderNumberTyp, 0, 1)
 
@@ -219,10 +216,14 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 			for _, info := range goodsInfo {
 				cond := []interface{}{outboundOrder.TaskId, closeOrder.Number, info.Sku}
 				taskOrderSkuCond = append(taskOrderSkuCond, cond)
+
+				orderGoodsIds = append(orderGoodsIds, info.ID)
+
+				closeGoodsMp[info.ID] = info.CloseCount
 			}
 
 			//关闭订单逻辑处理
-			err = dao.CloseOrderAndGoods(tx, closeOrderNumberAndTyp, closeGoods, taskOrderCond, taskOrderSkuCond)
+			err = dao.CloseOrderAndGoods(tx, closeOrderNumberAndTyp, orderGoodsIds, closeGoodsMp, taskOrderCond, taskOrderSkuCond)
 			if err != nil {
 				tx.Rollback()
 				return consumer.ConsumeRetryLater, err

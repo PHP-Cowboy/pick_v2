@@ -1,13 +1,16 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
 
 // 预拣货商品明细
 type PrePickGoods struct {
 	Base
 	WarehouseId      int    `gorm:"type:int(11);comment:仓库"`
 	BatchId          int    `gorm:"type:int(11) unsigned;index;comment:批次表id"`
-	OrderGoodsId     int    `gorm:"type:int(11) unsigned;comment:订单商品表ID"` //t_pick_order_goods 表 id
+	OrderGoodsId     int    `gorm:"type:int(11) unsigned;index;comment:订单商品表ID"` //t_pick_order_goods 表 id
 	Number           string `gorm:"type:varchar(32);comment:订单编号"`
 	ShopId           int    `gorm:"type:int(11);comment:店铺id"`
 	PrePickId        int    `gorm:"type:int(11) unsigned;index;comment:预拣货表id"` //index
@@ -73,6 +76,23 @@ const (
 
 func PrePickGoodsBatchSave(db *gorm.DB, list *[]PrePickGoods) (err error) {
 	err = db.Model(&PrePickGoods{}).CreateInBatches(list, BatchSize).Error
+
+	return
+}
+
+func PrePickGoodsReplaceSave(db *gorm.DB, list []PrePickGoods, values []string) (err error) {
+
+	if len(list) == 0 {
+		return
+	}
+
+	err = db.Model(&PrePickGoods{}).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns(values),
+		}).
+		CreateInBatches(list, BatchSize).
+		Error
 
 	return
 }
@@ -145,6 +165,12 @@ func GetPrePickGoodsByTypeParam(db *gorm.DB, ids []int, formType int, typeParam 
 
 func GetPrePickGoodsList(db *gorm.DB, cond *PrePickGoods) (err error, list []PrePickGoods) {
 	err = db.Model(&PrePickGoods{}).Where(cond).Find(&list).Error
+
+	return
+}
+
+func GetPrePickGoodsByOrderGoodsIds(db *gorm.DB, orderGoodsIds []int) (err error, list []PrePickGoods) {
+	err = db.Model(&PrePickGoods{}).Where("order_goods_id in (?)", orderGoodsIds).Find(&list).Error
 
 	return
 }

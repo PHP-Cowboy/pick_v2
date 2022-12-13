@@ -13,7 +13,7 @@ type PickGoods struct {
 	PickId           int    `gorm:"type:int(11) unsigned;index:pick_and_batch_idx;comment:拣货表id"`
 	BatchId          int    `gorm:"type:int(11) unsigned;index:pick_and_batch_idx;comment:批次表id"`
 	PrePickGoodsId   int    `gorm:"type:int(11);comment:预拣货商品表id"`
-	OrderGoodsId     int    `gorm:"type:int(11) unsigned;comment:订单商品表ID"` //t_pick_order_goods 表 id
+	OrderGoodsId     int    `gorm:"type:int(11) unsigned;index;comment:订单商品表ID"` //t_pick_order_goods 表 id
 	Number           string `gorm:"type:varchar(64);comment:订单编号"`
 	ShopId           int    `gorm:"type:int(11);comment:店铺id"`
 	DistributionType int    `gorm:"type:tinyint unsigned;comment:配送方式:1:公司配送,2:用户自提,3:三方物流,4:快递配送,5:首批物料|设备单"`
@@ -26,6 +26,8 @@ type PickGoods struct {
 	NeedNum          int    `gorm:"type:int;not null;comment:需拣数量"`
 	CompleteNum      int    `gorm:"type:int;default:null;comment:已拣数量"` //默认为null，无需拣货或者拣货数量为0时更新为0
 	ReviewNum        int    `gorm:"type:int;default:0;comment:复核数量"`
+	CloseNum         int    `gorm:"type:int;not null;comment:关闭数量"`
+	Status           int    `gorm:"type:tinyint;default:1;comment:状态:1:正常,2:关闭"`
 	Unit             string `gorm:"type:varchar(64);comment:单位"`
 }
 
@@ -38,6 +40,12 @@ type PickGoodsJoinOrder struct {
 	NeedNum   int    `json:"need_num"`
 	ReviewNum int    `json:"review_num"`
 }
+
+const (
+	_                     = iota
+	PickGoodsStatusNormal //正常
+	PickGoodsStatusClosed //关闭
+)
 
 func PickGoodsSave(db *gorm.DB, list *[]PickGoods) (err error) {
 	err = db.Model(&PickGoods{}).CreateInBatches(list, BatchSize).Error
@@ -88,6 +96,13 @@ func GetPickGoodsByNumber(db *gorm.DB, numbers []string) (err error, list []Pick
 // 根据拣货id查拣货池商品数据
 func GetPickGoodsByPickIds(db *gorm.DB, pickIds []int) (err error, list []PickGoods) {
 	err = db.Model(&PickGoods{}).Where("pick_id in (?)", pickIds).Find(&list).Error
+
+	return
+}
+
+// 根据拣货id查拣货池商品数据
+func GetPickGoodsByOrderGoodsIds(db *gorm.DB, orderGoodsId []int) (err error, list []PickGoods) {
+	err = db.Model(&PickGoods{}).Where("order_goods_id in (?)", orderGoodsId).Find(&list).Error
 
 	return
 }
