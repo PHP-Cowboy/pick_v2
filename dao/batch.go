@@ -460,7 +460,7 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 
 	//接单未复核完成
 	for _, p := range picks {
-		if p.Status > model.ToBePickedStatus && p.Status < model.ReviewCompletedStatus {
+		if p.PickUser != "" && p.Status < model.ReviewCompletedStatus {
 			picksMp[p.Id] = struct{}{}
 		}
 	}
@@ -470,7 +470,8 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 		_, picksMpOk := picksMp[good.PickId]
 
 		if picksMpOk {
-
+			//未复核完成订单号
+			notReviewNumbers = append(notReviewNumbers, good.Number)
 		}
 
 		orderNumbers = append(orderNumbers, good.Number)

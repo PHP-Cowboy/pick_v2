@@ -2,9 +2,11 @@ package handler
 
 import (
 	"errors"
+	"sort"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"gorm.io/gorm"
+
 	"pick_v2/dao"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
@@ -14,75 +16,7 @@ import (
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
-	"sort"
 )
-
-func getPick(pick []model.Pick) (res rsp.ReceivingOrdersRsp, err error) {
-
-	db := global.DB
-
-	if len(pick) == 1 { //只查到一条
-		res.Id = pick[0].Id
-		res.BatchId = pick[0].BatchId
-		res.Version = pick[0].Version
-		res.TakeOrdersTime = pick[0].TakeOrdersTime
-	} else { //查到多条
-		//排序
-		var (
-			batchIds []int
-			batchMp  = make(map[int]struct{}, 0)
-			pickMp   = make(map[int][]model.Pick, 0)
-		)
-
-		//去重，构造批次id切片
-		for _, b := range pick {
-			//构造批次下的拣货池数据map
-			//批次排序后，直接获取某个批次的全部拣货池数据。
-			//然后对这部分数据排序
-			pickMp[b.BatchId] = append(pickMp[b.BatchId], b)
-			//已经存入了批次map的，跳过
-			_, bMpOk := batchMp[b.BatchId]
-			if bMpOk {
-				continue
-			}
-			//写入批次mp
-			batchMp[b.BatchId] = struct{}{}
-			//存入批次id切片
-			batchIds = append(batchIds, b.BatchId)
-		}
-
-		var (
-			bat    model.Batch
-			result *gorm.DB
-		)
-
-		if len(batchIds) == 0 { //只有一个批次
-			bat.Id = batchIds[0]
-		} else {
-			//多个批次
-			result = db.Select("id").Where("id in (?)", batchIds).Order("sort desc").First(&bat)
-
-			if result.Error != nil {
-				return rsp.ReceivingOrdersRsp{}, result.Error
-			}
-		}
-
-		maxSort := 0
-
-		res.BatchId = bat.Id
-
-		//循环排序最大的批次下的拣货数据，并取出sort最大的那个的id
-		for _, pm := range pickMp[bat.Id] {
-			if pm.Sort >= maxSort {
-				res.Id = pm.Id
-				res.Version = pm.Version
-				res.TakeOrdersTime = pm.TakeOrdersTime
-			}
-		}
-	}
-
-	return res, nil
-}
 
 // 接单拣货
 func ReceivingOrders(c *gin.Context) {

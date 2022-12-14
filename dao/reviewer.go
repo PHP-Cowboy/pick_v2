@@ -314,7 +314,7 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 	err = model.UpdatePickByPk(tx, pick.Id, map[string]interface{}{
 		"status":            model.ReviewCompletedStatus,
 		"review_time":       &now,
-		"num":               form.Num,
+		"num":               *form.Num,
 		"delivery_order_no": val,
 		"delivery_no":       deliveryOrderNo,
 		"print_num":         gorm.Expr("print_num + ?", 1),

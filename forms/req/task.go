@@ -50,3 +50,7 @@ type CancelPickForm struct {
 type CentralizedPickDetailPDAForm struct {
 	Id int `json:"id" form:"id" binding:"required"`
 }
+
+type NoNeedToReview struct {
+	Id int `json:"id" binding:"required"`
+}
