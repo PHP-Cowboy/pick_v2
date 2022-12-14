@@ -30,7 +30,7 @@ type OutboundOrder struct {
 	ConsigneeTel      string    `gorm:"type:varchar(64);comment:收货人电话"`
 	OrderType         int       `gorm:"type:tinyint;default:1;comment:订单类型:1:新订单,2:拣货中,3:已完成,4:已关闭"`
 	LatestPickingTime *MyTime   `gorm:"type:datetime;default:null;comment:最近拣货时间"`
-	HasRemark         int       `gorm:"type:tinyint;default:0;comment:是否有备注:0:否,1:是"`
+	HasRemark         int       `gorm:"type:tinyint;default:1;comment:是否有备注:1:否,2:是"`
 	OrderRemark       string    `gorm:"type:varchar(512);comment:订单备注"`
 }
 

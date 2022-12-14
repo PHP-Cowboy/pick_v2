@@ -285,11 +285,14 @@ func GetPrePickDetail(db *gorm.DB, form req.GetPrePickDetailForm) (err error, re
 				GoodsSpe:  goods.GoodsSpe,
 				Shelves:   goods.Shelves,
 				NeedNum:   goods.NeedNum,
+				CloseNum:  goods.CloseNum,
 				Unit:      goods.Unit,
 				ParamsId:  []rsp.ParamsId{paramsId},
 			}
+
 		} else {
-			val.NeedNum += val.NeedNum
+			val.CloseNum += goods.CloseNum
+			val.NeedNum += goods.NeedNum
 			val.ParamsId = append(val.ParamsId, paramsId)
 			prePickGoodsSkuMp[goods.Sku] = val
 		}
@@ -313,6 +316,7 @@ func GetPrePickDetail(db *gorm.DB, form req.GetPrePickDetailForm) (err error, re
 			GoodsSpe:  goods.GoodsSpe,
 			Shelves:   goods.Shelves,
 			NeedNum:   goods.NeedNum,
+			CloseNum:  goods.CloseNum,
 			Unit:      goods.Unit,
 			ParamsId:  goods.ParamsId,
 		})

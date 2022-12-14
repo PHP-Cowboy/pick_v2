@@ -126,10 +126,21 @@ func GetBatchListByTyp(db *gorm.DB, typ int) (err error, list []Batch) {
 	return
 }
 
-func GetBatchList(db *gorm.DB, cond Batch) (err error, list []Batch) {
+func GetBatchList(db *gorm.DB, cond *Batch) (err error, list []Batch) {
 	err = db.Model(&Batch{}).
-		Where(&cond).
+		Where(cond).
 		Find(&list).
+		Error
+
+	return
+}
+
+// 根据批次ID获取根据sort排序的批次数据
+func GetBatchListByBatchIdsAndSort(db *gorm.DB, ids []int, sort string) (err error, batch Batch) {
+	err = db.Model(&Batch{}).
+		Where("id in (?)", ids).
+		Order(sort).
+		First(&batch).
 		Error
 
 	return

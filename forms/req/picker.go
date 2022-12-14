@@ -1,7 +1,8 @@
 package req
 
 type ReceivingOrdersForm struct {
-	Typ int `json:"typ" binding:"required"`
+	Typ      int    `json:"typ" binding:"required"`
+	UserName string `json:"-"`
 }
 
 type PickingRecordForm struct {

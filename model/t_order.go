@@ -4,6 +4,7 @@ import (
 	"errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"pick_v2/utils/ecode"
 	"time"
 )
 
@@ -31,7 +32,7 @@ type Order struct {
 	ConsigneeName     string    `gorm:"type:varchar(64);comment:收货人名称"`
 	ConsigneeTel      string    `gorm:"type:varchar(64);comment:收货人电话"`
 	OrderType         int       `gorm:"type:tinyint;default:1;comment:订单类型:1:新订单,2:拣货中,3:欠货单,4:已关闭"`
-	HasRemark         int       `gorm:"type:tinyint;default:0;comment:是否备注:0:否,1:是"`
+	HasRemark         int       `gorm:"type:tinyint;default:1;comment:是否备注:1:否,2:是"`
 	LatestPickingTime *MyTime   `gorm:"type:datetime;default:null;comment:最近拣货时间"`
 
 	//PayTotal          int       `gorm:"type:int;default:0;comment:支付商品总数"`
@@ -140,15 +141,44 @@ func GetOrderByPk(db *gorm.DB, id int) (err error, first Order) {
 	return
 }
 
-//根据订单号查询订单
-func GetOrderByNumber(db *gorm.DB, number string) (err error, first Order) {
-	err = db.Model(&Order{}).Where("number = ?", number).First(&first).Error
+// 根据订单编号查询订单数据
+func GetOrderListByNumbers(db *gorm.DB, numbers []string) (err error, list []Order) {
+	err = db.Model(&Order{}).Where("number in (?)", numbers).Find(&list).Error
+
 	return
 }
 
 // 根据订单编号查询订单数据
-func GetOrderListByNumbers(db *gorm.DB, numbers []string) (err error, list []Order) {
-	err = db.Model(&Order{}).Where("number in (?)", numbers).Find(&list).Error
+func GetOrderByNumber(db *gorm.DB, number string) (err error, order Order) {
+	err = db.Model(&Order{}).Where("number = ?", number).First(&order).Error
+
+	return
+}
+
+type LogOrder struct {
+	ShopName string  `json:"shop_name"`
+	PayAt    *MyTime `json:"pay_at"`
+}
+
+func GetLogOrderByNumber(db *gorm.DB, number string) (err error, logOrder LogOrder) {
+
+	err = db.Select("number,shop_name,pay_at").Model(&Order{}).Where("number = ?", number).First(&logOrder).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = db.Select("number,shop_name,pay_at").Model(&CompleteOrder{}).Where("number = ?", number).First(&logOrder).Error
+
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					err = ecode.DataNotExist
+					return
+				}
+				return
+			}
+			return
+		}
+		return
+	}
 
 	return
 }

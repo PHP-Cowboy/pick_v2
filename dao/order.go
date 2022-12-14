@@ -17,7 +17,7 @@ import (
 // MQ 订单数据处理 -- 正常拣货
 func Shipping(db *gorm.DB, form req.PurchaseOrderForm, info rsp.OrderInfo) (consumer.ConsumeResult, error) {
 	var (
-		hasRemark  int //是否备注
+		hasRemark  = 1 //是否备注,默认为否
 		orderGoods []model.OrderGoods
 	)
 
@@ -53,14 +53,14 @@ func Shipping(db *gorm.DB, form req.PurchaseOrderForm, info rsp.OrderInfo) (cons
 		})
 
 		//商品有备注 - 即为订单是有备注的
-		if hasRemark != 1 && goods.GoodsRemark != "" {
-			hasRemark = 1
+		if hasRemark != 2 && goods.GoodsRemark != "" {
+			hasRemark = 2
 		}
 	}
 
 	//订单有备注 - 即为订单是有备注的
-	if hasRemark != 1 && info.OrderRemark != "" {
-		hasRemark = 1
+	if hasRemark != 2 && info.OrderRemark != "" {
+		hasRemark = 2
 	}
 
 	tx := db.Begin()

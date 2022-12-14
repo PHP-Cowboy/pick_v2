@@ -82,6 +82,13 @@ func UpdatePickByPk(db *gorm.DB, pk int, mp map[string]interface{}) (err error) 
 	return
 }
 
+// 根据主键和版本号更新，乐观锁
+func UpdatePickByPkAndVersion(db *gorm.DB, pk, version int, mp map[string]interface{}) (err error) {
+	err = db.Model(&Pick{}).Where("id = ? and version = ?", pk, version).Updates(mp).Error
+
+	return
+}
+
 func UpdatePickByIds(db *gorm.DB, ids []int, mp map[string]interface{}) (err error) {
 	err = db.Model(&Pick{}).Where("id in (?)", ids).Updates(mp).Error
 
@@ -110,9 +117,19 @@ func GetPickListByIds(db *gorm.DB, ids []int) (err error, list []Pick) {
 }
 
 // 根据条件获取拣货列表
-func GetPickList(db *gorm.DB, cond Pick) (err error, list []Pick) {
+func GetPickList(db *gorm.DB, cond *Pick) (err error, list []Pick) {
 
 	err = db.Model(&Pick{}).Where(cond).Find(&list).Error
+
+	return
+}
+
+// 查询未被接单的拣货池数据
+func GetPickListNoOrderReceived(db *gorm.DB, batchIds []int, typ int) (err error, list []Pick) {
+	err = db.Model(&Pick{}).
+		Where("batch_id in (?) and pick_user = '' and status = ? and typ = ?", batchIds, ToBePickedStatus, typ).
+		Find(&list).
+		Error
 
 	return
 }

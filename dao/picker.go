@@ -2,7 +2,10 @@ package dao
 
 import (
 	"errors"
+
 	"fmt"
+	"pick_v2/forms/rsp"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -10,6 +13,151 @@ import (
 	"pick_v2/model"
 	"pick_v2/utils/ecode"
 )
+
+func GetPick(db *gorm.DB, pick []model.Pick) (res rsp.ReceivingOrdersRsp, err error) {
+
+	if len(pick) == 1 { //只查到一条
+		res.Id = pick[0].Id
+		res.BatchId = pick[0].BatchId
+		res.Version = pick[0].Version
+		res.TakeOrdersTime = pick[0].TakeOrdersTime
+	} else { //查到多条
+		//排序
+		var (
+			batchIds []int
+			batchMp  = make(map[int]struct{}, 0)
+			pickMp   = make(map[int][]model.Pick, 0)
+		)
+
+		//去重，构造批次id切片
+		for _, b := range pick {
+			//构造批次下的拣货池数据map
+			//批次排序后，直接获取某个批次的全部拣货池数据。
+			//然后对这部分数据排序
+			pickMp[b.BatchId] = append(pickMp[b.BatchId], b)
+			//已经存入了批次map的，跳过
+			_, bMpOk := batchMp[b.BatchId]
+			if bMpOk {
+				continue
+			}
+			//写入批次mp
+			batchMp[b.BatchId] = struct{}{}
+			//存入批次id切片
+			batchIds = append(batchIds, b.BatchId)
+		}
+
+		var (
+			batch model.Batch
+		)
+
+		if len(batchIds) == 0 { //只有一个批次
+			batch.Id = batchIds[0]
+		} else {
+			//多个批次
+			err, batch = model.GetBatchListByBatchIdsAndSort(db, batchIds, "sort desc")
+
+			if err != nil {
+				return
+			}
+		}
+
+		maxSort := 0
+
+		res.BatchId = batch.Id
+
+		//循环排序最大的批次下的拣货数据，并取出sort最大的那个的id
+		for _, pm := range pickMp[batch.Id] {
+			if pm.Sort >= maxSort {
+				res.Id = pm.Id
+				res.Version = pm.Version
+				res.TakeOrdersTime = pm.TakeOrdersTime
+			}
+		}
+	}
+
+	return
+}
+
+func ReceivingOrders(db *gorm.DB, form req.ReceivingOrdersForm) (err error, res rsp.ReceivingOrdersRsp) {
+	var (
+		picks   []model.Pick
+		batches []model.Batch
+	)
+
+	// 先查询是否有当前拣货员被分配的任务或已经接单且未完成拣货的数据,如果被分配多条，第一按批次优先级，第二按拣货池优先级 优先拣货
+	err, picks = model.GetPickList(db, &model.Pick{PickUser: form.UserName, Status: model.BatchOngoingStatus, Typ: form.Typ})
+	if err != nil {
+		return
+	}
+
+	now := time.Now()
+
+	//有分配的拣货任务
+	if len(picks) > 0 {
+		res, err = GetPick(db, picks)
+		if err != nil {
+			return
+		}
+		//后台分配的单没有接单时间,更新接单时间
+		if res.TakeOrdersTime == nil {
+			err = model.UpdatePickByIds(db, []int{res.Id}, map[string]interface{}{"take_orders_time": &now})
+
+			if err != nil {
+				return
+			}
+		}
+		return
+	}
+
+	//进行中的批次
+	err, batches = model.GetBatchList(db, &model.Batch{Status: model.BatchOngoingStatus, Typ: form.Typ})
+
+	if err != nil {
+		return
+	}
+
+	batchIds := make([]int, 0)
+
+	for _, b := range batches {
+		batchIds = append(batchIds, b.Id)
+	}
+
+	if len(batchIds) == 0 {
+		err = errors.New("没有进行中的批次,无法接单")
+		return
+	}
+
+	//查询未被接单的拣货池数据
+	err, picks = model.GetPickListNoOrderReceived(db, batchIds, form.Typ)
+
+	if err != nil {
+		return
+	}
+
+	//拣货池有未接单的数据
+	if len(picks) > 0 {
+
+		res, err = GetPick(db, picks)
+		if err != nil {
+			return
+		}
+
+		//更新拣货池 + version 防并发
+		err = model.UpdatePickByPkAndVersion(db, res.Id, res.Version, map[string]interface{}{
+			"pick_user":        form.UserName,
+			"take_orders_time": &now,
+			"version":          res.Version + 1,
+		})
+
+		if err != nil {
+			return
+		}
+		return
+	} else {
+		err = errors.New("暂无拣货单")
+		return
+	}
+}
 
 func CompletePick(db *gorm.DB, form req.CompletePickForm) (err error) {
 	// 这里是否需要做并发处理

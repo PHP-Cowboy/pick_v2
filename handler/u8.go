@@ -133,39 +133,36 @@ func LogDetail(c *gin.Context) {
 	var (
 		res       rsp.LogDetailRsp
 		pickGoods []model.PickGoods
-		order     model.Order
 		pick      model.Pick
 	)
 
 	db := global.DB
 
-	result := db.Model(&model.Order{}).Where("number = ?", form.Number).First(&order)
-
-	if result.Error != nil {
-
-		xsq_net.ErrorJSON(c, result.Error)
+	err, logOrder := model.GetLogOrderByNumber(db, form.Number)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
-	result = db.First(&pick, form.PickId)
+	err, pick = model.GetPickByPk(db, form.PickId)
 
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
-	res.ShopName = order.ShopName
-	res.PayAt = order.PayAt
+	res.ShopName = logOrder.ShopName
+	res.PayAt = logOrder.PayAt
 
 	res.PickUser = pick.PickUser
 	res.TakeOrdersTime = pick.TakeOrdersTime
 	res.ReviewUser = pick.ReviewUser
 	res.ReviewTime = pick.ReviewTime
 
-	result = db.Model(&model.PickGoods{}).Where(model.PickGoods{PickId: form.PickId, Number: form.Number}).Find(&pickGoods)
+	err, pickGoods = model.GetPickGoodsList(db, &model.PickGoods{PickId: form.PickId, Number: form.Number})
 
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
