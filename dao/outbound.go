@@ -248,7 +248,12 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 	localDb := db.Table("t_order_goods og").
 		Joins("left join t_order o on og.number = o.number").
 		Select("og.*,og.id as order_goods_id,o.*,o.id as order_id").
-		Where("o.order_type = ? and o.distribution_type = ? and o.pay_at <= ? and o.delivery_at <= ? ", model.NewOrderType, form.DistributionType, form.PayTime, form.DeliveryEndTime)
+		Where("o.order_type in (?) and o.distribution_type = ? and o.pay_at <= ? and o.delivery_at <= ? ",
+			[]int{model.NewOrderType, model.LackOrderType},
+			form.DistributionType,
+			form.PayTime,
+			form.DeliveryEndTime,
+		)
 
 	if form.DeliveryStartTime != "" {
 		localDb = localDb.Where("o.delivery_at >= ?", form.DeliveryStartTime)
@@ -424,6 +429,10 @@ func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, 
 		for _, good := range outboundGoods {
 			numbers = append(numbers, good.Number)
 		}
+	}
+
+	if form.Number != "" {
+		numbers = append(numbers, form.Number)
 	}
 
 	localDb := db.Model(&model.OutboundOrder{}).Where("task_id = ?", form.TaskId)
@@ -714,7 +723,7 @@ func ClosePrePickOrder(db *gorm.DB, form req.OutboundTaskCloseOrderForm) error {
 		prePickGoodsIds = append(prePickGoodsIds, pick.PrePickGoodsId)
 	}
 
-	prePickIds = slice.UniqueIntSlice(prePickIds)
+	prePickIds = slice.UniqueSlice(prePickIds)
 
 	//更新预拣池
 	err = model.UpdatePrePickStatusByIds(db, prePickIds, model.PrePickStatusClose)
