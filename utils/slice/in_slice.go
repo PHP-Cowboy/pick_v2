@@ -2,15 +2,13 @@ package slice
 
 import "reflect"
 
-// 字符串切片转map 空结构体 struct{} 不占用内存空间
-func StrSliceToMap(strSlice []string) map[string]struct{} {
-	set := make(map[string]struct{}, len(strSlice))
-
-	for _, s := range strSlice {
-		set[s] = struct{}{}
+// slice 转 map
+func SliceToMap[T comparable](arr []T) (mp map[T]struct{}) {
+	mp = make(map[T]struct{}, 0)
+	for _, t := range arr {
+		mp[t] = struct{}{}
 	}
-
-	return set
+	return mp
 }
 
 func InMap(m map[string]struct{}, s string) bool {

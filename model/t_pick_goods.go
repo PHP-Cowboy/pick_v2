@@ -25,7 +25,7 @@ type PickGoods struct {
 	DiscountPrice    int    `gorm:"comment:折扣价"`
 	NeedNum          int    `gorm:"type:int;not null;comment:需拣数量"`
 	CompleteNum      int    `gorm:"type:int;default:null;comment:已拣数量"` //默认为null，无需拣货或者拣货数量为0时更新为0
-	ReviewNum        int    `gorm:"type:int;default:0;comment:复核数量"`
+	ReviewNum        int    `gorm:"type:int;default:null;comment:复核数量"` //默认为null，无需拣货或者复核数量为0时更新为0
 	CloseNum         int    `gorm:"type:int;default:0;comment:关闭数量"`
 	Status           int    `gorm:"type:tinyint;default:1;comment:状态:1:正常,2:关闭"`
 	Unit             string `gorm:"type:varchar(64);comment:单位"`

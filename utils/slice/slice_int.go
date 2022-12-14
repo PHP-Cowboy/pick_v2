@@ -1,7 +1,7 @@
 package slice
 
 // 返回在 arr1 但不在 arr2 中的数据
-func Diff(arr1, arr2 []int) []int {
+func DiffInt(arr1, arr2 []int) []int {
 	mp := make(map[int]struct{}, 0)
 
 	arr := []int{}

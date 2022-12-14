@@ -411,6 +411,7 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 		return
 	}
 
+	//只能从暂停状态变更为关闭
 	if batch.Status != model.BatchSuspendStatus {
 		err = errors.New("请先停止拣货")
 		return
@@ -450,13 +451,25 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 		return
 	}
 
-	var orderNumbers = make([]string, 0, len(orderJoinGoods))
+	var (
+		orderNumbers     = make([]string, 0, len(orderJoinGoods))
+		notReviewNumbers = make([]string, 0, len(orderJoinGoods))
+	)
 
+	// 批次结束时如果有已接单但未复核完成的，不变更任务订单状态为完成
 	for _, good := range pickGoods {
-		orderNumbers = append(orderNumbers, good.Number)
+		if good.ReviewNum == 0 {
+			notReviewNumbers = append(notReviewNumbers, good.Number)
+		} else {
+			orderNumbers = append(orderNumbers, good.Number)
+		}
 	}
 
 	orderNumbers = slice.UniqueSlice(orderNumbers)
+	notReviewNumbers = slice.UniqueSlice(notReviewNumbers)
+
+	//去掉已结但未复核完成的
+	orderNumbers = slice.Diff(orderNumbers, notReviewNumbers)
 
 	//更新 OutboundOrder 为已完成
 	err = model.UpdateOutboundOrderByTaskIdAndNumbers(db, batch.TaskId, orderNumbers, map[string]interface{}{"order_type": model.OutboundOrderTypeComplete})
