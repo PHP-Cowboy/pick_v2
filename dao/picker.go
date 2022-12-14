@@ -83,7 +83,8 @@ func ReceivingOrders(db *gorm.DB, form req.ReceivingOrdersForm) (err error, res 
 	)
 
 	// 先查询是否有当前拣货员被分配的任务或已经接单且未完成拣货的数据,如果被分配多条，第一按批次优先级，第二按拣货池优先级 优先拣货
-	err, picks = model.GetPickList(db, &model.Pick{PickUser: form.UserName, Status: model.BatchOngoingStatus, Typ: form.Typ})
+	err, picks = model.GetPickListByPickUserAndStatusAndTyp(db, form.UserName, model.ToBePickedStatus, form.Typ)
+
 	if err != nil {
 		return
 	}
@@ -108,7 +109,7 @@ func ReceivingOrders(db *gorm.DB, form req.ReceivingOrdersForm) (err error, res 
 	}
 
 	//进行中的批次
-	err, batches = model.GetBatchList(db, &model.Batch{Status: model.BatchOngoingStatus, Typ: form.Typ})
+	err, batches = model.GetBatchListByStatusAndTyp(db, model.BatchOngoingStatus, form.Typ)
 
 	if err != nil {
 		return
