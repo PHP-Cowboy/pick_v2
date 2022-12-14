@@ -156,27 +156,32 @@ func GetOrderByNumber(db *gorm.DB, number string) (err error, order Order) {
 }
 
 type LogOrder struct {
+	Number   string  `json:"number"`
 	ShopName string  `json:"shop_name"`
 	PayAt    *MyTime `json:"pay_at"`
 }
 
+// u8错误日志获取订单信息
 func GetLogOrderByNumber(db *gorm.DB, number string) (err error, logOrder LogOrder) {
 
 	err = db.Select("number,shop_name,pay_at").Model(&Order{}).Where("number = ?", number).First(&logOrder).Error
 
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			err = db.Select("number,shop_name,pay_at").Model(&CompleteOrder{}).Where("number = ?", number).First(&logOrder).Error
+	if err == nil {
+		return
+	}
 
-			if err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					err = ecode.DataNotExist
-					return
-				}
-				return
-			}
-			return
-		}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return
+	}
+
+	err = db.Select("number,shop_name,pay_at").Model(&CompleteOrder{}).Where("number = ?", number).First(&logOrder).Error
+
+	if err == nil {
+		return
+	}
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		err = ecode.DataNotExist
 		return
 	}
 
