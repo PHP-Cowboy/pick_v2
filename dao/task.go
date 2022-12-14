@@ -427,7 +427,7 @@ func ChangeReviewNum(db *gorm.DB, form req.ChangeReviewNumForm) (err error) {
 	}
 
 	//更新出库单商品表数据
-	err = model.OutboundGoodsReplaceSave(tx, outboundGoods, []string{"lack_count", "out_count"})
+	err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"lack_count", "out_count"})
 	if err != nil {
 		tx.Rollback()
 		return

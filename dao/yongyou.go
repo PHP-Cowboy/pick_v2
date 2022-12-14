@@ -68,8 +68,9 @@ func PushYongYou(id int) {
 
 	stockLog.UpdateTime = time.Now()
 
-	//db.Omit("create_time", "number", "batch_id", "shop_name","delete_time").Save(stockLog)
-	db.Select("id", "update_time", "status", "request_xml", "response_xml", "msg").Save(stockLog)
+	err = model.StockLogReplaceSave(db, &stockLog, []string{"update_time", "status", "request_xml", "response_xml", "msg"})
+
+	//db.Select("id", "update_time", "status", "request_xml", "response_xml", "msg").Save(stockLog)
 }
 
 func SendShopXml(xml string) (string, error) {

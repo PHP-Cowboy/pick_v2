@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"errors"
+	"github.com/go-redis/redis/v8"
 	"pick_v2/global"
 	"pick_v2/utils/str_util"
 	"pick_v2/utils/timeutil"
@@ -43,15 +44,19 @@ func Set(key, val string, second int) (string, error) {
 	return global.Redis.Set(context.Background(), key, val, time.Duration(second)*time.Second).Result()
 }
 
-func Get(key string) (string, error) {
-	return global.Redis.Get(context.Background(), key).Result()
+func Get(key string) (val string, err error) {
+	val, err = global.Redis.Get(context.Background(), key).Result()
+	if err == redis.Nil {
+		return "", nil
+	}
+	return
 }
 
 func SetNx(key string, val string) error {
 	ok, err := global.Redis.SetNX(context.Background(), key, val, 0).Result()
 
 	if !ok {
-		return errors.New("设置过期时间失败")
+		return errors.New("设置失败")
 	}
 
 	return err

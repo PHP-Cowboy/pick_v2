@@ -3,7 +3,6 @@ package dao
 import (
 	"errors"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/model"
@@ -90,7 +89,7 @@ func OrderLimit(db *gorm.DB, form req.OrderLimitForm) (err error) {
 	}
 
 	//更新出库单商品的限发数量
-	err = UpdateOutboundGoodsLimit(tx, outboundGoods)
+	err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"limit_num"})
 
 	if err != nil {
 		tx.Rollback()
@@ -100,18 +99,6 @@ func OrderLimit(db *gorm.DB, form req.OrderLimitForm) (err error) {
 	tx.Commit()
 
 	return
-}
-
-// 更新出库单商品的限发数量
-func UpdateOutboundGoodsLimit(db *gorm.DB, list []model.OutboundGoods) error {
-	result := db.Model(&model.OutboundGoods{}).
-		Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "task_id,number,sku"}},
-			DoUpdates: clause.AssignmentColumns([]string{"limit_num"}),
-		}).
-		Save(&list)
-
-	return result.Error
 }
 
 // 任务批量限发
@@ -170,7 +157,7 @@ func TaskLimit(db *gorm.DB, form req.TaskLimitForm) error {
 		return err
 	}
 
-	err = UpdateOutboundGoodsLimit(tx, outboundGoods)
+	err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"limit_num"})
 
 	if err != nil {
 		tx.Rollback()
@@ -214,7 +201,7 @@ func RevokeLimit(db *gorm.DB, form req.RevokeLimitForm) error {
 
 	list := []model.OutboundGoods{outboundGoods}
 
-	err := model.OutboundGoodsReplaceSave(tx, list, []string{"limit_num"})
+	err := model.OutboundGoodsReplaceSave(tx, &list, []string{"limit_num"})
 
 	if err != nil {
 		return err

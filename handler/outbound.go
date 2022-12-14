@@ -6,6 +6,7 @@ import (
 	"pick_v2/dao"
 	"pick_v2/forms/req"
 	"pick_v2/global"
+	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/xsq_net"
 )
@@ -18,6 +19,13 @@ func CreateOutboundTask(c *gin.Context) {
 
 	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err := cache.AntiRepeatedClick("createTask", 10)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 

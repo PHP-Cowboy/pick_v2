@@ -187,18 +187,18 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, prePicks []model.Pre
 	}
 
 	//商品数据保存
-	result := db.Save(&pickGoods)
+	err = model.PickGoodsSave(db, &pickGoods)
 
-	if result.Error != nil {
-		return result.Error
+	if err != nil {
+		return
 	}
 
 	//订单备注数据
 	if len(pickRemark) > 0 {
-		result = db.Save(&pickRemark)
+		err = model.PickRemarkBatchSave(db, &pickRemark)
 
-		if result.Error != nil {
-			return result.Error
+		if err != nil {
+			return
 		}
 	}
 

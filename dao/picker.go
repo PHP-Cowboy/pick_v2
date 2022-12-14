@@ -195,7 +195,7 @@ func CompletePick(db *gorm.DB, form req.CompletePickForm) (err error) {
 		}
 
 		// 更新拣货数量(PickGoods.CompleteNum)为0
-		err = model.UpdatePickGoodsByPickId(tx, pick.Id, map[string]interface{}{"complete_num": 0, "review_num": 0})
+		err = model.UpdatePickGoodsByPickId(tx, pick.Id, map[string]interface{}{"complete_num": 0})
 
 		if err != nil {
 			tx.Rollback()

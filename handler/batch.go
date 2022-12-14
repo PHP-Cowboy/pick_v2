@@ -31,6 +31,13 @@ func CreateBatchByTask(c *gin.Context) {
 		return
 	}
 
+	err := cache.AntiRepeatedClick("createBatchByTask"+strconv.Itoa(form.TaskId), 10)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
 	userInfo := GetUserInfo(c)
 
 	if userInfo == nil {
@@ -40,7 +47,7 @@ func CreateBatchByTask(c *gin.Context) {
 
 	form.Typ = 1 // 常规批次
 
-	err := dao.CreateBatchByTask(global.DB, form, userInfo)
+	err = dao.CreateBatchByTask(global.DB, form, userInfo)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)

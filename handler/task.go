@@ -331,7 +331,12 @@ func PushPrint(c *gin.Context) {
 		})
 	}
 
-	result = db.Select("id", "update_time", "shop_code", "shop_name", "line", "print_num").Save(&pick)
+	err := model.PickReplaceSave(db, &pick, []string{"update_time", "shop_code", "shop_name", "line", "print_num"})
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
 
 	xsq_net.Success(c)
 }

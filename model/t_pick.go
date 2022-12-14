@@ -64,13 +64,13 @@ func PickSave(db *gorm.DB, picks *Pick) (err error) {
 	return
 }
 
-func PickReplaceSave(db *gorm.DB, list []Pick, values []string) (err error) {
+func PickReplaceSave(db *gorm.DB, list *[]Pick, values []string) (err error) {
 	err = db.Model(&Pick{}).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns(values),
 		}).
-		CreateInBatches(&list, BatchSize).
+		CreateInBatches(list, BatchSize).
 		Error
 
 	return

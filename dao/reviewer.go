@@ -288,7 +288,7 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 	tx := db.Begin()
 
 	//更新出库任务商品表数据
-	err = model.OutboundGoodsReplaceSave(tx, outboundGoods, []string{"lack_count", "out_count", "status", "delivery_order_no"})
+	err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"lack_count", "out_count", "status", "delivery_order_no"})
 	if err != nil {
 		tx.Rollback()
 		return
