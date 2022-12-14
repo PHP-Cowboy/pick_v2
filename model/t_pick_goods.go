@@ -68,8 +68,13 @@ func UpdatePickGoodsByPickId(db *gorm.DB, pickId int, mp map[string]interface{})
 }
 
 func UpdatePickGoodsByPickIds(db *gorm.DB, pickIds []int, mp map[string]interface{}) (err error) {
-	err = db.Model(&Pick{}).Where("pick_id in (?)", pickIds).Updates(mp).Error
+	err = db.Model(&PickGoods{}).Where("pick_id in (?)", pickIds).Updates(mp).Error
 
+	return
+}
+
+func GetPickGoodsList(db *gorm.DB, cond *PickGoods) (err error, list []PickGoods) {
+	err = db.Model(&PickGoods{}).Where(cond).Find(&list).Error
 	return
 }
 

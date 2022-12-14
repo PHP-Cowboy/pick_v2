@@ -4,6 +4,7 @@ import (
 	"errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"pick_v2/utils/ecode"
 	"time"
 )
 
@@ -143,6 +144,41 @@ func GetOrderByPk(db *gorm.DB, id int) (err error, first Order) {
 // 根据订单编号查询订单数据
 func GetOrderListByNumbers(db *gorm.DB, numbers []string) (err error, list []Order) {
 	err = db.Model(&Order{}).Where("number in (?)", numbers).Find(&list).Error
+
+	return
+}
+
+// 根据订单编号查询订单数据
+func GetOrderByNumber(db *gorm.DB, number string) (err error, order Order) {
+	err = db.Model(&Order{}).Where("number = ?", number).First(&order).Error
+
+	return
+}
+
+type LogOrder struct {
+	ShopName string  `json:"shop_name"`
+	PayAt    *MyTime `json:"pay_at"`
+}
+
+func GetLogOrderByNumber(db *gorm.DB, number string) (err error, logOrder LogOrder) {
+
+	err = db.Select("number,shop_name,pay_at").Model(&Order{}).Where("number = ?", number).First(&logOrder).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = db.Select("number,shop_name,pay_at").Model(&CompleteOrder{}).Where("number = ?", number).First(&logOrder).Error
+
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					err = ecode.DataNotExist
+					return
+				}
+				return
+			}
+			return
+		}
+		return
+	}
 
 	return
 }
