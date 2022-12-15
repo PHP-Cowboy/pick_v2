@@ -553,7 +553,13 @@ func BatchShopMaterial(c *gin.Context) {
 		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+idx), &item)
 	}
 
-	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{fmt.Sprintf("%s-%s-门店物料信息", batch.BatchName, model.GetDeliveryMethod(batch.DeliveryMethod))})
+	err, methodName := GetDeliveryMethod(db, batch.DeliveryMethod)
+
+	if err != nil {
+		methodName = "配送方式"
+	}
+
+	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{fmt.Sprintf("%s-%s-门店物料信息", batch.BatchName, methodName)})
 
 	var buffer bytes.Buffer
 	_ = xFile.Write(&buffer)
@@ -756,4 +762,19 @@ func GoodsSummaryList(c *gin.Context) {
 	c.Writer.Header().Add("Access-Control-Expose-Headers", "Content-Disposition")
 	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s.xlsx", date)+"\"")
 	c.Writer.Write(data)
+}
+
+// 获取
+func GetDeliveryMethod(db *gorm.DB, deliveryMethod int) (err error, methodName string) {
+	var dict model.Dict
+
+	err, dict = model.GetDictByTypeCodeAndValue(db, "delivery_method", strconv.Itoa(deliveryMethod))
+
+	if err != nil {
+		return
+	}
+
+	methodName = dict.Name
+
+	return
 }

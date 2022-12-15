@@ -45,27 +45,6 @@ const (
 	ExpressDeliveryBatchTyp //快递批次
 )
 
-// 获取配送方式
-func GetDeliveryMethod(method int) string {
-	var methodMp = map[int]string{
-		1: "公司配送",
-		2: "用户自提",
-		3: "三方物流",
-		4: "快递配送",
-		5: "首批物料",
-		6: "无需出库",
-		7: "首批设备",
-	}
-
-	s, ok := methodMp[method]
-
-	if !ok {
-		return ""
-	}
-
-	return s
-}
-
 func BatchSave(db *gorm.DB, batch *Batch) (err error) {
 
 	err = db.Model(&Batch{}).Save(batch).Error

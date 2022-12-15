@@ -233,6 +233,7 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 	//生成集中拣货
 	err = CreateCentralizedPick(db, outboundGoodsJoinOrder, batch.Id)
 	if err != nil {
+		tx.Rollback()
 		return err
 	}
 

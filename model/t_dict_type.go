@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"gorm.io/gorm"
+	"time"
+)
 
 // 字典类型表
 type DictType struct {
@@ -9,4 +12,9 @@ type DictType struct {
 	CreateTime time.Time  `gorm:"autoCreateTime;type:datetime;not null;comment:创建时间"`
 	UpdateTime time.Time  `gorm:"autoUpdateTime;type:datetime;not null;comment:更新时间"`
 	DeleteTime *time.Time `gorm:"type:datetime;default:null;comment:删除时间"`
+}
+
+func GetDictTypeByPk(db *gorm.DB, pk string) (err error, dictType DictType) {
+	err = db.Where(&DictType{Code: pk}).First(&dictType).Error
+	return
 }

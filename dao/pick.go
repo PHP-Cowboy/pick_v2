@@ -102,7 +102,7 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, prePicks []model.Pre
 	err = model.PickBatchSave(db, &picks)
 
 	if err != nil {
-		return err
+		return
 	}
 
 	//prePick 和 pick id 关系映射
@@ -208,7 +208,7 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, prePicks []model.Pre
 			err = model.UpdatePrePickGoodsByIds(db, prePickGoodsIds, map[string]interface{}{"status": model.PrePickGoodsStatusProcessing})
 
 			if err != nil {
-				return err
+				return
 			}
 		}
 
@@ -240,7 +240,7 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, prePicks []model.Pre
 			err = model.UpdatePrePickByIds(db, prePickIds, map[string]interface{}{"status": model.PrePickStatusProcessing})
 
 			if err != nil {
-				return err
+				return
 			}
 		}
 
@@ -248,7 +248,7 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, prePicks []model.Pre
 		if len(prePickRemarksIds) > 0 {
 			err = model.UpdatePrePickRemarkByIds(db, prePickRemarksIds, map[string]interface{}{"status": model.PrePickRemarkStatusProcessing})
 			if err != nil {
-				return err
+				return
 			}
 		}
 	}
