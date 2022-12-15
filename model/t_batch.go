@@ -114,6 +114,15 @@ func GetBatchList(db *gorm.DB, cond *Batch) (err error, list []Batch) {
 	return
 }
 
+func GetBatchListByStatus(db *gorm.DB, status int) (err error, list []Batch) {
+	err = db.Model(&Batch{}).
+		Where("status = ?", status).
+		Find(&list).
+		Error
+
+	return
+}
+
 // 获取进行中的批次
 func GetBatchListByStatusAndTyp(db *gorm.DB, status, typ int) (err error, list []Batch) {
 	err = db.Model(&Batch{}).

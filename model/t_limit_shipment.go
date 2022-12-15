@@ -58,7 +58,7 @@ func GetLimitShipmentPageListByTaskIdAndNumber(db *gorm.DB, taskId int, number s
 		Where(&LimitShipment{
 			TaskId: taskId,
 			Number: number,
-			Status: LimitShipmentStatusNormal,
+			Status: LimitShipmentStatusNormal, //如果status为0时不能这么写
 		})
 
 	err = local.Count(&total).Error
