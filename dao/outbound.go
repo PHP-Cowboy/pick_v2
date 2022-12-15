@@ -777,7 +777,7 @@ func CloseOutboundOrder(db *gorm.DB, form req.OutboundTaskCloseOrderForm) error 
 		return err
 	}
 
-	err = model.OutboundGoodsReplaceSave(db, outboundGoods, []string{"status"})
+	err = model.OutboundGoodsReplaceSave(db, &outboundGoods, []string{"status"})
 
 	if err != nil {
 		return err

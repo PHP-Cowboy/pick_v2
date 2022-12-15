@@ -3,6 +3,7 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"pick_v2/dao"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
@@ -47,7 +48,7 @@ func DictTypeList(c *gin.Context) {
 		list = append(list, &rsp.DictType{
 			Code:       t.Code,
 			Name:       t.Name,
-			CreateTime: t.CreateTime.Format(timeutil.TimeFormat),
+			CreateTime: timeutil.FormatToDateTime(t.CreateTime),
 		})
 	}
 
@@ -210,44 +211,10 @@ func CreateDict(c *gin.Context) {
 		return
 	}
 
-	db := global.DB
+	err := dao.CreateDict(global.DB, form)
 
-	var (
-		dictType model.DictType
-	)
-
-	result := db.Where(&model.DictType{Code: form.TypeCode}).First(&dictType)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	var count int64
-
-	result = db.Model(&model.Dict{}).Where("type_code = ? and code = ?", form.TypeCode, form.Code).Count(&count)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	if count > 0 {
-		xsq_net.ErrorJSON(c, ecode.DataAlreadyExist)
-		return
-	}
-
-	dict := model.Dict{
-		Code:     strings.ToLower(form.Code),
-		TypeCode: strings.ToLower(form.TypeCode),
-		Name:     form.Name,
-		Value:    form.Value,
-		IsEdit:   form.IsEdit,
-	}
-
-	result = db.Create(&dict)
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
@@ -256,6 +223,7 @@ func CreateDict(c *gin.Context) {
 
 // 修改字典数据
 func ChangeDict(c *gin.Context) {
+
 	var form req.ChangeDictForm
 
 	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
@@ -265,28 +233,9 @@ func ChangeDict(c *gin.Context) {
 		return
 	}
 
-	var (
-		dict model.Dict
-	)
+	err := dao.ChangeDict(global.DB, form)
 
-	db := global.DB
-
-	result := db.Where(model.Dict{TypeCode: form.TypeCode, Code: form.Code}).First(&dict)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	if dict.IsEdit == 0 {
-		xsq_net.ErrorJSON(c, ecode.DataCannotBeModified)
-		return
-	}
-
-	result = db.Model(&dict).Updates(form)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
+	if err != nil {
 		return
 	}
 

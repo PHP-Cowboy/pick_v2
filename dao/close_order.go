@@ -382,7 +382,7 @@ func CloseOrderAndGoods(
 		outboundGoods[i].LackCount -= closeCount
 	}
 
-	err = model.OutboundGoodsReplaceSave(tx, outboundGoods, []string{"lack_count", "out_count"})
+	err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"lack_count", "out_count"})
 
 	if err != nil {
 		return

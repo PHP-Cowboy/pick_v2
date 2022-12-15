@@ -28,7 +28,7 @@ func CreateBatchByTask(db *gorm.DB, form req.CreateBatchByTaskForm, claims *midd
 	//根据任务ID查询出库任务订单表数据，获取任务的全部订单号
 	err, outboundOrderList := model.GetOutboundOrderByTaskId(db, form.TaskId)
 	if err != nil {
-		return err
+		return
 	}
 
 	//构造订单号数据
@@ -53,7 +53,7 @@ func CreateBatchByTask(db *gorm.DB, form req.CreateBatchByTaskForm, claims *midd
 
 	err = CreateBatch(db, newCreateBatchForm, claims)
 	if err != nil {
-		return err
+		return
 	}
 
 	return
@@ -113,7 +113,7 @@ func CreateBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.C
 	}
 
 	//批量更新 t_outbound_goods 状态 为拣货中
-	if err = model.OutboundGoodsReplaceSave(tx, outboundGoods, []string{"status"}); err != nil {
+	if err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"status"}); err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -225,7 +225,7 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 	}
 
 	//批量更新 t_outbound_goods 状态
-	if err = model.OutboundGoodsReplaceSave(tx, outboundGoods, []string{"status"}); err != nil {
+	if err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"status"}); err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -233,6 +233,7 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 	//生成集中拣货
 	err = CreateCentralizedPick(db, outboundGoodsJoinOrder, batch.Id)
 	if err != nil {
+		tx.Rollback()
 		return err
 	}
 
@@ -401,6 +402,7 @@ func BatchList(db *gorm.DB, form req.GetBatchListForm) (err error, res rsp.GetBa
 func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 	var (
 		batch          model.Batch
+		picks          []model.Pick
 		pickGoods      []model.PickGoods
 		orderJoinGoods []model.OrderJoinGoods
 	)
@@ -440,7 +442,61 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 
 	if err != nil {
 		tx.Rollback()
-		err = errors.New("推送u8拣货数据查询失败:" + err.Error())
+		return
+	}
+
+	//查询拣货任务状态
+	err, picks = model.GetPickList(db, &model.Pick{BatchId: batch.Id})
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	var (
+		picksMp          = make(map[int]struct{}, 0) //接单未复核完成
+		orderNumbers     = make([]string, 0, len(orderJoinGoods))
+		notReviewNumbers = make([]string, 0, len(orderJoinGoods))
+	)
+
+	//接单未复核完成
+	for _, p := range picks {
+		if p.PickUser != "" && p.Status < model.ReviewCompletedStatus {
+			picksMp[p.Id] = struct{}{}
+		}
+	}
+
+	// 批次结束时如果有已接单但未复核完成的，不变更任务订单状态为完成
+	for _, good := range pickGoods {
+		_, picksMpOk := picksMp[good.PickId]
+
+		if picksMpOk {
+			//未复核完成订单号
+			notReviewNumbers = append(notReviewNumbers, good.Number)
+		}
+
+		orderNumbers = append(orderNumbers, good.Number)
+	}
+
+	orderNumbers = slice.UniqueSlice(orderNumbers)
+
+	notReviewNumbers = slice.UniqueSlice(notReviewNumbers)
+
+	//去掉已结但未复核完成的
+	numbers := slice.Diff(orderNumbers, notReviewNumbers)
+
+	//更新 OutboundOrder 为已完成
+	err = model.UpdateOutboundOrderByTaskIdAndNumbers(db, batch.TaskId, numbers, map[string]interface{}{"order_type": model.OutboundOrderTypeComplete})
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	//订货系统MQ交互逻辑
+	err = SendBatchMsgToPurchase(db, batch.Id, 0)
+	if err != nil {
+		tx.Rollback()
 		return
 	}
 
@@ -450,36 +506,6 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 		tx.Rollback()
 		return
 	}
-
-	var (
-		orderNumbers     = make([]string, 0, len(orderJoinGoods))
-		notReviewNumbers = make([]string, 0, len(orderJoinGoods))
-	)
-
-	// 批次结束时如果有已接单但未复核完成的，不变更任务订单状态为完成
-	for _, good := range pickGoods {
-		if good.ReviewNum == 0 {
-			notReviewNumbers = append(notReviewNumbers, good.Number)
-		} else {
-			orderNumbers = append(orderNumbers, good.Number)
-		}
-	}
-
-	orderNumbers = slice.UniqueSlice(orderNumbers)
-	notReviewNumbers = slice.UniqueSlice(notReviewNumbers)
-
-	//去掉已结但未复核完成的
-	orderNumbers = slice.Diff(orderNumbers, notReviewNumbers)
-
-	//更新 OutboundOrder 为已完成
-	err = model.UpdateOutboundOrderByTaskIdAndNumbers(db, batch.TaskId, orderNumbers, map[string]interface{}{"order_type": model.OutboundOrderTypeComplete})
-
-	if err != nil {
-		tx.Rollback()
-		return
-	}
-
-	err = SendBatchMsgToPurchase(db, batch.Id, 0)
 
 	tx.Commit()
 

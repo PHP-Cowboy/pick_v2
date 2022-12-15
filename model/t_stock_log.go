@@ -1,6 +1,9 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
 
 // u8 推送日志
 type StockLog struct {
@@ -25,5 +28,16 @@ const (
 
 func BatchSaveStockLog(db *gorm.DB, list *[]StockLog) (err error) {
 	err = db.Model(&StockLog{}).CreateInBatches(list, BatchSize).Error
+	return
+}
+
+func StockLogReplaceSave(db *gorm.DB, list *StockLog, values []string) (err error) {
+	err = db.Model(&StockLog{}).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns(values),
+		}).
+		CreateInBatches(list, BatchSize).
+		Error
 	return
 }

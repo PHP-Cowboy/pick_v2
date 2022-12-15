@@ -92,13 +92,13 @@ func OutboundGoodsBatchSave(db *gorm.DB, list []OutboundGoods) (err error) {
 	return
 }
 
-func OutboundGoodsReplaceSave(db *gorm.DB, list []OutboundGoods, values []string) (err error) {
+func OutboundGoodsReplaceSave(db *gorm.DB, list *[]OutboundGoods, values []string) (err error) {
 	err = db.Model(&OutboundGoods{}).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "task_id,number,sku"}},
 			DoUpdates: clause.AssignmentColumns(values),
 		}).
-		CreateInBatches(&list, BatchSize).
+		CreateInBatches(list, BatchSize).
 		Error
 
 	return
@@ -163,7 +163,7 @@ func GetOutboundGoodsJoinOrderListByTaskId(db *gorm.DB, taskId int) (err error, 
 	err = db.Table("t_outbound_goods og").
 		Select("*").
 		Joins("left join t_outbound_order oo on og.task_id = oo.task_id and og.number = oo.number").
-		Where("oo.task_id = ? ", taskId).
+		Where("oo.task_id = ? and order_type in (?)", taskId, []int{OutboundOrderTypeNew, OutboundOrderTypeComplete}).
 		Find(&list).
 		Error
 
