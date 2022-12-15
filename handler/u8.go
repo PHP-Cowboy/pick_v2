@@ -53,7 +53,7 @@ func LogList(c *gin.Context) {
 
 	res.Total = total
 
-	localDb.Scopes(model.Paginate(form.Page, form.Size)).Find(&stockLog)
+	localDb.Scopes(model.Paginate(form.Page, form.Size)).Order("id desc").Find(&stockLog)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -169,6 +169,10 @@ func LogDetail(c *gin.Context) {
 	list := make([]rsp.LogDetail, 0, len(pickGoods))
 
 	for _, pg := range pickGoods {
+		if pg.ReviewNum <= 0 {
+			continue
+		}
+
 		list = append(list, rsp.LogDetail{
 			Id:               pg.Id,
 			UpdateTime:       pg.UpdateTime.Format(timeutil.TimeFormat),

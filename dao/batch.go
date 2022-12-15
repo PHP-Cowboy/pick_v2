@@ -454,12 +454,12 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 	}
 
 	var (
-		picksMp          = make(map[int]struct{}, 0) //接单未复核完成
+		picksMp          = make(map[int]struct{}, 0) //已接单未复核完成map
 		orderNumbers     = make([]string, 0, len(orderJoinGoods))
 		notReviewNumbers = make([]string, 0, len(orderJoinGoods))
 	)
 
-	//接单未复核完成
+	//已接单未复核完成
 	for _, p := range picks {
 		if p.PickUser != "" && p.Status < model.ReviewCompletedStatus {
 			picksMp[p.Id] = struct{}{}
@@ -471,7 +471,7 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 		_, picksMpOk := picksMp[good.PickId]
 
 		if picksMpOk {
-			//未复核完成订单号
+			//已接单未复核完成订单号
 			notReviewNumbers = append(notReviewNumbers, good.Number)
 		}
 
@@ -482,8 +482,22 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 
 	notReviewNumbers = slice.UniqueSlice(notReviewNumbers)
 
-	//去掉已结但未复核完成的
+	//去掉已接单但未复核完成的
 	numbers := slice.Diff(orderNumbers, notReviewNumbers)
+
+	//在预拣池中，未进入拣货池的单也要更新成已完成
+	var prePickList []model.PrePickGoods
+	err, prePickList = model.GetPrePickGoodsListByBatchIdAndStatus(db, batch.Id, model.PrePickGoodsStatusUnhandled)
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	//未进入拣货池的单合并到完成订单中去
+	for _, pl := range prePickList {
+		numbers = append(numbers, pl.Number)
+	}
 
 	//更新 OutboundOrder 为已完成
 	err = model.UpdateOutboundOrderByTaskIdAndNumbers(db, batch.TaskId, numbers, map[string]interface{}{"order_type": model.OutboundOrderTypeComplete})
@@ -500,6 +514,7 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 		return
 	}
 
+	//过滤掉 未拣货的
 	err = YongYouLog(tx, pickGoods, orderJoinGoods, batch.Id)
 
 	if err != nil {

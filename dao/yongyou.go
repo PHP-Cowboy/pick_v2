@@ -296,6 +296,11 @@ func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderJoinGoods []model
 	mpPgv := make(map[string]req.PickGoodsView, 0)
 
 	for _, good := range pickGoods {
+		//复核数为0的，不推u8
+		if good.ReviewNum <= 0 {
+			continue
+		}
+
 		order, ogOk := mpOrderAndGoods[good.OrderGoodsId]
 		if !ogOk {
 			continue
