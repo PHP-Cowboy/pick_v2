@@ -634,12 +634,13 @@ func EndOutboundTask(db *gorm.DB, form req.EndOutboundTaskForm) (err error) {
 	err, batchList = model.GetBatchListByTaskId(db, form.TaskId)
 
 	if err != nil {
-		return err
+		return
 	}
 
 	for _, batch := range batchList {
 		if batch.Status != model.BatchClosedStatus {
-			return errors.New("批次任务:" + batch.BatchName + "没有结束")
+			err = errors.New("批次任务:" + batch.BatchName + "没有结束")
+			return
 		}
 	}
 
@@ -660,7 +661,7 @@ func EndOutboundTask(db *gorm.DB, form req.EndOutboundTaskForm) (err error) {
 
 	tx.Commit()
 
-	return nil
+	return
 }
 
 // 关闭订单

@@ -282,6 +282,7 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 			TaskId:            pick.TaskId,
 			Number:            number,
 			LatestPickingTime: (*model.MyTime)(&now),
+			OrderType:         model.PickingOrderType,
 		})
 	}
 
@@ -289,13 +290,6 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 
 	//更新出库任务商品表数据
 	err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"lack_count", "out_count", "status", "delivery_order_no"})
-	if err != nil {
-		tx.Rollback()
-		return
-	}
-
-	//变更出库任务订单表最近拣货时间
-	err = model.OutboundOrderReplaceSave(tx, outboundOrder, []string{"latest_picking_time"})
 	if err != nil {
 		tx.Rollback()
 		return
@@ -335,6 +329,8 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 
 	//批次已结束的复核出库要单独推u8
 	if batch.Status == model.BatchClosedStatus {
+		//批次结束时，要更新出库任务订单状态
+		//model.PickGoods{}
 
 		//如果出库任务已结束，则需要更新订单和订单商品表&&完成订单和完成订单表状态&&推送订货系统【前面已经更新了出库单相关数据】
 		var outboundTask model.OutboundTask
@@ -369,6 +365,13 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 			return
 		}
 
+	}
+
+	//变更出库任务订单表最近拣货时间&&订单类型
+	err = model.OutboundOrderReplaceSave(tx, outboundOrder, []string{"latest_picking_time", "order_type"})
+	if err != nil {
+		tx.Rollback()
+		return
 	}
 
 	tx.Commit()

@@ -74,12 +74,24 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, prePicks []model.Pre
 		prePickRemarksIds []int
 		pickGoods         []model.PickGoods
 		pickRemark        []model.PickRemark
+		prePickMp         = make(map[int]struct{}, 0) //根据条件筛选的预拣池如果没有数据，则不生成对应的拣货池记录
 	)
+
+	for _, good := range prePickGoods {
+		prePickMp[good.PrePickId] = struct{}{}
+	}
 
 	var picks = make([]model.Pick, 0, len(prePicks))
 
 	//拣货池数据处理
 	for _, pre := range prePicks {
+
+		_, prePickMpOk := prePickMp[pre.Id]
+
+		//如果预拣池id不在prePickMp中，则不生成对应的拣货池记录，因为没有对应的商品
+		if !prePickMpOk {
+			continue
+		}
 
 		picks = append(picks, model.Pick{
 			WarehouseId:    form.WarehouseId,

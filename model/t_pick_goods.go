@@ -307,5 +307,14 @@ func CountPickPoolNumsByPickIds(db *gorm.DB, pickIds []int, query string) (err e
 		mp[n.PickId] = n
 	}
 
+	for _, id := range pickIds {
+		_, mpOk := mp[id]
+
+		if !mpOk {
+			mp[id] = CountPickPoolNums{}
+		}
+
+	}
+
 	return
 }

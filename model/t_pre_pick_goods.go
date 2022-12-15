@@ -104,6 +104,11 @@ func UpdatePrePickGoodsByPrePickIds(db *gorm.DB, prePickIds []int, mp map[string
 	return
 }
 
+func GetPrePickGoodsListByBatchIdAndStatus(db *gorm.DB, batchId, status int) (err error, list []PrePickGoods) {
+	err = db.Model(&PrePickGoods{}).Where("batch_id = ? and status = ?", batchId, status).Find(&list).Error
+	return
+}
+
 func GetPrePickGoodsJoinPrePickListByNumber(db *gorm.DB, numbers []string) (err error, list []PrePickGoodsJoinPrePick) {
 	err = db.Table("t_pre_pick_goods pg").
 		Select("pg.id as pre_pick_goods_id,pg.*,pp.*").
