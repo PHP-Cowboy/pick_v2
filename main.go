@@ -54,9 +54,9 @@ func main() {
 		global.Logger["err"].Infof("消费topic：purchase_order失败:%s", err.Error())
 	}
 
-	//if err := c.Subscribe("close_order", consumer.MessageSelector{}, handler.NewCloseOrder); err != nil {
-	//	global.Logger["err"].Infof("消费topic：close_order失败:%s", err.Error())
-	//}
+	if err := c.Subscribe("close_order", consumer.MessageSelector{}, handler.NewCloseOrder); err != nil {
+		global.Logger["err"].Infof("消费topic：close_order失败:%s", err.Error())
+	}
 
 	_ = c.Start()
 

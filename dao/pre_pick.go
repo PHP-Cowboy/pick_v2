@@ -207,10 +207,11 @@ func CreatePrePickLogic(
 
 		//构造 更新 t_outbound_goods 表 status 状态 为拣货中
 		outboundGoods = append(outboundGoods, model.OutboundGoods{
-			TaskId: og.TaskId,
-			Number: og.Number,
-			Sku:    og.Sku,
-			Status: model.OutboundGoodsStatusPicking,
+			TaskId:  og.TaskId,
+			Number:  og.Number,
+			Sku:     og.Sku,
+			BatchId: batchId,
+			Status:  model.OutboundGoodsStatusPicking,
 		})
 	}
 
