@@ -304,6 +304,12 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 		return
 	}
 
+	outboundType := model.OutboundTypeNormal
+
+	if *form.Num == 0 {
+		outboundType = model.OutboundTypeNoNeedToIssue
+	}
+
 	//更新拣货池表
 	err = model.UpdatePickByPk(tx, pick.Id, map[string]interface{}{
 		"status":            model.ReviewCompletedStatus,
@@ -312,6 +318,7 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 		"delivery_order_no": val,
 		"delivery_no":       deliveryOrderNo,
 		"print_num":         gorm.Expr("print_num + ?", 1),
+		"outbound_type":     outboundType,
 	})
 
 	if err != nil {
