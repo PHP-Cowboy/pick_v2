@@ -704,7 +704,7 @@ func BatchCloseBatch(tx *gorm.DB, status int) (err error) {
 		statusMp  = make(map[int]int, 0)
 	)
 
-	err, batchList = model.GetBatchList(tx, &model.Batch{Status: status})
+	err, batchList = model.GetBatchListByStatus(tx, status)
 
 	if err != nil {
 		return

@@ -50,6 +50,7 @@ func CountCompleteOrderNumsByNumber(db *gorm.DB, numbers []string) (err error, m
 	err = db.Model(&CompleteOrderDetail{}).
 		Select("number,sum(pay_count) as sum_pay_count,sum(close_count) as sum_close_count,sum(review_count) as sum_review_count").
 		Where("number in (?)", numbers).
+		Group("number").
 		Find(&completeOrderNums).
 		Error
 
