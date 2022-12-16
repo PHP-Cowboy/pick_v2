@@ -697,14 +697,14 @@ func SendBatchMsgToPurchase(tx *gorm.DB, batchId int, pickId int) (err error) {
 }
 
 // 批量变更批次状态为 暂停||进行中
-func BatchCloseBatch(tx *gorm.DB, status int) (err error) {
+func BatchChangeBatch(db *gorm.DB, status int) (err error) {
 	var (
 		batchList []model.Batch
 		batchIds  []int
 		statusMp  = make(map[int]int, 0)
 	)
 
-	err, batchList = model.GetBatchListByStatus(tx, status)
+	err, batchList = model.GetBatchListByStatus(db, status)
 
 	if err != nil {
 		return
@@ -734,7 +734,7 @@ func BatchCloseBatch(tx *gorm.DB, status int) (err error) {
 	}
 
 	//变更状态
-	err = model.UpdateBatchByIds(tx, batchIds, map[string]interface{}{"status": statusVal})
+	err = model.UpdateBatchByIds(db, batchIds, map[string]interface{}{"status": statusVal})
 
 	if err != nil {
 		return

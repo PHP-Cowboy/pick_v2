@@ -21,9 +21,10 @@ type CloseOrder struct {
 }
 
 const (
-	CloseOrderStatus         = iota
-	CloseOrderStatusPending  //处理中
-	CloseOrderStatusComplete //已完成
+	CloseOrderStatus          = iota
+	CloseOrderStatusPending   //处理中
+	CloseOrderStatusComplete  //已完成
+	CloseOrderStatusException //异常
 )
 
 func SaveCloseOrder(db *gorm.DB, data *CloseOrder) (err error) {

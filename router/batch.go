@@ -52,7 +52,6 @@ func BatchRoute(g *gin.RouterGroup) {
 		//合并拣货
 		batchGroup.POST("/merge_pick", handler.MergePick)
 		//批量变更批次状态为 暂停||进行中
-		batchGroup.POST("/batchCloseBatch", handler.BatchCloseBatch)
-
+		batchGroup.POST("/batchChangeBatch", handler.BatchChangeBatch)
 	}
 }

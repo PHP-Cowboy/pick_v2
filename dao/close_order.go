@@ -25,9 +25,15 @@ func CloseOrderCount(db *gorm.DB) (err error, res rsp.CloseOrderCountRsp) {
 		case model.CloseOrderStatusPending:
 			res.PendingNum = cl.Count
 			break
+
 		//已完成
 		case model.CloseOrderStatusComplete:
 			res.CompleteNum = cl.Count
+			break
+
+		//异常
+		case model.CloseOrderStatusException:
+			res.ExceptionNum = cl.Count
 			break
 		}
 	}
@@ -107,14 +113,15 @@ func CloseOrderDetail(db *gorm.DB, form req.CloseOrderDetailForm) (err error, re
 		return
 	}
 
-	list := make([]rsp.OrderGoodsList, 0, len(closeGoods))
+	list := make([]rsp.CloseGoodsList, 0, len(closeGoods))
 
 	for _, good := range closeGoods {
-		list = append(list, rsp.OrderGoodsList{
+		list = append(list, rsp.CloseGoodsList{
 			GoodsName:      good.GoodsName,
 			GoodsSpe:       good.GoodsSpe,
 			PayCount:       good.PayCount,
 			CloseCount:     good.CloseCount,
+			OutCount:       0,
 			NeedCloseCount: good.NeedCloseCount,
 			GoodsRemark:    good.GoodsRemark,
 		})
@@ -133,8 +140,71 @@ func CloseOrderDetail(db *gorm.DB, form req.CloseOrderDetailForm) (err error, re
 	return
 }
 
-// 关闭订单列表&&详情
+// 关闭订单&&详情列表
+func CloseOrderAndGoodsList(db *gorm.DB) (err error, res []rsp.CloseOrderAndGoodsList) {
 
+	var (
+		closeOrders   []model.CloseOrder
+		closeOrderIds []int
+		closeGoods    []model.CloseGoods
+		closeGoodsMp  = make(map[int][]rsp.CloseGoodsList, 0)
+	)
+
+	err, closeOrders = model.GetCloseOrderList(db, model.CloseOrder{Status: model.CloseOrderStatusPending})
+
+	if err != nil {
+		return
+	}
+
+	for _, order := range closeOrders {
+		closeOrderIds = append(closeOrderIds, order.Id)
+	}
+
+	err, closeGoods = model.GetCloseGoodsListByCloseOrderIds(db, closeOrderIds)
+
+	if err != nil {
+		return
+	}
+
+	for _, good := range closeGoods {
+		closeGoodsMpVal, closeGoodsMpOk := closeGoodsMp[good.CloseOrderId]
+
+		if !closeGoodsMpOk {
+			closeGoodsMpVal = []rsp.CloseGoodsList{}
+		}
+
+		closeGoodsMpVal = append(closeGoodsMpVal, rsp.CloseGoodsList{
+			GoodsName:      good.GoodsName,
+			GoodsSpe:       good.GoodsSpe,
+			PayCount:       good.PayCount,
+			CloseCount:     good.CloseCount,
+			OutCount:       0,
+			NeedCloseCount: good.NeedCloseCount,
+			GoodsRemark:    good.GoodsRemark,
+		})
+
+		closeGoodsMp[good.CloseOrderId] = closeGoodsMpVal
+	}
+
+	for _, order := range closeOrders {
+		list, closeGoodsMpOk := closeGoodsMp[order.Id]
+
+		if !closeGoodsMpOk {
+			list = make([]rsp.CloseGoodsList, 0, 0)
+		}
+
+		res = append(res, rsp.CloseOrderAndGoodsList{
+			Number:      order.Number,
+			ShopName:    order.ShopName,
+			OrderRemark: order.OrderRemark,
+			List:        list,
+		})
+	}
+
+	return
+}
+
+// 关单处理
 func CloseOrderExec(db *gorm.DB, form req.CloseOrder) (err error) {
 	var (
 		outboundOrders      []model.OutboundOrder

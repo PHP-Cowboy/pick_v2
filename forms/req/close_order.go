@@ -13,3 +13,7 @@ type CloseOrderDetailForm struct {
 type CloseOrder struct {
 	Number []string `json:"number"`
 }
+
+type CloseOrderExecExceptionForm struct {
+	Number string `json:"number" binding:"required"`
+}

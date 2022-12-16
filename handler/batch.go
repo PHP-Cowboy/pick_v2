@@ -648,8 +648,8 @@ func MergePick(c *gin.Context) {
 }
 
 // 批量变更批次状态为 暂停||进行中
-func BatchCloseBatch(c *gin.Context) {
-	var form req.BatchCloseBatchForm
+func BatchChangeBatch(c *gin.Context) {
+	var form req.BatchChangeBatchForm
 
 	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
 
@@ -658,12 +658,11 @@ func BatchCloseBatch(c *gin.Context) {
 		return
 	}
 
-	tx := global.DB.Begin()
+	db := global.DB
 
-	err := dao.BatchCloseBatch(tx, form.Status)
+	err := dao.BatchChangeBatch(db, *form.Status)
 
 	if err != nil {
-		tx.Rollback()
 		xsq_net.ErrorJSON(c, err)
 		return
 	}

@@ -27,7 +27,7 @@ func CloseOrderList(c *gin.Context) {
 	var form req.CloseOrderListForm
 
 	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
@@ -60,7 +60,19 @@ func CloseOrderDetail(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
-// 关闭订单
+// 关闭订单&&详情列表
+func CloseOrderAndGoodsList(c *gin.Context) {
+	err, res := dao.CloseOrderAndGoodsList(global.DB)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.SucJson(c, res)
+}
+
+// 关单处理
 func CloseOrderExec(c *gin.Context) {
 	var form req.CloseOrder
 
@@ -75,6 +87,20 @@ func CloseOrderExec(c *gin.Context) {
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+}
+
+// 异常关单处理
+func CloseOrderExecException(c *gin.Context) {
+	var form req.CloseOrderExecExceptionForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
 		return
 	}
 

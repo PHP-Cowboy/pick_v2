@@ -34,3 +34,8 @@ func GetCloseGoodsListByNumbers(db *gorm.DB, number []string) (err error, list [
 	err = db.Model(&CloseGoods{}).Where("number in (?)", number).Find(&list).Error
 	return
 }
+
+func GetCloseGoodsListByCloseOrderIds(db *gorm.DB, closeOrderIds []int) (err error, list []CloseGoods) {
+	err = db.Model(&CloseGoods{}).Where("close_order_id in (?)", closeOrderIds).Find(&list).Error
+	return
+}

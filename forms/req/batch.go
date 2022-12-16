@@ -99,8 +99,8 @@ type MergePickForm struct {
 	Typ         int      `json:"typ"` //类型：1:常规批次,2:快递批次;前端不需要传,程序里赋值
 }
 
-type BatchCloseBatchForm struct {
-	Status int `json:"status"`
+type BatchChangeBatchForm struct {
+	Status *int `json:"status" binding:"required,oneof=0 2"`
 }
 
 type PrintCallGetReq struct {
