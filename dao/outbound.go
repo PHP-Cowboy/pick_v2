@@ -300,6 +300,11 @@ func OutboundOrderBatchSaveLogic(db *gorm.DB, taskId int, orderJoinGoods []model
 	)
 
 	for _, goods := range orderJoinGoods {
+		//欠货数量小于0的不进入任务中，订单下无商品的也不会创建订单
+		if goods.LackCount <= 0 {
+			continue
+		}
+
 		_, ok := outboundOrderMp[goods.Number]
 
 		if !ok {

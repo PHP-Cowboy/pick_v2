@@ -113,7 +113,7 @@ func CreateBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.C
 	}
 
 	//批量更新 t_outbound_goods 状态 为拣货中
-	if err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"status"}); err != nil {
+	if err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"batch_id", "status"}); err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -225,7 +225,7 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 	}
 
 	//批量更新 t_outbound_goods 状态
-	if err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"status"}); err != nil {
+	if err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"batch_id", "status"}); err != nil {
 		tx.Rollback()
 		return err
 	}
