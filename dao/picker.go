@@ -187,7 +187,7 @@ func CompletePick(db *gorm.DB, form req.CompletePickForm) (err error) {
 	//****************************** 无需拣货 ******************************//
 	if form.Type == 2 {
 		//更新主表 无需拣货直接更新为复核完成
-		err = model.UpdatePickByIds(tx, []int{pick.Id}, map[string]interface{}{"status": model.ReviewCompletedStatus})
+		err = model.UpdatePickByIds(tx, []int{pick.Id}, map[string]interface{}{"status": model.ReviewCompletedStatus, "outbound_type": model.OutboundTypeNoNeedToIssue})
 
 		if err != nil {
 			tx.Rollback()
