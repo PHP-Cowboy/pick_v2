@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"pick_v2/global"
 	"pick_v2/utils/ecode"
+	"runtime"
 )
 
 var Empty = &struct{}{}
@@ -43,7 +44,9 @@ func JSON(c *gin.Context, data interface{}, err error) {
 
 // 错误业务JSON 不需关注输出数据
 func ErrorJSON(c *gin.Context, err error) {
-	WriteErrLog(c, err)
+	_, file, line, _ := runtime.Caller(1)
+
+	WriteErrLog(c, err, file, line)
 	JSON(c, Empty, err)
 }
 
@@ -60,7 +63,7 @@ func Success(c *gin.Context) {
 	CodeWithJSON(c, Empty, ecode.Success)
 }
 
-func WriteErrLog(c *gin.Context, err error) {
+func WriteErrLog(c *gin.Context, err error, file string, line int) {
 
 	l, ok := global.Logger["err"]
 
@@ -74,7 +77,7 @@ func WriteErrLog(c *gin.Context, err error) {
 		panic(pErr.Error())
 	}
 
-	l.Infof("url:%s,params:%s,err:%s", c.Request.URL.Path, params, err.Error())
+	l.Infof("file:%s,line:%d,url:%s,params:%s,err:%s", file, line, c.Request.URL.Path, params, err.Error())
 
 }
 

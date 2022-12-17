@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"pick_v2/dao"
@@ -101,6 +102,18 @@ func CloseOrderExecException(c *gin.Context) {
 
 	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
 		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	xsq_net.Success(c)
+}
+
+func TestMsgQueue(c *gin.Context) {
+
+	err := errors.New("err")
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 

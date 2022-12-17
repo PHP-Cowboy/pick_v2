@@ -3,12 +3,11 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 	"pick_v2/handler"
-	"pick_v2/middlewares"
 )
 
 func CloseOrderRoute(g *gin.RouterGroup) {
 
-	closeOrderGroup := g.Group("/closeOrder", middlewares.JWTAuth(), middlewares.IsAdminAuth())
+	closeOrderGroup := g.Group("/closeOrder")
 	{
 		//关闭订单状态数量统计
 		closeOrderGroup.GET("/closeOrderCount", handler.CloseOrderCount)
@@ -22,6 +21,8 @@ func CloseOrderRoute(g *gin.RouterGroup) {
 		closeOrderGroup.POST("/closeOrderExec", handler.CloseOrderExec)
 		//异常关单处理
 		closeOrderGroup.POST("/closeOrderExecException", handler.CloseOrderExecException)
+		//
+		closeOrderGroup.GET("/testMsgQueue", handler.TestMsgQueue)
 	}
 
 }

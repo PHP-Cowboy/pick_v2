@@ -31,7 +31,9 @@ func CreateBatchByTask(c *gin.Context) {
 		return
 	}
 
-	err := cache.AntiRepeatedClick("createBatchByTask"+strconv.Itoa(form.TaskId), 10)
+	rdsKey := c.Request.URL.Path + strconv.Itoa(form.TaskId)
+
+	err := cache.AntiRepeatedClick(rdsKey, 30)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
@@ -47,12 +49,20 @@ func CreateBatchByTask(c *gin.Context) {
 
 	form.Typ = 1 // 常规批次
 
-	err = dao.CreateBatchByTask(global.DB, form, userInfo)
+	tx := global.DB.Begin()
+
+	err = dao.CreateBatchByTask(tx, form, userInfo)
 
 	if err != nil {
+		tx.Rollback()
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
+
+	//执行完成后删除锁定时间
+	_, _ = cache.Del(rdsKey)
+
+	tx.Commit()
 
 	xsq_net.Success(c)
 }
@@ -77,12 +87,17 @@ func NewBatch(c *gin.Context) {
 
 	form.Typ = 1 // 常规批次
 
-	err := dao.CreateBatch(global.DB, form, userInfo)
+	tx := global.DB.Begin()
+
+	err := dao.CreateBatch(tx, form, userInfo)
 
 	if err != nil {
+		tx.Rollback()
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
+
+	tx.Commit()
 
 	xsq_net.Success(c)
 }

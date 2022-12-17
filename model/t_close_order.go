@@ -32,6 +32,11 @@ func SaveCloseOrder(db *gorm.DB, data *CloseOrder) (err error) {
 	return
 }
 
+func UpdateCloseOrderByNumbers(db *gorm.DB, numbers []string, mp map[string]interface{}) (err error) {
+	err = db.Model(&CloseOrder{}).Where("number in (?)", numbers).Updates(mp).Error
+	return
+}
+
 func GetCloseOrderByPk(db *gorm.DB, id int) (err error, closeOrder CloseOrder) {
 	err = db.Model(&CloseOrder{}).First(&closeOrder, id).Error
 	return

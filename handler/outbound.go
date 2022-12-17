@@ -22,7 +22,9 @@ func CreateOutboundTask(c *gin.Context) {
 		return
 	}
 
-	err := cache.AntiRepeatedClick("createTask", 10)
+	rdsKey := c.Request.URL.Path
+
+	err := cache.AntiRepeatedClick(rdsKey, 30)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
@@ -57,6 +59,9 @@ func CreateOutboundTask(c *gin.Context) {
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
+
+	//执行完成后删除锁定时间
+	_, _ = cache.Del(rdsKey)
 
 	tx.Commit()
 

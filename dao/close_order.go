@@ -314,6 +314,19 @@ func CloseOrderExec(db *gorm.DB, form req.CloseOrder) (err error) {
 		return
 	}
 
+	err = model.UpdateCloseOrderByNumbers(tx, form.Number, map[string]interface{}{"status": model.CloseOrderStatusComplete})
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	err = SendMsgQueue("close_order_result", form.Number)
+
+	if err != nil {
+		return
+	}
+
 	tx.Commit()
 
 	return
@@ -535,7 +548,7 @@ func ClosePrePick(
 		return
 	}
 
-	//todo 如果预拣池全部被关闭，则更新预拣池状态
+	// 如果预拣池全部被关闭，则更新预拣池状态
 
 	return
 }
@@ -620,6 +633,6 @@ func ClosePick(
 		return
 	}
 
-	//todo 如果预拣池全部被关闭，则更新预拣池状态
+	// 如果预拣池全部被关闭，则更新预拣池状态
 	return
 }

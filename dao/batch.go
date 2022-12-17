@@ -23,10 +23,10 @@ import (
 )
 
 // 全量拣货 -按任务创建批次
-func CreateBatchByTask(db *gorm.DB, form req.CreateBatchByTaskForm, claims *middlewares.CustomClaims) (err error) {
+func CreateBatchByTask(tx *gorm.DB, form req.CreateBatchByTaskForm, claims *middlewares.CustomClaims) (err error) {
 
 	//根据任务ID查询出库任务订单表数据，获取任务的全部订单号
-	err, outboundOrderList := model.GetOutboundOrderByTaskId(db, form.TaskId)
+	err, outboundOrderList := model.GetOutboundOrderByTaskId(tx, form.TaskId)
 	if err != nil {
 		return
 	}
@@ -51,7 +51,7 @@ func CreateBatchByTask(db *gorm.DB, form req.CreateBatchByTaskForm, claims *midd
 		Typ:       form.Typ,
 	}
 
-	err = CreateBatch(db, newCreateBatchForm, claims)
+	err = CreateBatch(tx, newCreateBatchForm, claims)
 	if err != nil {
 		return
 	}
@@ -60,37 +60,33 @@ func CreateBatchByTask(db *gorm.DB, form req.CreateBatchByTaskForm, claims *midd
 }
 
 // 创建批次
-func CreateBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.CustomClaims) error {
+func CreateBatch(tx *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.CustomClaims) (err error) {
 
 	var (
 		orderGoodsIds []int
 		outboundGoods []model.OutboundGoods
+		batch         model.Batch
 	)
 
-	tx := db.Begin()
-
 	//批次
-	err, batch := BatchSaveLogic(tx, form, claims)
+	err, batch = BatchSaveLogic(tx, form, claims)
 
 	if err != nil {
-		tx.Rollback()
-		return err
+		return
 	}
 
 	//预拣池逻辑
 	err, orderGoodsIds, outboundGoods, _, _, _, _, _ = CreatePrePickLogic(tx, form, claims, batch.Id)
 
 	if err != nil {
-		tx.Rollback()
-		return err
+		return
 	}
 
 	//批量更新 t_order_goods 表 batch_id
 	err = model.UpdateOrderGoodsByIds(tx, orderGoodsIds, map[string]interface{}{"batch_id": batch.Id})
 
 	if err != nil {
-		tx.Rollback()
-		return err
+		return
 	}
 
 	//构造更新 t_outbound_order 表 order_type 数据
@@ -106,21 +102,18 @@ func CreateBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.C
 	}
 
 	//批量更新 t_outbound_order 表 order_type 状态为拣货中
-	err = model.OutboundOrderReplaceSave(db, outboundOrder, []string{"order_type"})
+	err = model.OutboundOrderReplaceSave(tx, outboundOrder, []string{"order_type"})
 
 	if err != nil {
-		return err
+		return
 	}
 
 	//批量更新 t_outbound_goods 状态 为拣货中
 	if err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"batch_id", "status"}); err != nil {
-		tx.Rollback()
-		return err
+		return
 	}
 
-	tx.Commit()
-
-	return nil
+	return
 }
 
 // 生成批次数据逻辑
@@ -624,7 +617,7 @@ func GetBatchOrderAndGoods(db *gorm.DB, form req.GetBatchOrderAndGoodsForm) (err
 }
 
 // 推送批次信息到消息队列
-func SyncBatch(batchId int) error {
+func SendMsgQueue(topic string, messages []string) error {
 	p, _ := rocketmq.NewProducer(
 		producer.WithNsResolver(primitive.NewPassthroughResolver([]string{global.ServerConfig.RocketMQ})),
 		producer.WithRetry(2),
@@ -637,14 +630,19 @@ func SyncBatch(batchId int) error {
 		return err
 	}
 
-	topic := "pick_batch"
+	mq := make([]*primitive.Message, 0, len(messages))
 
-	msg := &primitive.Message{
-		Topic: topic,
-		Body:  []byte(strconv.Itoa(batchId)),
+	for _, m := range messages {
+
+		msg := &primitive.Message{
+			Topic: topic,
+			Body:  []byte(m),
+		}
+
+		mq = append(mq, msg)
 	}
 
-	res, err := p.SendSync(context.Background(), msg)
+	res, err := p.SendSync(context.Background(), mq...)
 
 	if err != nil {
 		global.Logger["err"].Infof("send message error: %s", err.Error())
@@ -690,7 +688,10 @@ func SendBatchMsgToPurchase(tx *gorm.DB, batchId int, pickId int) (err error) {
 	}
 
 	if isSend {
-		err = SyncBatch(batchId)
+		err = SendMsgQueue("pick_batch", []string{strconv.Itoa(batchId)})
+		if err != nil {
+			return
+		}
 	}
 
 	return
