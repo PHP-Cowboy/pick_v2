@@ -4,19 +4,12 @@ import (
 	"github.com/patrickmn/go-cache"
 	"pick_v2/global"
 	"pick_v2/model"
-	"time"
 )
-
-var goCache *cache.Cache
-
-func init() {
-	//创建一个默认过期时间为24小时的缓存
-	//每12小时清洗一次过期物品
-	goCache = cache.New(24*time.Hour, 12*time.Hour)
-}
 
 // 获取分类缓存
 func GetClassification() (map[string]string, error) {
+
+	goCache := global.GoCache
 
 	goodsClassMap, ok := goCache.Get("goodsClassMap")
 
@@ -47,6 +40,8 @@ func GetClassification() (map[string]string, error) {
 // 更新分类缓存
 func SetClassification() error {
 
+	goCache := global.GoCache
+
 	var class []model.Classification
 
 	result := global.DB.Find(&class)
@@ -68,6 +63,8 @@ func SetClassification() error {
 
 // 获取店铺线路
 func GetShopLine() (map[int]string, error) {
+	goCache := global.GoCache
+
 	shopLineMap, ok := goCache.Get("shopLine")
 
 	mp := make(map[int]string, 0)
@@ -96,6 +93,8 @@ func GetShopLine() (map[int]string, error) {
 
 // 更新店铺线路缓存
 func SetShopLine() error {
+	goCache := global.GoCache
+
 	var shops []model.Shop
 
 	result := global.DB.Find(&shops)

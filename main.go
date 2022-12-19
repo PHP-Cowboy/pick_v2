@@ -12,16 +12,19 @@ import (
 
 func main() {
 
+	//日志初始化
 	initialize.InitNewLogger()
-
+	//配置初始化
 	initialize.InitConfig()
-
+	//数据库初始化
 	initialize.InitMysql()
-
+	//任务初始化
 	initialize.InitJob()
-
+	//redis初始化
 	initialize.InitRedis()
-
+	//缓存初始化
+	initialize.InitGoCache()
+	//路由初始化
 	g := initialize.InitRouter()
 
 	serverConfig := global.ServerConfig
