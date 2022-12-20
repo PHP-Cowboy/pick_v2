@@ -12,7 +12,7 @@ type PickGoods struct {
 	WarehouseId      int    `gorm:"type:int(11);comment:仓库"`
 	PickId           int    `gorm:"type:int(11) unsigned;index:pick_and_batch_idx;comment:拣货表id"`
 	BatchId          int    `gorm:"type:int(11) unsigned;index:pick_and_batch_idx;comment:批次表id"`
-	PrePickGoodsId   int    `gorm:"type:int(11);comment:预拣货商品表id"`
+	PrePickGoodsId   int    `gorm:"type:int(11);index;comment:预拣货商品表id"`
 	OrderGoodsId     int    `gorm:"type:int(11) unsigned;index;comment:订单商品表ID"` //t_pick_order_goods 表 id
 	Number           string `gorm:"type:varchar(64);comment:订单编号"`
 	ShopId           int    `gorm:"type:int(11);comment:店铺id"`
@@ -106,8 +106,8 @@ func GetPickGoodsByPickIds(db *gorm.DB, pickIds []int) (err error, list []PickGo
 }
 
 // 根据拣货id查拣货池商品数据
-func GetPickGoodsByOrderGoodsIds(db *gorm.DB, orderGoodsId []int) (err error, list []PickGoods) {
-	err = db.Model(&PickGoods{}).Where("order_goods_id in (?)", orderGoodsId).Find(&list).Error
+func GetPickGoodsByOrderGoodsIds(db *gorm.DB, prePickGoodsIds []int) (err error, list []PickGoods) {
+	err = db.Model(&PickGoods{}).Where("pre_pick_goods_id in (?)", prePickGoodsIds).Find(&list).Error
 
 	return
 }

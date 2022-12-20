@@ -5,7 +5,7 @@ import "gorm.io/gorm"
 // 关闭订单表
 type CloseOrder struct {
 	Base
-	Number           string  `gorm:"type:varchar(64);unique;comment:订单编号"`
+	Number           string  `gorm:"type:varchar(64);index;comment:订单编号"`
 	ShopName         string  `gorm:"type:varchar(64);not null;comment:店铺名称"`
 	PayAt            *MyTime `gorm:"type:datetime;comment:支付时间"`
 	PayTotal         int     `gorm:"type:int;default:0;comment:下单总数"`
@@ -27,8 +27,19 @@ const (
 	CloseOrderStatusException //异常
 )
 
+const (
+	_                 = iota
+	CloseOrderTypPart //部分关闭
+	CloseOrderTypAll  //全单关闭
+)
+
 func SaveCloseOrder(db *gorm.DB, data *CloseOrder) (err error) {
 	err = db.Model(&CloseOrder{}).Save(data).Error
+	return
+}
+
+func UpdateCloseOrderByPk(db *gorm.DB, id int, mp map[string]interface{}) (err error) {
+	err = db.Model(&CloseOrder{}).Where("id = ?", id).Updates(mp).Error
 	return
 }
 

@@ -49,5 +49,5 @@ func ChangeDeliveryMethod(db *gorm.DB, form req.ChangeDeliveryMethodForm) (err e
 		return ecode.DataCannotBeModified
 	}
 
-	return model.OutboundOrderBatchUpdate(db, model.OutboundOrder{TaskId: form.TaskId, Number: form.Number}, map[string]interface{}{"distribution_type": form.DistributionType})
+	return model.OutboundOrderBatchUpdate(db, &model.OutboundOrder{TaskId: form.TaskId, Number: form.Number}, map[string]interface{}{"distribution_type": form.DistributionType})
 }

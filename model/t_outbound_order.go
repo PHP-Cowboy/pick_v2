@@ -65,8 +65,8 @@ func OutboundOrderReplaceSave(db *gorm.DB, list []OutboundOrder, values []string
 	return
 }
 
-func OutboundOrderBatchUpdate(db *gorm.DB, where OutboundOrder, mp map[string]interface{}) (err error) {
-	err = db.Model(&OutboundOrder{}).Where(&where).Updates(mp).Error
+func OutboundOrderBatchUpdate(db *gorm.DB, where *OutboundOrder, mp map[string]interface{}) (err error) {
+	err = db.Model(&OutboundOrder{}).Where(where).Updates(mp).Error
 
 	return
 }

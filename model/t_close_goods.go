@@ -9,7 +9,7 @@ type CloseGoods struct {
 	Base
 	CloseOrderId   int    `gorm:"type:int;index;default:0;comment:关闭订单表ID"`
 	OrderGoodsId   int    `gorm:"type:int(11) unsigned;comment:订单商品ID"`
-	Number         string `gorm:"type:varchar(64);comment:订单编号"`
+	Number         string `gorm:"type:varchar(64);index;comment:订单编号"`
 	GoodsName      string `gorm:"type:varchar(64);comment:商品名称"`
 	Sku            string `gorm:"type:varchar(64);index:number_sku_idx;comment:sku"`
 	GoodsSpe       string `gorm:"type:varchar(128);comment:商品规格"`

@@ -84,7 +84,7 @@ func CloseOrderExec(c *gin.Context) {
 		return
 	}
 
-	err := dao.CloseOrderExec(global.DB, form)
+	err := dao.CloseOrderExecNew(global.DB, form)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)

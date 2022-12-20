@@ -134,6 +134,14 @@ func GetOutboundGoodsInMultiColumn(db *gorm.DB, multiColumn [][]interface{}) (er
 	return
 }
 
+func GetOutboundGoodsListByPks(db *gorm.DB, taskId int, number string, sku []string) (err error, list []OutboundGoods) {
+	err = db.Model(&OutboundGoods{}).
+		Where("task_id = ? and number = ? and sku in (?)", taskId, number, sku).
+		Find(&list).
+		Error
+	return
+}
+
 func GetOutboundGoodsJoinOrderList(db *gorm.DB, taskId int, number []string) (err error, list []OutboundGoodsJoinOrder) {
 
 	err = db.Table("t_outbound_goods og").

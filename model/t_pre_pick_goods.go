@@ -31,13 +31,13 @@ type PrePickGoods struct {
 }
 
 type PrePickGoodsJoinPrePick struct {
+	PrePickId        int    `json:"pre_pick_id"` //预拣货表id
 	PrePickGoodsId   int    `json:"pre_pick_goods_id"`
 	WarehouseId      int    `json:"warehouse_id"`
 	BatchId          int    `json:"batch_id"`
 	OrderGoodsId     int    `json:"order_goods_id"` //t_pick_order_goods 表 id
 	Number           string `json:"number"`
 	ShopId           int    `json:"shop_id"`
-	PrePickId        int    `json:"pre_pick_id"`       //预拣货表id
 	DistributionType int    `json:"distribution_type"` //配送方式:1:公司配送,2:用户自提,3:三方物流,4:快递配送,5:首批物料|设备单
 	Sku              string `json:"sku"`
 	GoodsName        string `json:"goods_name"`
@@ -151,6 +151,17 @@ func GetPrePickGoodsJoinPrePickListByBatchId(db *gorm.DB, batchId int) (err erro
 	return
 }
 
+func GetPrePickGoodsJoinPrePickListByTaskId(db *gorm.DB, taskId int) (err error, list []PrePickGoodsJoinPrePick) {
+	err = db.Table("t_pre_pick_goods pg").
+		Select("pg.id as pre_pick_goods_id,pg.*,pp.id as pre_pick_id").
+		Joins("left join t_pre_pick pp on pg.pre_pick_id = pp.id").
+		Where(" pp.task_id", taskId).
+		Find(&list).
+		Error
+
+	return
+}
+
 // 按分类或商品获取未进入拣货池的商品数据
 func GetPrePickGoodsByTypeParam(db *gorm.DB, ids []int, formType int, typeParam []string) (err error, prePickGoods []PrePickGoods) {
 
@@ -174,8 +185,8 @@ func GetPrePickGoodsList(db *gorm.DB, cond *PrePickGoods) (err error, list []Pre
 	return
 }
 
-func GetPrePickGoodsByOrderGoodsIds(db *gorm.DB, orderGoodsIds []int) (err error, list []PrePickGoods) {
-	err = db.Model(&PrePickGoods{}).Where("order_goods_id in (?)", orderGoodsIds).Find(&list).Error
+func GetPrePickGoodsByGoodsIdsAndPrePickId(db *gorm.DB, orderGoodsIds []int, taskId int) (err error, list []PrePickGoods) {
+	err = db.Model(&PrePickGoods{}).Where("order_goods_id in (?) and ", orderGoodsIds).Find(&list).Error
 
 	return
 }

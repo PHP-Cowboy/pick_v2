@@ -2,10 +2,12 @@ package dao
 
 import (
 	"errors"
+	"fmt"
 	"gorm.io/gorm"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/model"
+	"pick_v2/utils/slice"
 )
 
 // 关闭订单状态数量统计
@@ -204,342 +206,61 @@ func CloseOrderAndGoodsList(db *gorm.DB) (err error, res []rsp.CloseOrderAndGood
 	return
 }
 
-// 关单处理
-func CloseOrderExec(db *gorm.DB, form req.CloseOrder) (err error) {
+// 关闭预拣池
+func ClosePrePick(tx *gorm.DB, closeGoodsMp map[int]int, taskId int) (err error, prePickGoodsIds []int) {
 	var (
-		outboundOrders      []model.OutboundOrder
-		closeOrders         []model.CloseOrder
-		closeGoods          []model.CloseGoods
-		closeOrderNumberTyp []rsp.CloseOrderNumberTyp
-		orderGoodsIds       []int
-		closeGoodsMp        = make(map[int]int, 0)
+		prePickGoodsJoinPrePick []model.PrePickGoodsJoinPrePick
+		prePickGoodsUpdate      []model.PrePickGoods
+		prePickIds              []int
+		notCloseAllPrePickIds   []int
 	)
 
-	//校验是否所有批次全部暂停
-	//查询是否有进行中的批次
-	err, _ = model.GetBatchFirst(db, model.Batch{Status: model.BatchOngoingStatus})
-
-	//err 不是未找到数据
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return
-	}
-
-	//关闭订单数据
-	err, closeOrders = model.GetCloseOrderByNumbers(db, form.Number)
+	//根据任务ID查询全部预拣池任务和预拣池商品数据
+	err, prePickGoodsJoinPrePick = model.GetPrePickGoodsJoinPrePickListByTaskId(tx, taskId)
 
 	if err != nil {
 		return
 	}
 
-	for _, order := range closeOrders {
-		closeOrderNumberTyp = append(closeOrderNumberTyp, rsp.CloseOrderNumberTyp{
-			Number: order.Number,
-			Typ:    order.Typ,
-		})
-	}
+	for _, good := range prePickGoodsJoinPrePick {
+		prePickIds = append(prePickIds, good.PrePickId)
 
-	//关闭订单商品数据
-	err, closeGoods = model.GetCloseGoodsListByNumbers(db, form.Number)
-
-	if err != nil {
-		return
-	}
-
-	for _, good := range closeGoods {
-		orderGoodsIds = append(orderGoodsIds, good.OrderGoodsId)
-
-		closeGoodsMp[good.OrderGoodsId] = good.CloseCount
-	}
-
-	//MQ 中 处理新订单关闭 [包括订单中的新订单和任务中的新订单]
-	err, outboundOrders = model.GetOutboundOrderByNumbers(db, form.Number)
-
-	if err != nil {
-		return
-	}
-
-	//map[number]taskId
-	numberTaskMp := make(map[string]int, 0)
-
-	for _, order := range outboundOrders {
-		//任务中的新订单，已在关闭订单消息中处理掉
-
-		taskId, numberTaskMpOk := numberTaskMp[order.Number]
-		//利用主键自增，找到订单号对应的最大批次
-		//订单每次只能在一个任务中，任务结束后变为欠货单才能重新进入下一个任务中
-		if !numberTaskMpOk || order.TaskId > taskId {
-			numberTaskMp[order.Number] = order.TaskId
-		}
-	}
-
-	taskOrderCond := [][]interface{}{}
-
-	//构造任务订单查询条件数据
-	for no, taskId := range numberTaskMp {
-		cond := []interface{}{taskId, no}
-		taskOrderCond = append(taskOrderCond, cond)
-	}
-
-	//构造任务商品查询条件
-	taskOrderSkuCond := [][]interface{}{}
-	for _, cg := range closeGoods {
-		taskId, numberTaskMpOk := numberTaskMp[cg.Number]
-
-		if !numberTaskMpOk {
-			err = errors.New("关闭商品数据有误")
-			return
-		}
-
-		cond := []interface{}{taskId, cg.Number, cg.Sku}
-		taskOrderSkuCond = append(taskOrderSkuCond, cond)
-	}
-
-	tx := db.Begin()
-
-	err = CloseOrderAndGoods(tx, closeOrderNumberTyp, orderGoodsIds, closeGoodsMp, taskOrderCond, taskOrderSkuCond)
-	if err != nil {
-		tx.Rollback()
-		return
-	}
-
-	err = ClosePrePick(tx, orderGoodsIds, closeGoodsMp)
-	if err != nil {
-		tx.Rollback()
-		return
-	}
-
-	err = ClosePick(tx, orderGoodsIds, closeGoodsMp)
-	if err != nil {
-		tx.Rollback()
-		return
-	}
-
-	err = model.UpdateCloseOrderByNumbers(tx, form.Number, map[string]interface{}{"status": model.CloseOrderStatusComplete})
-
-	if err != nil {
-		tx.Rollback()
-		return
-	}
-
-	err = SendMsgQueue("close_order_result", form.Number)
-
-	if err != nil {
-		return
-	}
-
-	tx.Commit()
-
-	return
-}
-
-// 订单&&订单商品关闭
-func CloseOrderAndGoods(
-	tx *gorm.DB,
-	closeOrderNumberTyp []rsp.CloseOrderNumberTyp,
-	orderGoodsIds []int,
-	closeGoodsMp map[int]int,
-	taskOrderCond,
-	taskOrderSkuCond [][]interface{},
-) (
-	err error,
-) {
-	if len(orderGoodsIds) == 0 {
-		err = errors.New("被关闭商品不能为空")
-		return
-	}
-
-	var (
-		orderGoods []model.OrderGoods
-	)
-
-	err, orderGoods = model.GetOrderGoodsListByIds(tx, orderGoodsIds)
-
-	if err != nil {
-		return
-	}
-
-	for i, og := range orderGoods {
-		closeCount, closeGoodsMpOk := closeGoodsMp[og.Id]
-
-		if !closeGoodsMpOk {
-			err = errors.New("订单商品map异常")
-			return
-		}
-
-		if og.LackCount < closeCount {
-			err = errors.New("欠货数量小于关闭数量")
-			return
-		}
-
-		orderGoods[i].CloseCount += closeCount
-		orderGoods[i].LackCount -= closeCount
-	}
-
-	err = model.OrderGoodsReplaceSave(tx, &orderGoods, []string{"update_time", "lack_count", "close_count"})
-
-	if err != nil {
-		return
-	}
-
-	//全单关闭订单号
-	var (
-		closeOrderNumbers   []string
-		closeOrderNumbersMp = make(map[string]struct{}, 0)
-	)
-
-	for _, nt := range closeOrderNumberTyp {
-		if nt.Typ == 2 {
-			closeOrderNumbers = append(closeOrderNumbers, nt.Number)
-			closeOrderNumbersMp[nt.Number] = struct{}{}
-		}
-	}
-
-	//全单关闭
-	if len(closeOrderNumbers) == 0 {
-		err = model.UpdateOrderByNumbers(tx, closeOrderNumbers, map[string]interface{}{"order_type": model.CloseOrderType})
-		if err != nil {
-			return
-		}
-	}
-
-	//不需要处理任务数据
-	if taskOrderCond == nil {
-		return
-	}
-
-	var (
-		outboundOrder       []model.OutboundOrder
-		outboundOrderUpdate []model.OutboundOrder
-	)
-
-	err, outboundOrder = model.GetOutboundOrderInMultiColumn(tx, taskOrderCond)
-	if err != nil {
-		return
-	}
-
-	if len(outboundOrder) == 0 {
-		err = errors.New("任务订单未找到")
-		return
-	}
-
-	for _, order := range outboundOrder {
-		_, closeOrderNumbersMpOk := closeOrderNumbersMp[order.Number]
-
-		if closeOrderNumbersMpOk {
-			outboundOrderUpdate = append(outboundOrderUpdate, order)
-		}
-	}
-
-	if len(outboundOrderUpdate) > 0 {
-		err = model.OutboundOrderReplaceSave(tx, outboundOrderUpdate, []string{"order_type"})
-
-		if err != nil {
-			return
-		}
-	}
-
-	var (
-		outboundGoods []model.OutboundGoods
-	)
-
-	err, outboundGoods = model.GetOutboundGoodsInMultiColumn(tx, taskOrderSkuCond)
-
-	if err != nil {
-		return
-	}
-
-	for i, good := range outboundGoods {
 		closeCount, closeGoodsMpOk := closeGoodsMp[good.OrderGoodsId]
 
 		if !closeGoodsMpOk {
-			err = errors.New("订单商品map异常")
-			return
-		}
-
-		if good.LackCount < closeCount {
-			err = errors.New("欠货数量小于关闭数量")
-			return
-		}
-
-		outboundGoods[i].CloseCount += closeCount
-		outboundGoods[i].LackCount -= closeCount
-	}
-
-	err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"lack_count", "out_count"})
-
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-// 关闭预拣池
-func ClosePrePick(
-	tx *gorm.DB,
-	orderGoodsIds []int,
-	closeGoodsMp map[int]int,
-) (
-	err error,
-) {
-	var (
-		prePickGoods       []model.PrePickGoods
-		prePickGoodsUpdate []model.PrePickGoods
-		prePickIds         []int
-	)
-
-	err, prePickGoods = model.GetPrePickGoodsByOrderGoodsIds(tx, orderGoodsIds)
-
-	if err != nil {
-		return
-	}
-
-	//一个品可能被拣多次，但只有结束后才能进入新的任务、批次。
-	//更新预拣池id最大的 map[order_goods_id]id
-	prePickCloseMp := make(map[int]int, 0)
-
-	for _, good := range prePickGoods {
-
-		id, prePickCloseMpOk := prePickCloseMp[good.OrderGoodsId]
-
-		if !prePickCloseMpOk || good.Id > id {
-			prePickCloseMp[good.OrderGoodsId] = good.Id
-		}
-
-	}
-
-	for _, good := range prePickGoods {
-		id, prePickCloseMpOk := prePickCloseMp[good.OrderGoodsId]
-
-		if !prePickCloseMpOk {
-			err = errors.New("预拣池商品map异常")
-			return
-		}
-		//订单商品id与对应的预拣池id不匹配，则为历史预拣池数据，跳过
-		if id != good.Id {
+			//没被关闭的
+			notCloseAllPrePickIds = append(notCloseAllPrePickIds, good.PrePickId)
 			continue
 		}
 
-		closeCount, closeGoodsMpOk := closeGoodsMp[good.OrderGoodsId]
-
-		if !closeGoodsMpOk {
-			err = errors.New("订单商品map异常")
-			return
-		}
-
 		updatePrePickGoodsData := model.PrePickGoods{
-			Base:     model.Base{Id: id},
+			Base:     model.Base{Id: good.PrePickGoodsId},
 			NeedNum:  good.NeedNum - closeCount,
 			CloseNum: good.CloseNum + closeCount,
 		}
 
-		if updatePrePickGoodsData.NeedNum <= 0 {
+		prePickGoodsIds = append(prePickGoodsIds, good.PrePickGoodsId)
+
+		//需拣如果小于零是有问题的，说明关闭数量大于需拣数量
+		if updatePrePickGoodsData.NeedNum < 0 {
+			err = errors.New(fmt.Sprintf(
+				"需拣变更err:t_pre_pick_goods.id:%d,need_num:%d,closeCount:%d",
+				good.PrePickGoodsId,
+				good.NeedNum,
+				closeCount,
+			))
+			return
+		}
+
+		if updatePrePickGoodsData.NeedNum == 0 {
 			updatePrePickGoodsData.Status = model.PrePickGoodsStatusClose
+		} else {
+			//没有被全部关闭的
+			notCloseAllPrePickIds = append(notCloseAllPrePickIds, good.PrePickId)
 		}
 		//需要被更新的预拣池商品数据
 		prePickGoodsUpdate = append(prePickGoodsUpdate, updatePrePickGoodsData)
 
-		prePickIds = append(prePickIds, good.PrePickId)
 	}
 
 	err = model.PrePickGoodsReplaceSave(tx, prePickGoodsUpdate, []string{"need_num", "close_num", "status"})
@@ -548,7 +269,19 @@ func ClosePrePick(
 		return
 	}
 
+	prePickIds = slice.UniqueSlice(prePickIds)
+	notCloseAllPrePickIds = slice.UniqueSlice(notCloseAllPrePickIds)
+
+	prePickIds = slice.Diff(prePickIds, notCloseAllPrePickIds)
+
 	// 如果预拣池全部被关闭，则更新预拣池状态
+	if len(prePickIds) > 0 {
+		err = model.UpdatePrePickStatusByIds(tx, prePickIds, model.PrePickStatusClose)
+
+		if err != nil {
+			return
+		}
+	}
 
 	return
 }
@@ -559,20 +292,14 @@ func CloseCentralizedPick(tx *gorm.DB) (err error) {
 }
 
 // 关闭拣货池
-func ClosePick(
-	tx *gorm.DB,
-	orderGoodsIds []int,
-	closeGoodsMp map[int]int,
-) (
-	err error,
-) {
+func ClosePick(tx *gorm.DB, closeGoodsMp map[int]int, prePickGoodsIds []int) (err error) {
 	var (
 		pickGoods       []model.PickGoods
 		pickGoodsUpdate []model.PickGoods
 		pickIds         []int
 	)
 
-	err, pickGoods = model.GetPickGoodsByOrderGoodsIds(tx, orderGoodsIds)
+	err, pickGoods = model.GetPickGoodsByOrderGoodsIds(tx, prePickGoodsIds)
 
 	if err != nil {
 		return
@@ -634,5 +361,292 @@ func ClosePick(
 	}
 
 	// 如果预拣池全部被关闭，则更新预拣池状态
+	return
+}
+
+// 关单处理
+func CloseOrderExecNew(db *gorm.DB, form req.CloseOrder) (err error) {
+	var (
+		closeOrders   []model.CloseOrder
+		closeGoods    []model.CloseGoods
+		orderGoodsIds []int
+		closeGoodsMp  = make(map[int]int, 0)
+	)
+
+	//校验是否所有批次全部暂停
+	//查询是否有进行中的批次
+	err, _ = model.GetBatchFirst(db, model.Batch{Status: model.BatchOngoingStatus})
+
+	//err 不是未找到数据
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return
+	}
+
+	//关闭订单数据
+	err, closeOrders = model.GetCloseOrderByNumbers(db, form.Number)
+
+	if err != nil {
+		return
+	}
+
+	//关闭订单商品数据
+	err, closeGoods = model.GetCloseGoodsListByNumbers(db, form.Number)
+
+	if err != nil {
+		return
+	}
+
+	for _, good := range closeGoods {
+		orderGoodsIds = append(orderGoodsIds, good.OrderGoodsId)
+
+		closeGoodsMp[good.OrderGoodsId] = good.CloseCount
+	}
+
+	for _, co := range closeOrders {
+		tx := db.Begin()
+
+		err = CloseOrderHandle(tx, co.Number, co.Typ, closeGoodsMp, orderGoodsIds)
+
+		if err != nil {
+			tx.Rollback()
+			continue
+		}
+
+		//更新关单任务状态
+		err = model.UpdateCloseOrderByPk(tx, co.Id, map[string]interface{}{"status": model.CloseOrderStatusComplete})
+
+		if err != nil {
+			tx.Rollback()
+			continue
+		}
+
+		err = SendMsgQueue("close_order_result", []string{co.Number})
+
+		if err != nil {
+			tx.Rollback()
+			continue
+		}
+
+		tx.Commit()
+
+	}
+
+	return
+}
+
+// 关单处理
+func CloseOrderHandle(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]int, orderGoodsIds []int) (err error) {
+	var (
+		isCommit bool //用于判断是否提交事务，是否还需要继续执行后续流程
+		taskId   int
+	)
+
+	err, isCommit, taskId = OrderDataHandle(tx, number, typ, closeGoodsMp)
+
+	if err != nil || isCommit {
+		return
+	}
+
+	//批次数据处理
+	err, isCommit = BatchDataHandle(tx, closeGoodsMp, orderGoodsIds, taskId)
+
+	if err != nil || isCommit {
+		return
+	}
+
+	return
+}
+
+// 订单数据处理(包括订单相关表和任务订单相关表)
+func OrderDataHandle(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]int) (err error, isCommit bool, taskId int) {
+	//关闭订单&&订单商品逻辑
+	err, isCommit = CloseGoodsAndOrderLogic(tx, number, typ, closeGoodsMp)
+
+	if err != nil {
+		return
+	}
+
+	if isCommit {
+		return
+	}
+
+	//关闭出库任务订单&&订单商品
+	err, isCommit, taskId = CloseTaskLogic(tx, number, typ, closeGoodsMp)
+
+	if err != nil {
+		return
+	}
+
+	if isCommit {
+		return
+	}
+
+	return
+}
+
+// 批次数据处理
+func BatchDataHandle(tx *gorm.DB, closeGoodsMp map[int]int, orderGoodsIds []int, taskId int) (err error, isCommit bool) {
+	var prePickGoodsIds []int
+
+	err, prePickGoodsIds = ClosePrePick(tx, closeGoodsMp, taskId)
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	err = ClosePick(tx, closeGoodsMp, prePickGoodsIds)
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+	return
+}
+
+// 关闭订单以及订单商品逻辑
+func CloseGoodsAndOrderLogic(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]int) (err error, isCommit bool) {
+
+	var (
+		order      model.Order
+		orderGoods []model.OrderGoods
+	)
+
+	err, order = model.GetOrderByNumber(tx, number)
+
+	if err != nil {
+		return
+	}
+
+	//全单关闭
+	if typ == model.CloseOrderTypAll {
+		//全单关闭时更新订单类型为关闭
+		err = model.UpdateOrderByNumbers(tx, []string{number}, map[string]interface{}{"order_type": model.CloseOrderType})
+		if err != nil {
+			return
+		}
+	}
+
+	//根据订单号查询全部订单商品数据
+	err, orderGoods = model.GetOrderGoodsListByNumbers(tx, []string{number})
+
+	if err != nil {
+		return
+	}
+
+	//订单商品关闭
+	for i, og := range orderGoods {
+		closeCount, closeGoodsMpOk := closeGoodsMp[og.Id]
+
+		if !closeGoodsMpOk {
+			err = errors.New("订单商品map异常")
+			return
+		}
+
+		if og.LackCount < closeCount {
+			err = errors.New("欠货数量小于关闭数量")
+			return
+		}
+
+		orderGoods[i].CloseCount += closeCount
+		orderGoods[i].LackCount -= closeCount
+	}
+
+	err = model.OrderGoodsReplaceSave(tx, &orderGoods, []string{"update_time", "lack_count", "close_count"})
+
+	if err != nil {
+		return
+	}
+
+	//如果是新订单，则处理完订单后可以直接提交，不做后续逻辑处理
+	if order.OrderType == model.NewOrderType {
+		isCommit = true
+	}
+
+	return
+}
+
+// 关闭任务订单以及商品逻辑
+func CloseTaskLogic(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]int) (err error, isCommit bool, taskId int) {
+
+	var (
+		outboundOrder model.OutboundOrder
+		closeGoods    []model.CloseGoods
+		outboundGoods []model.OutboundGoods
+	)
+
+	//获取订单所在的最新任务
+	err, outboundOrder = model.GetOutboundOrderByNumberFirstSortByTaskId(tx, number)
+
+	if err != nil {
+		return
+	}
+
+	if outboundOrder.OrderType == model.OutboundOrderTypeNew {
+		isCommit = true
+	}
+
+	taskId = outboundOrder.TaskId
+
+	//全单关闭
+	if typ == model.CloseOrderTypAll {
+
+		//更新任务订单为关闭
+		err = model.OutboundOrderBatchUpdate(
+			tx,
+			&model.OutboundOrder{
+				TaskId: taskId,
+				Number: number,
+			},
+			map[string]interface{}{"order_type": model.OutboundOrderTypeClose},
+		)
+
+		if err != nil {
+			return
+		}
+
+	}
+
+	//关闭订单商品数据
+	err, closeGoods = model.GetCloseGoodsListByNumbers(tx, []string{number})
+
+	if err != nil {
+		return
+	}
+
+	//构造任务商品查询条件
+	skus := make([]string, 0, len(closeGoods))
+
+	for _, cg := range closeGoods {
+		skus = append(skus, cg.Sku)
+	}
+
+	err, outboundGoods = model.GetOutboundGoodsListByPks(tx, taskId, number, skus)
+
+	if err != nil {
+		return
+	}
+
+	for i, good := range outboundGoods {
+		closeCount, closeGoodsMpOk := closeGoodsMp[good.OrderGoodsId]
+
+		if !closeGoodsMpOk {
+			err = errors.New("订单商品map异常")
+			return
+		}
+
+		if good.LackCount < closeCount {
+			err = errors.New(fmt.Sprintf("欠货数量小于关闭数量,taskId:%d,number:%s,sku:%s", taskId, number, good.Sku))
+			return
+		}
+
+		outboundGoods[i].CloseCount += closeCount
+		outboundGoods[i].LackCount -= closeCount
+	}
+
+	err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"lack_count", "out_count"})
+
+	if err != nil {
+		return
+	}
 	return
 }
