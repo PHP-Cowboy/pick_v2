@@ -19,11 +19,6 @@ type Pick struct {
 	ShopCode        string   `gorm:"type:varchar(255);not null;comment:店铺编号"`
 	ShopName        string   `gorm:"type:varchar(64);not null;comment:店铺名称"`
 	Line            string   `gorm:"type:varchar(255);not null;comment:线路"`
-	ShopNum         int      `gorm:"type:int;default:0;comment:门店数"`
-	OrderNum        int      `gorm:"type:int;default:0;comment:订单数"`
-	NeedNum         int      `gorm:"type:int;default:0;comment:需拣数量"`
-	PickNum         int      `gorm:"type:int;default:0;comment:拣货数量"`
-	ReviewNum       int      `gorm:"type:int;default:0;comment:复核数量"`
 	Num             int      `gorm:"type:int;default:0;comment:件数"`
 	PrintNum        int      `gorm:"type:int;default:0;comment:打印次数"`
 	PickUser        string   `gorm:"type:varchar(32);default:'';comment:拣货人"`
@@ -37,6 +32,12 @@ type Pick struct {
 	DeliveryNo      string   `gorm:"type:varchar(255);index:delivery_no_idx;comment:出库单号"`
 	Typ             int      `gorm:"type:tinyint;default:1;comment:批次类型:1:常规批次,2:快递批次"`
 	DeliveryOrderNo GormList `gorm:"type:varchar(255);comment:出库单号"`
+
+	//ShopNum         int      `gorm:"type:int;default:0;comment:门店数"`
+	//OrderNum        int      `gorm:"type:int;default:0;comment:订单数"`
+	//NeedNum         int      `gorm:"type:int;default:0;comment:需拣数量"`
+	//PickNum         int      `gorm:"type:int;default:0;comment:拣货数量"`
+	//ReviewNum       int      `gorm:"type:int;default:0;comment:复核数量"`
 }
 
 const (
@@ -151,6 +152,22 @@ func GetPickListNoOrderReceived(db *gorm.DB, batchIds []int, typ int) (err error
 	return
 }
 
+// 统计拣货池剩余数量
+func CountPickRemainingQuantity(db *gorm.DB, batchIds []int, status, typ int, pickUser string) (err error, count int64) {
+	err = db.Model(&Pick{}).
+		Where(
+			"batch_id in (?) and status = ? and typ = ? and (pick_user = '' or pick_user = ?)",
+			batchIds,
+			status,
+			typ,
+			pickUser,
+		).
+		Count(&count).
+		Error
+
+	return
+}
+
 // 获取当前用户已接单但未复核完成的批次
 func GetPickListByPickUserAndNotReviewCompleted(db *gorm.DB, userName string, typ int) (err error, list []Pick) {
 	err = db.Model(&Pick{}).
@@ -164,5 +181,30 @@ func GetPickListByPickUserAndNotReviewCompleted(db *gorm.DB, userName string, ty
 // 根据出库单号查询拣货数据
 func GetPickListByDeliveryNo(db *gorm.DB, deliveryNo []string) (err error, list []Pick) {
 	err = db.Model(&Pick{}).Where("delivery_no in (?)", deliveryNo).Find(&list).Error
+	return
+}
+
+// 获取两天内拣货记录
+func GetPickingRecord(db *gorm.DB, pickUser, towDaysAgo string, status *int, page, size int) (err error, total int64, list []Pick) {
+	local := db.Where("pick_user = ? and take_orders_time >= ?", pickUser, towDaysAgo)
+
+	if status != nil && *status == 0 {
+		local.Where("status = ?", *status)
+	} else {
+		local.Where("status != 0")
+	}
+
+	err = local.Count(&total).Error
+
+	if err != nil {
+		return
+	}
+
+	err = local.Scopes(Paginate(page, size)).Order("take_orders_time desc").Find(&list).Error
+
+	if err != nil {
+		return
+	}
+
 	return
 }

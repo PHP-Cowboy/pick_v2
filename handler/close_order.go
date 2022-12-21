@@ -94,20 +94,6 @@ func CloseOrderExec(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-// 异常关单处理
-func CloseOrderExecException(c *gin.Context) {
-	var form req.CloseOrderExecExceptionForm
-
-	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
-
-	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
-		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
-		return
-	}
-
-	xsq_net.Success(c)
-}
-
 func TestMsgQueue(c *gin.Context) {
 
 	err := errors.New("err")

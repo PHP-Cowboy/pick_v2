@@ -156,15 +156,17 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 		status = 2
 
 		var (
-			closeGoodsMp = make(map[int]int, 0)
+			closeGoodsMp  = make(map[int]int, 0)
+			orderGoodsIds []int
 		)
 
 		for _, info := range goodsInfo {
 			closeGoodsMp[info.ID] = info.CloseCount
+			orderGoodsIds = append(orderGoodsIds, info.ID)
 		}
 
 		//关闭订单逻辑处理
-		err = dao.CloseOrderHandle(tx, closeOrder.Number, closeOrder.Typ, closeGoodsMp)
+		err = dao.CloseOrderHandle(tx, closeOrder.Number, closeOrder.Typ, closeGoodsMp, orderGoodsIds)
 		if err != nil {
 			tx.Rollback()
 			return consumer.ConsumeRetryLater, err
@@ -186,15 +188,17 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 			status = 2
 
 			var (
-				closeGoodsMp = make(map[int]int, 0)
+				closeGoodsMp  = make(map[int]int, 0)
+				orderGoodsIds []int
 			)
 
 			for _, info := range goodsInfo {
 				closeGoodsMp[info.ID] = info.CloseCount
+				orderGoodsIds = append(orderGoodsIds, info.ID)
 			}
 
 			//关闭订单逻辑处理
-			err = dao.CloseOrderHandle(tx, closeOrder.Number, closeOrder.Typ, closeGoodsMp)
+			err = dao.CloseOrderHandle(tx, closeOrder.Number, closeOrder.Typ, closeGoodsMp, orderGoodsIds)
 			if err != nil {
 				tx.Rollback()
 				return consumer.ConsumeRetryLater, err

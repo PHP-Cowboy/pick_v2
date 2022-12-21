@@ -289,9 +289,6 @@ func ChangeReviewNum(db *gorm.DB, form req.ChangeReviewNumForm) (err error) {
 		reviewNumDiffTotal += reviewNumDiffMp[sr.Sku]
 	}
 
-	//拣货池 复核总数 = 复核总数 - 复核数 差值
-	pick.ReviewNum = pick.ReviewNum + reviewNumDiffTotal
-
 	var (
 		numberConsumeMp       = make(map[string]int, 0) //order相关消费复核差值map
 		orderGoodsIdConsumeMp = make(map[int]int, 0)    //orderGoods相关消费复核差值map
@@ -409,14 +406,6 @@ func ChangeReviewNum(db *gorm.DB, form req.ChangeReviewNumForm) (err error) {
 	}
 
 	tx := db.Begin()
-
-	//更新拣货任务表复核数量
-	err = model.UpdatePickByPk(tx, pick.Id, map[string]interface{}{"review_num": pick.ReviewNum})
-
-	if err != nil {
-		tx.Rollback()
-		return
-	}
 
 	//更新拣货商品表 复核数量 [need_num,review_num not null]
 	err = model.PickGoodsReplaceSave(tx, &pickGoods, []string{"need_num", "complete_num", "review_num"})

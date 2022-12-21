@@ -7,7 +7,9 @@ type ReceivingOrdersForm struct {
 
 type PickingRecordForm struct {
 	Paging
-	Status *int `json:"status" form:"status"`
+	Status     *int   `json:"status" form:"status"`
+	PickUser   string `json:"-"`
+	TowDaysAgo string `json:"-"`
 }
 
 type CompletePickForm struct {
@@ -23,7 +25,8 @@ type CompleteConcentratedPickForm struct {
 }
 
 type RemainingQuantityForm struct {
-	Typ int `json:"typ" form:"typ"`
+	Typ      int    `json:"typ" form:"typ"`
+	PickUser string `json:"-"`
 }
 
 type CompletePickDetail struct {

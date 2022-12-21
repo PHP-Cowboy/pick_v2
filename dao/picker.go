@@ -2,9 +2,9 @@ package dao
 
 import (
 	"errors"
-
 	"fmt"
 	"pick_v2/forms/rsp"
+	"sort"
 	"time"
 
 	"gorm.io/gorm"
@@ -371,5 +371,261 @@ func CompletePick(db *gorm.DB, form req.CompletePickForm) (err error) {
 	}
 
 	tx.Commit()
+	return
+}
+
+// 拣货记录
+func PickingRecord(db *gorm.DB, form req.PickingRecordForm) (err error, res rsp.PickingRecordRsp) {
+	var (
+		picks     []model.Pick
+		total     int64
+		pickGoods []model.PickGoods
+		pickIds   []int
+		numsMp    = make(map[int]model.CountPickPoolNums, 0)
+	)
+
+	err, total, picks = model.GetPickingRecord(db, form.PickUser, form.TowDaysAgo, form.Status, form.Page, form.Size)
+
+	if err != nil {
+		return
+	}
+
+	res.Total = total
+
+	for _, p := range picks {
+		pickIds = append(pickIds, p.Id)
+	}
+
+	err, pickGoods = model.GetPickGoodsByPickIds(db, pickIds)
+
+	if err != nil {
+		return
+	}
+
+	query := "pick_id,count(distinct(shop_id)) as shop_num,count(distinct(number)) as order_num,sum(need_num) as need_num"
+
+	err, numsMp = model.CountPickPoolNumsByPickIds(db, pickIds, query)
+
+	if err != nil {
+		return
+	}
+
+	type Goods struct {
+		CompleteNum      int
+		DistributionType int
+	}
+
+	pickGoodsMp := make(map[int]Goods, 0)
+
+	for _, pg := range pickGoods {
+		_, pgMpOk := pickGoodsMp[pg.PickId]
+
+		g := Goods{
+			CompleteNum:      pg.CompleteNum,
+			DistributionType: pg.DistributionType,
+		}
+
+		if !pgMpOk {
+			pickGoodsMp[pg.PickId] = g
+		} else {
+			g.CompleteNum += pickGoodsMp[pg.PickId].CompleteNum
+			pickGoodsMp[pg.PickId] = g
+		}
+	}
+
+	list := make([]rsp.PickingRecord, 0)
+
+	for _, p := range picks {
+		pgMp, pgMpOk := pickGoodsMp[p.Id]
+
+		outNum := 0
+		distributionType := 0
+
+		if pgMpOk {
+			outNum = pgMp.CompleteNum
+			distributionType = pgMp.DistributionType
+		}
+
+		reviewStatus := "未复核"
+		if p.ReviewTime != nil {
+			reviewStatus = "已复核"
+		}
+
+		nums, numsMpOk := numsMp[p.Id]
+
+		if !numsMpOk {
+			err = errors.New("拣货池统计数量有误")
+			return
+		}
+
+		list = append(list, rsp.PickingRecord{
+			Id:               p.Id,
+			TaskName:         p.TaskName,
+			ShopCode:         p.ShopCode,
+			ShopNum:          nums.ShopNum,
+			OrderNum:         nums.OrderNum,
+			NeedNum:          nums.NeedNum,
+			TakeOrdersTime:   p.TakeOrdersTime,
+			ReviewUser:       p.ReviewUser,
+			OutNum:           outNum,
+			ReviewStatus:     reviewStatus,
+			DistributionType: distributionType,
+			IsRemark:         false,
+		})
+	}
+
+	res.List = list
+	return
+}
+
+// 拣货记录明细
+func PickingRecordDetail(db *gorm.DB, form req.PickingRecordDetailForm) (err error, res rsp.PickingRecordDetailRsp) {
+	var (
+		pick       model.Pick
+		pickGoods  []model.PickGoods
+		pickRemark []model.PickRemark
+	)
+
+	err, pick = model.GetPickByPk(db, form.PickId)
+
+	if err != nil {
+		return
+	}
+
+	res.TaskName = pick.TaskName
+	res.OutTotal = 0
+	res.UnselectedTotal = 0
+	res.PickUser = pick.PickUser
+
+	res.TakeOrdersTime = pick.TakeOrdersTime
+	res.ReviewUser = pick.ReviewUser
+	res.ReviewTime = pick.ReviewTime
+
+	err, pickGoods = model.GetPickGoodsByPickIds(db, []int{form.PickId})
+
+	if err != nil {
+		return
+	}
+
+	pickGoodsSkuMp := make(map[string]rsp.MergePickGoods, 0)
+	//相同sku合并处理
+	for _, goods := range pickGoods {
+		val, ok := pickGoodsSkuMp[goods.Sku]
+
+		paramsId := rsp.ParamsId{
+			PickGoodsId:  goods.Id,
+			OrderGoodsId: goods.OrderGoodsId,
+		}
+
+		if !ok {
+
+			pickGoodsSkuMp[goods.Sku] = rsp.MergePickGoods{
+				Id:          goods.Id,
+				Sku:         goods.Sku,
+				GoodsName:   goods.GoodsName,
+				GoodsType:   goods.GoodsType,
+				GoodsSpe:    goods.GoodsSpe,
+				Shelves:     goods.Shelves,
+				NeedNum:     goods.NeedNum,
+				CompleteNum: goods.CompleteNum,
+				ReviewNum:   goods.ReviewNum,
+				Unit:        goods.Unit,
+				ParamsId:    []rsp.ParamsId{paramsId},
+			}
+		} else {
+			val.NeedNum += goods.NeedNum
+			val.CompleteNum += goods.CompleteNum
+			val.ParamsId = append(val.ParamsId, paramsId)
+			pickGoodsSkuMp[goods.Sku] = val
+		}
+	}
+
+	goodsMap := make(map[string][]rsp.MergePickGoods, 0)
+
+	needTotal := 0
+	completeTotal := 0
+	for _, goods := range pickGoodsSkuMp {
+		completeTotal += goods.CompleteNum
+		needTotal += goods.NeedNum
+
+		goodsMap[goods.GoodsType] = append(goodsMap[goods.GoodsType], rsp.MergePickGoods{
+			Id:          goods.Id,
+			Sku:         goods.Sku,
+			GoodsName:   goods.GoodsName,
+			GoodsType:   goods.GoodsType,
+			GoodsSpe:    goods.GoodsSpe,
+			Shelves:     goods.Shelves,
+			NeedNum:     goods.NeedNum,
+			CompleteNum: goods.CompleteNum,
+			ReviewNum:   goods.ReviewNum,
+			Unit:        goods.Unit,
+			ParamsId:    goods.ParamsId,
+		})
+	}
+
+	res.ShopCode = pick.ShopCode
+	res.OutTotal = completeTotal
+	res.UnselectedTotal = needTotal - completeTotal
+
+	//按货架号排序
+	for s, goods := range goodsMap {
+
+		ret := rsp.MyMergePickGoods(goods)
+
+		sort.Sort(ret)
+
+		goodsMap[s] = ret
+	}
+
+	res.Goods = goodsMap
+
+	err, pickRemark = model.GetPickRemarkByPickId(db, form.PickId)
+
+	if err != nil {
+		return
+	}
+
+	list := []rsp.PickRemark{}
+	for _, remark := range pickRemark {
+		list = append(list, rsp.PickRemark{
+			Number:      remark.Number,
+			OrderRemark: remark.OrderRemark,
+			GoodsRemark: remark.GoodsRemark,
+		})
+	}
+
+	res.RemarkList = list
+
+	return
+}
+
+// 剩余数量
+func RemainingQuantity(db *gorm.DB, form req.RemainingQuantityForm) (err error, count int64) {
+	var (
+		batches  []model.Batch
+		batchIds []int
+	)
+
+	//批次进行中或暂停的单数量
+	err, batches = model.GetBatchListByTyp(db, form.Typ)
+
+	if err != nil {
+		return
+	}
+
+	for _, b := range batches {
+		batchIds = append(batchIds, b.Id)
+	}
+
+	if len(batchIds) > 0 {
+		err, count = model.CountPickRemainingQuantity(db, batchIds, model.ToBePickedStatus, form.Typ, form.PickUser)
+
+		if err != nil {
+			return
+		}
+
+		return
+	}
+
 	return
 }

@@ -79,8 +79,8 @@ func GetBatchByPk(db *gorm.DB, pk int) (err error, batch Batch) {
 }
 
 // 根据条件查找第一条数据
-func GetBatchFirst(db *gorm.DB, cond Batch) (err error, batch *Batch) {
-	err = db.Model(&Batch{}).Where(cond).First(batch).Error
+func GetBatchFirstByStatus(db *gorm.DB, status int) (err error, batch *Batch) {
+	err = db.Model(&Batch{}).Where("status = ?", status).First(&batch).Error
 	return
 }
 
@@ -98,7 +98,7 @@ func GetBatchListByTaskId(db *gorm.DB, taskId int) (err error, list []Batch) {
 // 快递批次进行中或暂停的单数量
 func GetBatchListByTyp(db *gorm.DB, typ int) (err error, list []Batch) {
 	err = db.Model(&Batch{}).
-		Where("typ = ? and ( status = 0 or status = 2 )", typ).
+		Where("typ = ? and ( status = ? or status = ? )", typ, BatchOngoingStatus, BatchSuspendStatus).
 		Find(&list).
 		Error
 

@@ -207,18 +207,34 @@ func CloseOrderAndGoodsList(db *gorm.DB) (err error, res []rsp.CloseOrderAndGood
 }
 
 // 关闭预拣池
-func ClosePrePick(tx *gorm.DB, closeGoodsMp map[int]int, taskId int) (err error, prePickGoodsIds []int) {
+func ClosePrePick(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId int) (err error, prePickGoodsIds []int) {
 	var (
 		prePickGoodsJoinPrePick []model.PrePickGoodsJoinPrePick
 		prePickGoodsUpdate      []model.PrePickGoods
 		prePickIds              []int
 		notCloseAllPrePickIds   []int
+		batchId                 int
+		batch                   model.Batch
 	)
 
 	//根据任务ID查询全部预拣池任务和预拣池商品数据
-	err, prePickGoodsJoinPrePick = model.GetPrePickGoodsJoinPrePickListByTaskId(tx, taskId)
+	err, prePickGoodsJoinPrePick = model.GetPrePickGoodsJoinPrePickListByTaskId(tx, taskId, number)
 
 	if err != nil {
+		return
+	}
+
+	//一个订单只会在一个进行中的任务里，且也只会在这个任务下的某一个批次中
+	batchId = prePickGoodsJoinPrePick[0].BatchId
+
+	err, batch = model.GetBatchByPk(tx, batchId)
+	if err != nil {
+		return
+	}
+
+	//不是暂停中的批次不处理[已结束的不能处理，会导致u8数据错误，进行中是处理前要把所有的批次暂停]
+	if batch.Status != model.BatchSuspendStatus {
+		err = errors.New(fmt.Sprintf("批次状态异常:%d", batch.Status))
 		return
 	}
 
@@ -375,7 +391,7 @@ func CloseOrderExecNew(db *gorm.DB, form req.CloseOrder) (err error) {
 
 	//校验是否所有批次全部暂停
 	//查询是否有进行中的批次
-	err, _ = model.GetBatchFirst(db, model.Batch{Status: model.BatchOngoingStatus})
+	err, _ = model.GetBatchFirstByStatus(db, model.BatchOngoingStatus)
 
 	//err 不是未找到数据
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -448,7 +464,7 @@ func CloseOrderHandle(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]
 	}
 
 	//批次数据处理
-	err, isCommit = BatchDataHandle(tx, closeGoodsMp, orderGoodsIds, taskId)
+	err, isCommit = BatchDataHandle(tx, closeGoodsMp, number, taskId)
 
 	if err != nil || isCommit {
 		return
@@ -485,10 +501,10 @@ func OrderDataHandle(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]i
 }
 
 // 批次数据处理
-func BatchDataHandle(tx *gorm.DB, closeGoodsMp map[int]int, orderGoodsIds []int, taskId int) (err error, isCommit bool) {
+func BatchDataHandle(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId int) (err error, isCommit bool) {
 	var prePickGoodsIds []int
 
-	err, prePickGoodsIds = ClosePrePick(tx, closeGoodsMp, taskId)
+	err, prePickGoodsIds = ClosePrePick(tx, closeGoodsMp, number, taskId)
 	if err != nil {
 		tx.Rollback()
 		return

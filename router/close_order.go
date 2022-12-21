@@ -19,8 +19,6 @@ func CloseOrderRoute(g *gin.RouterGroup) {
 		closeOrderGroup.GET("/closeOrderAndGoodsList", handler.CloseOrderAndGoodsList)
 		//关单处理
 		closeOrderGroup.POST("/closeOrderExec", handler.CloseOrderExec)
-		//异常关单处理
-		closeOrderGroup.POST("/closeOrderExecException", handler.CloseOrderExecException)
 		//
 		closeOrderGroup.GET("/testMsgQueue", handler.TestMsgQueue)
 	}
