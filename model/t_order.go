@@ -34,11 +34,6 @@ type Order struct {
 	OrderType         int       `gorm:"type:tinyint;default:1;comment:订单类型:1:新订单,2:拣货中,3:欠货单,4:已关闭"`
 	HasRemark         int       `gorm:"type:tinyint;default:1;comment:是否备注:1:否,2:是"`
 	LatestPickingTime *MyTime   `gorm:"type:datetime;default:null;comment:最近拣货时间"`
-
-	//PayTotal          int       `gorm:"type:int;default:0;comment:支付商品总数"`
-	//Picked            int       `gorm:"type:int;default:0;comment:已拣数量"`
-	//UnPicked          int       `gorm:"type:int;default:0;comment:未拣数量"`
-	//CloseNum          int       `gorm:"type:int;default:0;comment:关闭数量"`
 }
 
 const (

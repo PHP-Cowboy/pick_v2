@@ -247,6 +247,8 @@ func GetModelCloseOrderData(closeOrder rsp.CloseOrder, closeTotal, status int) (
 		City:             closeOrder.City,
 		District:         closeOrder.District,
 		Status:           status,
+		Applicant:        closeOrder.Applicant,
+		ApplyTime:        closeOrder.ApplyTime,
 	}
 
 	return

@@ -105,7 +105,7 @@ func OrderLimit(db *gorm.DB, form req.OrderLimitForm) (err error) {
 func TaskLimit(db *gorm.DB, form req.TaskLimitForm) error {
 
 	var (
-		outboundGoodsJoinOrder []model.OutboundGoodsJoinOrder
+		outboundGoodsJoinOrder []model.GoodsJoinOrder
 	)
 
 	result := db.Table("t_outbound_goods og").

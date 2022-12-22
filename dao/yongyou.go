@@ -282,15 +282,15 @@ func SubKeepNum(a string, b string, num int32) string {
 }
 
 // 推送u8 日志记录生成
-func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderJoinGoods []model.OrderJoinGoods, batchId int) (err error) {
-	mpOrderAndGoods := make(map[int]model.OrderJoinGoods, 0)
+func YongYouLog(tx *gorm.DB, pickGoods []model.PickGoods, orderJoinGoods []model.GoodsJoinOrder, batchId int) (err error) {
+	mpOrderAndGoods := make(map[int]model.GoodsJoinOrder, 0)
 
 	for _, order := range orderJoinGoods {
-		_, ok := mpOrderAndGoods[order.Id]
+		_, ok := mpOrderAndGoods[order.OrderGoodsId]
 		if ok {
 			continue
 		}
-		mpOrderAndGoods[order.Id] = order
+		mpOrderAndGoods[order.OrderGoodsId] = order
 	}
 
 	mpPgv := make(map[string]req.PickGoodsView, 0)

@@ -11,7 +11,7 @@ import (
 )
 
 // 生成集中拣货
-func CreateCentralizedPick(db *gorm.DB, outboundGoodsJoinOrder []model.OutboundGoodsJoinOrder, batchId int) error {
+func CreateCentralizedPick(db *gorm.DB, outboundGoodsJoinOrder []model.GoodsJoinOrder, batchId int) error {
 
 	mpCentralized := make(map[string]model.CentralizedPick, 0)
 

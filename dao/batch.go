@@ -162,7 +162,7 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 	var (
 		orderGoodsIds          []int
 		outboundGoods          []model.OutboundGoods
-		outboundGoodsJoinOrder []model.OutboundGoodsJoinOrder
+		outboundGoodsJoinOrder []model.GoodsJoinOrder
 		prePickIds             []int
 		prePicks               []model.PrePick
 		prePickGoods           []model.PrePickGoods
@@ -397,7 +397,7 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 		batch          model.Batch
 		picks          []model.Pick
 		pickGoods      []model.PickGoods
-		orderJoinGoods []model.OrderJoinGoods
+		orderJoinGoods []model.GoodsJoinOrder
 	)
 
 	err, batch = model.GetBatchByPk(db, form.Id)

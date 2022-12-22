@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// 如果这里修改了，join表最好也同步改掉
 type OutboundOrder struct {
 	TaskId            int       `gorm:"primaryKey;type:int(11);not null;comment:t_outbound_task表ID"`
 	Number            string    `gorm:"primaryKey;type:varchar(64);index;comment:订单编号"`

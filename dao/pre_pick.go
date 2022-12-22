@@ -26,7 +26,7 @@ func CreatePrePickLogic(
 	err error,
 	orderGoodsIds []int,
 	outboundGoods []model.OutboundGoods,
-	outboundGoodsJoinOrder []model.OutboundGoodsJoinOrder,
+	outboundGoodsJoinOrder []model.GoodsJoinOrder,
 	prePickIds []int,
 	prePicks []model.PrePick,
 	prePickGoods []model.PrePickGoods,

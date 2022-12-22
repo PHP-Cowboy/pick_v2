@@ -124,7 +124,7 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 		pick           model.Pick
 		pickGoods      []model.PickGoods
 		batch          model.Batch
-		orderJoinGoods []model.OrderJoinGoods
+		orderJoinGoods []model.GoodsJoinOrder
 	)
 
 	//根据id获取拣货数据
@@ -200,7 +200,7 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 			continue
 		}
 
-		pickGoodsId, mpOk := orderPickGoodsIdMp[info.Id]
+		pickGoodsId, mpOk := orderPickGoodsIdMp[info.OrderGoodsId]
 
 		if !mpOk {
 			continue
@@ -403,15 +403,7 @@ func TaskEndDeliveryUpdateOrders(
 	deliveryOrderNo model.GormList,
 ) (err error) {
 	var (
-		orderJoinGoods        []model.OrderJoinGoods
-		lackOrder             []model.Order                  //欠货订单
-		lackGoods             []model.OrderGoods             //欠货订单商品出库数据更新
-		completeOrder         []model.CompleteOrder          //完成订单
-		completeOrderDetail   []model.CompleteOrderDetail    //完成订单商品数据
-		completeIds           []int                          //完成订单id，删除订单使用
-		completeOrderGoodsIds []int                          //完成订单商品id，删订单商品数据使用
-		completeOrderMp       = make(map[string]struct{}, 0) //完成订单编号去重
-		lackOrderMp           = make(map[int]struct{}, 0)    //欠货订单 根据ID去重
+		orderJoinGoods []model.GoodsJoinOrder
 	)
 
 	//根据拣货订单编号查询 订单&&商品信息
@@ -453,113 +445,11 @@ func TaskEndDeliveryUpdateOrders(
 		}
 	}
 
-	now := time.Now()
+	err = OrderUpdateHandle(tx, orderJoinGoods, lackNumbersMap, nil, nil, deliveryOrderNo)
 
-	//最近拣货时间
-	pickTime := (*model.MyTime)(&now)
-
-	for _, goodsJoinOrder := range orderJoinGoods {
-
-		deliveryOrderNoArr := make(model.GormList, 0)
-
-		deliveryOrderNoArr = append(deliveryOrderNoArr, goodsJoinOrder.DeliveryOrderNo...)
-		deliveryOrderNoArr = append(deliveryOrderNoArr, deliveryOrderNo...)
-
-		//是否欠货单
-		_, lackNumbersMapOk := lackNumbersMap[goodsJoinOrder.Number]
-
-		if lackNumbersMapOk {
-
-			//欠货订单商品相关更新
-			lackGoods = append(lackGoods, model.OrderGoods{
-				Id:              goodsJoinOrder.OrderGoodsId,
-				Number:          goodsJoinOrder.Number,
-				LackCount:       goodsJoinOrder.LackCount,        //在上一次循环已经变更成 历史欠货数量 - 本次欠货数量了
-				OutCount:        goodsJoinOrder.OutCount,         //在上一次循环已经变更成 历史出库数量 + 本次出库数量了
-				Status:          model.OrderGoodsUnhandledStatus, //欠货，更新成未处理
-				DeliveryOrderNo: deliveryOrderNoArr,
-			})
-
-			//欠货订单去重
-			_, lackOrderMpOk := lackOrderMp[goodsJoinOrder.OrderId]
-
-			if lackOrderMpOk {
-				continue
-			}
-
-			//欠货订单
-			lackOrder = append(lackOrder, model.Order{
-				Id:                goodsJoinOrder.OrderId,
-				ShopId:            goodsJoinOrder.ShopId,
-				ShopName:          goodsJoinOrder.ShopName,
-				ShopType:          goodsJoinOrder.ShopType,
-				ShopCode:          goodsJoinOrder.ShopCode,
-				Number:            goodsJoinOrder.Number,
-				HouseCode:         goodsJoinOrder.HouseCode,
-				Line:              goodsJoinOrder.Line,
-				OrderType:         model.LackOrderType,
-				LatestPickingTime: pickTime,
-			})
-
-			lackOrderMp[goodsJoinOrder.OrderId] = struct{}{}
-		} else {
-
-			//完成订单详情
-			completeOrderDetail = append(completeOrderDetail, model.CompleteOrderDetail{
-				Number:          goodsJoinOrder.Number,
-				GoodsName:       goodsJoinOrder.GoodsName,
-				Sku:             goodsJoinOrder.Sku,
-				GoodsSpe:        goodsJoinOrder.GoodsSpe,
-				GoodsType:       goodsJoinOrder.GoodsType,
-				Shelves:         goodsJoinOrder.Shelves,
-				PayCount:        goodsJoinOrder.PayCount,
-				CloseCount:      goodsJoinOrder.CloseCount,
-				ReviewCount:     goodsJoinOrder.OutCount,
-				GoodsRemark:     goodsJoinOrder.GoodsRemark,
-				DeliveryOrderNo: deliveryOrderNoArr,
-			})
-
-			//完成订单商品id，删除完成订单商品数据
-			completeOrderGoodsIds = append(completeOrderGoodsIds, goodsJoinOrder.OrderGoodsId)
-
-			_, completeOrderMpOk := completeOrderMp[goodsJoinOrder.Number]
-
-			if completeOrderMpOk {
-				continue
-			}
-
-			//完成订单id，删除订单表完成订单
-			completeIds = append(completeIds, goodsJoinOrder.OrderId)
-
-			//完成订单
-			completeOrder = append(completeOrder, model.CompleteOrder{
-				Number:         goodsJoinOrder.Number,
-				OrderRemark:    goodsJoinOrder.OrderRemark,
-				ShopId:         goodsJoinOrder.ShopId,
-				ShopName:       goodsJoinOrder.ShopName,
-				ShopType:       goodsJoinOrder.ShopType,
-				ShopCode:       goodsJoinOrder.ShopCode,
-				Line:           goodsJoinOrder.Line,
-				DeliveryMethod: goodsJoinOrder.DistributionType,
-				Province:       goodsJoinOrder.Province,
-				City:           goodsJoinOrder.City,
-				District:       goodsJoinOrder.District,
-				PickTime:       pickTime,
-				PayAt:          goodsJoinOrder.PayAt,
-			})
-
-			completeOrderMp[goodsJoinOrder.Number] = struct{}{}
-		}
+	if err != nil {
+		return
 	}
-
-	//欠货订单更新字段
-	lackOrderValues := []string{"shop_id", "shop_name", "shop_type", "shop_code", "house_code", "line", "order_type", "latest_picking_time"}
-
-	//欠货商品更新字段
-	lackGoodsValues := []string{"lack_count", "out_count", "delivery_order_no", "status"}
-
-	//结束任务更新订单数据
-	err = UpdateOrders(tx, &lackOrder, &lackGoods, lackOrderValues, lackGoodsValues, &completeOrder, &completeOrderDetail, completeIds, completeOrderGoodsIds)
 
 	return
 }

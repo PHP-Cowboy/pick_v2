@@ -478,22 +478,14 @@ func OrderDataHandle(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]i
 	//关闭订单&&订单商品逻辑
 	err, isCommit = CloseGoodsAndOrderLogic(tx, number, typ, closeGoodsMp)
 
-	if err != nil {
-		return
-	}
-
-	if isCommit {
+	if err != nil || isCommit {
 		return
 	}
 
 	//关闭出库任务订单&&订单商品
 	err, isCommit, taskId = CloseTaskLogic(tx, number, typ, closeGoodsMp)
 
-	if err != nil {
-		return
-	}
-
-	if isCommit {
+	if err != nil || isCommit {
 		return
 	}
 
@@ -506,14 +498,12 @@ func BatchDataHandle(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskI
 
 	err, prePickGoodsIds = ClosePrePick(tx, closeGoodsMp, number, taskId)
 	if err != nil {
-		tx.Rollback()
 		return
 	}
 
 	err = ClosePick(tx, closeGoodsMp, prePickGoodsIds)
 
 	if err != nil {
-		tx.Rollback()
 		return
 	}
 	return

@@ -18,6 +18,9 @@ type CloseOrder struct {
 	OrderRemark      string  `gorm:"type:varchar(512);comment:订单备注"`
 	Typ              int     `gorm:"type:tinyint;default:1;comment:状态:1:部分关闭,2:全单关闭"`
 	Status           int     `gorm:"type:tinyint;default:1;comment:状态:1:处理中,2:已完成,3:异常"`
+	Applicant        string  `gorm:"type:varchar(64);comment:申请人"`
+	ApplyTime        *MyTime `gorm:"type:datetime;comment:申请时间"`
+	CloseUser        string  `gorm:"type:varchar(32);comment:关单处理人昵称"`
 }
 
 const (

@@ -44,8 +44,6 @@ type OutboundGoodsJoinOrder struct {
 	ShopCode          string   `gorm:"type:varchar(255);not null;comment:店铺编号"`
 	HouseCode         string   `gorm:"type:varchar(64);not null;comment:仓库编码"`
 	DistributionType  int      `gorm:"type:tinyint;comment:配送方式"`
-	GoodsNum          int      `gorm:"type:int;default:0;comment:下单商品总数"`
-	CloseNum          int      `gorm:"type:int;default:0;comment:关闭数量"`
 	Line              string   `gorm:"type:varchar(255);not null;comment:线路"`
 	Province          string   `gorm:"type:varchar(64);comment:省"`
 	City              string   `gorm:"type:varchar(64);comment:市"`
@@ -142,7 +140,7 @@ func GetOutboundGoodsListByPks(db *gorm.DB, taskId int, number string, sku []str
 	return
 }
 
-func GetOutboundGoodsJoinOrderList(db *gorm.DB, taskId int, number []string) (err error, list []OutboundGoodsJoinOrder) {
+func GetOutboundGoodsJoinOrderList(db *gorm.DB, taskId int, number []string) (err error, list []GoodsJoinOrder) {
 
 	err = db.Table("t_outbound_goods og").
 		Select("*").
@@ -154,7 +152,7 @@ func GetOutboundGoodsJoinOrderList(db *gorm.DB, taskId int, number []string) (er
 	return
 }
 
-func GetOutboundGoodsJoinOrderListByNumbers(db *gorm.DB, number []string) (err error, list []OutboundGoodsJoinOrder) {
+func GetOutboundGoodsJoinOrderListByNumbers(db *gorm.DB, number []string) (err error, list []GoodsJoinOrder) {
 
 	err = db.Table("t_outbound_goods og").
 		Select("*").
@@ -167,7 +165,7 @@ func GetOutboundGoodsJoinOrderListByNumbers(db *gorm.DB, number []string) (err e
 }
 
 // 根据任务ID查询出库任务订单&&订单商品数据
-func GetOutboundGoodsJoinOrderListByTaskId(db *gorm.DB, taskId int) (err error, list []OutboundGoodsJoinOrder) {
+func GetOutboundGoodsJoinOrderListByTaskId(db *gorm.DB, taskId int) (err error, list []GoodsJoinOrder) {
 	err = db.Table("t_outbound_goods og").
 		Select("*").
 		Joins("left join t_outbound_order oo on og.task_id = oo.task_id and og.number = oo.number").

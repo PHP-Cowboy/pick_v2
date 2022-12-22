@@ -63,6 +63,8 @@ type CloseOrder struct {
 	City             string           `json:"city"`              //市
 	District         string           `json:"district"`          //区
 	Typ              int              `json:"typ"`               //1.部分关闭,2.全单关闭,
+	Applicant        string           `json:"applicant"`         //申请人
+	ApplyTime        *model.MyTime    `json:"apply_time"`        //申请时间
 	GoodsInfo        []CloseGoodsInfo `json:"goods_info"`        //被关闭商品明细
 }
 

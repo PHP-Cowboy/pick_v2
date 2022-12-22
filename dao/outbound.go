@@ -12,6 +12,7 @@ import (
 	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"strings"
+	"time"
 )
 
 // 出库单任务列表
@@ -20,7 +21,7 @@ func OutboundTaskList(db *gorm.DB, form req.OutboundTaskListForm) (err error, re
 	var taskIds []int
 
 	if form.ShopId > 0 || form.Number != "" || form.Sku != "" {
-		var outboundOrderAndGoods []model.OutboundGoodsJoinOrder
+		var outboundOrderAndGoods []model.GoodsJoinOrder
 
 		orderDb := db.Table("t_outbound_goods og").
 			Select("task_id").
@@ -241,7 +242,7 @@ func OutboundOrderCount(db *gorm.DB, form req.OutboundOrderCountForm) (error, rs
 func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int) error {
 
 	var (
-		orderJoinGoods []model.OrderJoinGoods
+		orderJoinGoods []model.GoodsJoinOrder
 		mp             = make(map[string]int, 0) //空map，共用逻辑时使用，这里没什么用途
 	)
 
@@ -289,7 +290,7 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 }
 
 // 出库订单相关保存逻辑
-func OutboundOrderBatchSaveLogic(db *gorm.DB, taskId int, orderJoinGoods []model.OrderJoinGoods, mp map[string]int) error {
+func OutboundOrderBatchSaveLogic(db *gorm.DB, taskId int, orderJoinGoods []model.GoodsJoinOrder, mp map[string]int) error {
 	var (
 		outboundOrderMp = make(map[string]model.OutboundOrder, 0)             //出库订单map 以订单号为key，用于更新订单备注以及限发总数，然后存储
 		remarkMp        = make(map[string]struct{}, 0)                        //订单备注map，用于处理 订单是否有备注
@@ -797,7 +798,7 @@ func OutboundTaskAddOrder(db *gorm.DB, form req.OutboundTaskAddOrderForm) error 
 
 	var (
 		limitShipmentMp = make(map[string]int, 0)
-		orderList       []model.OrderJoinGoods
+		orderList       []model.GoodsJoinOrder
 	)
 
 	//限发
@@ -847,7 +848,7 @@ func GetTaskSkuNum(db *gorm.DB, form req.GetTaskSkuNumForm) (err error, num int)
 func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 
 	var (
-		outboundGoodsJoinOrder []model.OutboundGoodsJoinOrder
+		outboundGoodsJoinOrder []model.GoodsJoinOrder
 		outboundNumbers        []string //出库任务订单
 		orderGoods             []model.OrderGoods
 	)
@@ -895,6 +896,33 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 		}
 	}
 
+	//订单更新处理
+	err = OrderUpdateHandle(tx, outboundGoodsJoinOrder, lackNumbersMap, orderGoodsHistoryMp, orderPickTimeMp, nil)
+
+	if err != nil {
+		return
+	}
+
+	//更新出库任务订单为已完成
+	err = model.UpdateOutboundOrderByTaskIdAndNumbers(tx, taskId, outboundNumbers, map[string]interface{}{"order_type": model.OutboundOrderTypeComplete})
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+// 订单更新处理
+func OrderUpdateHandle(
+	tx *gorm.DB,
+	goodsJoinOrders []model.GoodsJoinOrder,
+	lackNumbersMap map[string]struct{},
+	orderGoodsHistoryMp map[int]model.HistoryOrderGoods,
+	orderPickTimeMp map[string]*model.MyTime,
+	deliveryOrderNo model.GormList,
+) (
+	err error,
+) {
 	var (
 		lackOrder             []model.Order                  //欠货订单
 		lackGoods             []model.OrderGoods             //欠货订单商品出库数据更新
@@ -906,37 +934,63 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 		lackOrderMp           = make(map[int]struct{}, 0)    //欠货订单ID去重
 	)
 
-	for _, goodsJoinOrder := range outboundGoodsJoinOrder {
-		//最近拣货时间
-		pickTime, orderPickTimeMpOk := orderPickTimeMp[goodsJoinOrder.Number]
+	var (
+		orderPickTimeMpOk bool
+		pickTime          *model.MyTime
+	)
 
-		if !orderPickTimeMpOk {
-			pickTime = nil
+	for _, goodsJoinOrder := range goodsJoinOrders {
+
+		//最近拣货时间 [确认出库时orderPickTimeMp传nil]
+		// 结束批次时，最近拣货时间取的任务中订单表的最近拣货时间
+		// 确认出库时，订单最近拣货时间为当前时间
+		if orderPickTimeMp != nil {
+			//结束批次时
+			//最近拣货时间
+			pickTime, orderPickTimeMpOk = orderPickTimeMp[goodsJoinOrder.Number]
+
+			if !orderPickTimeMpOk {
+				pickTime = nil
+			}
+		} else {
+			//确认出库时
+			now := time.Now()
+			//最近拣货时间
+			pickTime = (*model.MyTime)(&now)
 		}
 
-		//历史出库订单
-		//historyDeliveryOrderNoArr, orderGoodsDeliveryNumberMpOk := orderGoodsDeliveryNumberMp[goodsJoinOrder.OrderGoodsId]
-		orderGoodsHistory, orderGoodsHistoryMpOk := orderGoodsHistoryMp[goodsJoinOrder.OrderGoodsId]
-
-		historyDeliveryOrderNoArr := []string{}
-
-		if orderGoodsHistoryMpOk {
-			historyDeliveryOrderNoArr = orderGoodsHistory.DeliveryNumber
-		}
-
+		//出库单号
 		deliveryOrderNoArr := make(model.GormList, 0)
+		// 最近拣货时间 [确认出库时orderGoodsHistoryMp传nil]
+		// 结束批次时，读取的是订单商品表数据，这里可以取到历史出库单号
+		// 确认出库时，没有去读取历史出库单号，只是生成了本次的出库单号
+		if orderGoodsHistoryMp != nil {
+			//结束批次时
+			//历史出库订单
+			orderGoodsHistory, orderGoodsHistoryMpOk := orderGoodsHistoryMp[goodsJoinOrder.OrderGoodsId]
 
-		deliveryOrderNoArr = append(deliveryOrderNoArr, goodsJoinOrder.DeliveryOrderNo...)
-		deliveryOrderNoArr = append(deliveryOrderNoArr, historyDeliveryOrderNoArr...)
+			historyDeliveryOrderNoArr := []string{}
 
-		/*
-			出库任务中订单数据只有本次出库数量
-			历史出库数量在订单商品表数据中，这里先给他加进来
-			欠货数量不用处理，订单第一次进入任务只后再进入时，欠货数量已经是最新欠货数量了
-		*/
+			if orderGoodsHistoryMpOk {
+				historyDeliveryOrderNoArr = orderGoodsHistory.DeliveryNumber
+			}
 
-		//订单商品出货数量 = 历史出货数量 + 本次出货数量
-		goodsJoinOrder.OutCount += orderGoodsHistory.OutCount
+			deliveryOrderNoArr = append(deliveryOrderNoArr, goodsJoinOrder.DeliveryOrderNo...)
+			deliveryOrderNoArr = append(deliveryOrderNoArr, historyDeliveryOrderNoArr...)
+
+			/*
+				出库任务中订单数据只有本次出库数量
+				历史出库数量在订单商品表数据中，这里先给他加进来
+				欠货数量不用处理，订单第一次进入任务只后再进入时，欠货数量已经是最新欠货数量了
+			*/
+
+			//订单商品出货数量 = 历史出货数量 + 本次出货数量
+			goodsJoinOrder.OutCount += orderGoodsHistory.OutCount
+		} else {
+			//确认出库时
+			deliveryOrderNoArr = append(deliveryOrderNoArr, goodsJoinOrder.DeliveryOrderNo...)
+			deliveryOrderNoArr = append(deliveryOrderNoArr, deliveryOrderNo...)
+		}
 
 		//是否欠货单
 		_, lackNumbersMapOk := lackNumbersMap[goodsJoinOrder.Number]
@@ -1022,12 +1076,6 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 
 			completeOrderMp[goodsJoinOrder.Number] = struct{}{}
 		}
-	}
-
-	//更新出库任务订单为已完成
-	err = model.UpdateOutboundOrderByTaskIdAndNumbers(tx, taskId, outboundNumbers, map[string]interface{}{"order_type": model.OutboundOrderTypeComplete})
-	if err != nil {
-		return
 	}
 
 	//欠货订单更新字段

@@ -778,7 +778,7 @@ func PrintCallGet(c *gin.Context) {
 
 	for _, info := range orderJoinGoods {
 
-		pgs, ok := goodsMp[info.Id]
+		pgs, ok := goodsMp[info.OrderGoodsId]
 
 		if !ok {
 			continue

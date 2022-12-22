@@ -165,7 +165,7 @@ func CompletePick(db *gorm.DB, form req.CompletePickForm) (err error) {
 	var (
 		pick           model.Pick
 		pickGoods      []model.PickGoods
-		orderJoinGoods []model.OrderJoinGoods
+		orderJoinGoods []model.GoodsJoinOrder
 	)
 
 	err, pick = model.GetPickByPk(db, form.PickId)
@@ -315,7 +315,7 @@ func CompletePick(db *gorm.DB, form req.CompletePickForm) (err error) {
 			continue
 		}
 
-		pickGoodsId, mpOk := orderPickGoodsIdMp[info.Id]
+		pickGoodsId, mpOk := orderPickGoodsIdMp[info.OrderGoodsId]
 
 		if !mpOk {
 			continue
