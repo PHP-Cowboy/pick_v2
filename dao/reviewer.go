@@ -336,11 +336,20 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 
 	//批次已结束的复核出库要单独推u8
 	if batch.Status == model.BatchClosedStatus {
-		//批次结束时，要更新出库任务订单状态
-		//model.PickGoods{}
-
 		//如果出库任务已结束，则需要更新订单和订单商品表&&完成订单和完成订单表状态&&推送订货系统【前面已经更新了出库单相关数据】
-		var outboundTask model.OutboundTask
+		var (
+			outboundTask model.OutboundTask
+			picks        []model.Pick
+		)
+
+		err, picks = model.GetPickList(tx, &model.Pick{BatchId: batch.Id})
+
+		if err != nil {
+			return
+		}
+
+		//批次结束时，要更新出库任务订单状态
+		err = UpdateOutboundOrderLogic(tx, orderNumbers, batch.TaskId, pick.Id, picks)
 
 		//如果出库任务也结束了 则需要更新 订单和订单商品表&&完成订单和完成订单表状态
 		//出库任务的关闭必须要所有批次被关闭，所以这个可以写在批次结束判断内部
@@ -367,7 +376,9 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 			return
 		}
 
-		err = SendBatchMsgToPurchase(db, batch.Id, pick.Id)
+		//消息中处理了是否发送消息逻辑
+		err = SendBatchMsgToPurchase(db, batch.Id, pick.Id, picks)
+
 		if err != nil {
 			return
 		}
@@ -390,6 +401,54 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 			ShopId:          shopId,
 			Type:            1, // 1-全部打印 2-打印箱单 3-打印出库单 第一次全打，后边的前段选
 		})
+	}
+
+	return
+}
+
+func UpdateOutboundOrderLogic(tx *gorm.DB, numbers []string, taskId, pickId int, picks []model.Pick) (err error) {
+	var (
+		pickIds            []int
+		pickGoods          []model.PickGoods
+		notCompleteNumbers []string
+		updateNumbers      []string
+	)
+	//step1:查询当前批次已接单未复核完成的任务
+	for _, ps := range picks {
+		//确认出库中刚更新的数据立即查询可能数据还在缓存中，那边传递拣货ID过来，直接跳过，认为时拣货复核完成的。
+		if ps.Id == pickId {
+			continue
+		}
+
+		//拣货池有被接单且状态不是复核完成状态
+		if ps.PickUser != "" && ps.Status < model.ReviewCompletedStatus {
+			pickIds = append(pickIds, ps.Id)
+			break
+		}
+	}
+
+	//step2:查询任务中订单
+	if len(pickIds) > 0 {
+		err, pickGoods = model.GetPickGoodsByPickIds(tx, pickIds)
+
+		if err != nil {
+			return
+		}
+
+		for _, good := range pickGoods {
+			notCompleteNumbers = append(notCompleteNumbers, good.Number)
+		}
+
+		//去重
+		notCompleteNumbers = slice.UniqueSlice(notCompleteNumbers)
+		//本次出库订单号，且不在其他已接单未复核出库任务中的单号
+		updateNumbers = slice.Diff(numbers, notCompleteNumbers)
+
+		//step3:取出在本次拣货中但不在step2中查询到的订单编号里的单号，更新成已完成
+		err = model.UpdateOutboundOrderByTaskIdAndNumbers(tx, taskId, updateNumbers, map[string]interface{}{"order_type": model.OutboundOrderTypeComplete})
+		if err != nil {
+			return
+		}
 	}
 
 	return

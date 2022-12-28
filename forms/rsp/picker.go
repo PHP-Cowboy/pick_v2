@@ -35,6 +35,7 @@ type MergePickGoods struct {
 	NeedNum     int        `json:"need_num"`
 	CompleteNum int        `json:"complete_num"`
 	ReviewNum   int        `json:"review_num"`
+	CloseNum    int        `json:"close_num"`
 	Unit        string     `json:"unit"`
 	ParamsId    []ParamsId `json:"params_id"`
 }
@@ -90,4 +91,9 @@ type PickingRecord struct {
 	ReviewStatus     string        `json:"review_status"`
 	DistributionType int           `json:"distribution_type"`
 	IsRemark         bool          `json:"is_remark"`
+}
+
+type CustomsDeclarationReminderRsp struct {
+	Sku      string `json:"sku"`
+	CloseNum int    `json:"close_num"`
 }

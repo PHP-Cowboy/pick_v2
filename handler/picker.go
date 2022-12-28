@@ -231,3 +231,24 @@ func PickingRecordDetail(c *gin.Context) {
 
 	xsq_net.SucJson(c, res)
 }
+
+// 关单提醒
+func CustomsDeclarationReminder(c *gin.Context) {
+	var form req.CustomsDeclarationReminderForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err, res := dao.CustomsDeclarationReminder(global.DB, form)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.SucJson(c, res)
+}

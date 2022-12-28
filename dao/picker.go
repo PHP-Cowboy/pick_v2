@@ -629,3 +629,51 @@ func RemainingQuantity(db *gorm.DB, form req.RemainingQuantityForm) (err error, 
 
 	return
 }
+
+// 关单提醒
+func CustomsDeclarationReminder(db *gorm.DB, form req.CustomsDeclarationReminderForm) (err error, res []rsp.CustomsDeclarationReminderRsp) {
+	var (
+		pickGoods []model.PickGoods
+	)
+
+	err, pickGoods = model.GetPickGoodsByPickIds(db, []int{form.Id})
+
+	if err != nil {
+		return
+	}
+
+	pickGoodsSkuMp := make(map[string]rsp.MergePickGoods, 0)
+	//相同sku合并处理
+	for _, goods := range pickGoods {
+		val, ok := pickGoodsSkuMp[goods.Sku]
+
+		if !ok {
+			pickGoodsSkuMp[goods.Sku] = rsp.MergePickGoods{
+				NeedNum:  goods.NeedNum,
+				CloseNum: goods.CloseNum,
+			}
+		} else {
+			val.NeedNum += goods.NeedNum
+			val.CloseNum += goods.CloseNum
+			pickGoodsSkuMp[goods.Sku] = val
+		}
+	}
+
+	for _, val := range form.SkuNeedNum {
+		needNum, pickGoodsSkuMpOk := pickGoodsSkuMp[val.Sku]
+
+		if !pickGoodsSkuMpOk {
+			err = errors.New(fmt.Sprintf("sku:%s对应的拣货数据不存在", val.Sku))
+			return
+		}
+
+		if val.NeedNum > needNum.NeedNum {
+			res = append(res, rsp.CustomsDeclarationReminderRsp{
+				Sku:      val.Sku,
+				CloseNum: needNum.CloseNum,
+			})
+		}
+	}
+
+	return
+}

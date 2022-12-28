@@ -83,7 +83,7 @@ func OutboundTaskList(db *gorm.DB, form req.OutboundTaskListForm) (err error, re
 
 	res.Total = result.RowsAffected
 
-	result = localDb.Scopes(model.Paginate(form.Page, form.Size)).Find(&outboundTask)
+	result = localDb.Scopes(model.Paginate(form.Page, form.Size)).Order("id desc").Find(&outboundTask)
 
 	if result.Error != nil {
 		return result.Error, res
@@ -853,7 +853,7 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 		orderGoods             []model.OrderGoods
 	)
 
-	//查询任务全部订单&&商品;
+	//查询任务全部订单&&商品;[新订单和已完成]
 	err, outboundGoodsJoinOrder = model.GetOutboundGoodsJoinOrderListByTaskId(tx, taskId)
 
 	//订单最近拣货时间map
@@ -876,8 +876,9 @@ func EndOutboundTaskUpdateOrder(tx *gorm.DB, taskId int) (err error) {
 		}
 
 		outboundNumbers = append(outboundNumbers, o.Number)
-
 	}
+
+	outboundNumbers = slice.UniqueSlice(outboundNumbers)
 
 	//订单历史出库数据map
 	orderGoodsHistoryMp := make(map[int]model.HistoryOrderGoods, 0)
@@ -981,7 +982,7 @@ func OrderUpdateHandle(
 			/*
 				出库任务中订单数据只有本次出库数量
 				历史出库数量在订单商品表数据中，这里先给他加进来
-				欠货数量不用处理，订单第一次进入任务只后再进入时，欠货数量已经是最新欠货数量了
+				欠货数量不用处理，订单第一次进入任务之后再进入时，欠货数量已经是最新欠货数量了
 			*/
 
 			//订单商品出货数量 = 历史出货数量 + 本次出货数量

@@ -47,3 +47,13 @@ type PickingRecordDetailForm struct {
 type ConcentratedPickReceivingOrdersForm struct {
 	BatchId int `json:"batch_id" binding:"required"`
 }
+
+type CustomsDeclarationReminderForm struct {
+	Id         int          `json:"id"`
+	SkuNeedNum []SkuNeedNum `json:"sku_need_num"`
+}
+
+type SkuNeedNum struct {
+	Sku     string `json:"sku"`
+	NeedNum int    `json:"need_num"`
+}

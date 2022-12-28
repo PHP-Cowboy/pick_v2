@@ -500,8 +500,16 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 		return
 	}
 
-	//订货系统MQ交互逻辑
-	err = SendBatchMsgToPurchase(db, batch.Id, 0)
+	//结束批次时，如果批次中还有已接单未完成复核的任务先不发消息到订货系统
+	//复核出库时再发送消息到MQ
+	if len(picksMp) > 0 {
+		//订货系统MQ交互逻辑
+
+	}
+
+	//消息中处理了是否发送消息逻辑
+	err = SendBatchMsgToPurchase(db, batch.Id, 0, picks)
+
 	if err != nil {
 		tx.Rollback()
 		return
@@ -662,14 +670,7 @@ func SendMsgQueue(topic string, messages []string) error {
 }
 
 // 批次结束 || 确认出库 订货系统MQ交互逻辑
-func SendBatchMsgToPurchase(tx *gorm.DB, batchId int, pickId int) (err error) {
-	var picks []model.Pick
-
-	err, picks = model.GetPickList(tx, &model.Pick{BatchId: batchId})
-
-	if err != nil {
-		return
-	}
+func SendBatchMsgToPurchase(tx *gorm.DB, batchId int, pickId int, picks []model.Pick) (err error) {
 
 	var isSend = true
 
