@@ -334,12 +334,20 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 		return
 	}
 
+	//变更出库任务订单表最近拣货时间&&订单类型
+	err = model.OutboundOrderReplaceSave(tx, outboundOrder, []string{"latest_picking_time", "order_type"})
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
 	//批次已结束的复核出库要单独推u8
 	if batch.Status == model.BatchClosedStatus {
 		//如果出库任务已结束，则需要更新订单和订单商品表&&完成订单和完成订单表状态&&推送订货系统【前面已经更新了出库单相关数据】
 		var (
-			outboundTask model.OutboundTask
-			picks        []model.Pick
+			outboundTask    model.OutboundTask
+			picks           []model.Pick
+			reviewedNumbers []string
 		)
 
 		err, picks = model.GetPickList(tx, &model.Pick{BatchId: batch.Id})
@@ -349,7 +357,12 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 		}
 
 		//批次结束时，要更新出库任务订单状态
-		err = UpdateOutboundOrderLogic(tx, orderNumbers, batch.TaskId, pick.Id, picks)
+		err, reviewedNumbers = UpdateOutboundOrderLogic(tx, orderNumbers, batch.TaskId, pick.Id, picks)
+
+		if err != nil {
+			tx.Rollback()
+			return
+		}
 
 		//如果出库任务也结束了 则需要更新 订单和订单商品表&&完成订单和完成订单表状态
 		//出库任务的关闭必须要所有批次被关闭，所以这个可以写在批次结束判断内部
@@ -363,7 +376,7 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 		//任务是否结束
 		if outboundTask.Status == model.OutboundTaskStatusClosed {
 			//任务结束时出库更新订单
-			err = TaskEndDeliveryUpdateOrders(tx, orderNumbers, pickGoods, no)
+			err = TaskEndDeliveryUpdateOrders(tx, orderNumbers, reviewedNumbers, pickGoods, no)
 			if err != nil {
 				tx.Rollback()
 				return
@@ -377,19 +390,13 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 		}
 
 		//消息中处理了是否发送消息逻辑
-		err = SendBatchMsgToPurchase(db, batch.Id, pick.Id, picks)
+		err = SendBatchMsgToPurchase(batch.Id, pick.Id, picks)
 
 		if err != nil {
+			tx.Rollback()
 			return
 		}
 
-	}
-
-	//变更出库任务订单表最近拣货时间&&订单类型
-	err = model.OutboundOrderReplaceSave(tx, outboundOrder, []string{"latest_picking_time", "order_type"})
-	if err != nil {
-		tx.Rollback()
-		return
 	}
 
 	tx.Commit()
@@ -406,12 +413,11 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 	return
 }
 
-func UpdateOutboundOrderLogic(tx *gorm.DB, numbers []string, taskId, pickId int, picks []model.Pick) (err error) {
+func UpdateOutboundOrderLogic(tx *gorm.DB, numbers []string, taskId, pickId int, picks []model.Pick) (err error, reviewedNumbers []string) {
 	var (
 		pickIds            []int
 		pickGoods          []model.PickGoods
-		notCompleteNumbers []string
-		updateNumbers      []string
+		notReviewedNumbers []string
 	)
 	//step1:查询当前批次已接单未复核完成的任务
 	for _, ps := range picks {
@@ -436,20 +442,27 @@ func UpdateOutboundOrderLogic(tx *gorm.DB, numbers []string, taskId, pickId int,
 		}
 
 		for _, good := range pickGoods {
-			notCompleteNumbers = append(notCompleteNumbers, good.Number)
+			notReviewedNumbers = append(notReviewedNumbers, good.Number)
 		}
 
 		//去重
-		notCompleteNumbers = slice.UniqueSlice(notCompleteNumbers)
-		//本次出库订单号，且不在其他已接单未复核出库任务中的单号
-		updateNumbers = slice.Diff(numbers, notCompleteNumbers)
+		notReviewedNumbers = slice.UniqueSlice(notReviewedNumbers)
 
-		//step3:取出在本次拣货中但不在step2中查询到的订单编号里的单号，更新成已完成
-		err = model.UpdateOutboundOrderByTaskIdAndNumbers(tx, taskId, updateNumbers, map[string]interface{}{"order_type": model.OutboundOrderTypeComplete})
-		if err != nil {
-			return
-		}
 	}
+
+	if len(notReviewedNumbers) > 0 {
+		//本次出库订单号，且不在其他已接单未复核出库任务中的单号
+		numbers = slice.Diff(numbers, notReviewedNumbers)
+	}
+
+	//step3:取出在本次拣货中但不在step2中查询到的订单编号里的单号，更新成已完成
+
+	err = model.UpdateOutboundOrderByTaskIdAndNumbers(tx, taskId, numbers, map[string]interface{}{"order_type": model.OutboundOrderTypeComplete})
+	if err != nil {
+		return
+	}
+
+	reviewedNumbers = numbers
 
 	return
 }
@@ -457,7 +470,8 @@ func UpdateOutboundOrderLogic(tx *gorm.DB, numbers []string, taskId, pickId int,
 // 任务结束时出库更新订单
 func TaskEndDeliveryUpdateOrders(
 	tx *gorm.DB,
-	orderNumbers []string,
+	orderNumbers,
+	reviewedNumbers []string,
 	pickGoods []model.PickGoods,
 	deliveryOrderNo model.GormList,
 ) (err error) {
@@ -476,6 +490,8 @@ func TaskEndDeliveryUpdateOrders(
 	lackNumbersMap := make(map[string]struct{}, 0)
 	//订单复核数map
 	orderGoodsReviewMp := make(map[int]int, 0)
+	//已经完成复核的订单map,不在其他已接未复核完成的单里
+	reviewedNumbersMp := slice.SliceToMap(reviewedNumbers)
 
 	for _, pg := range pickGoods {
 		orderGoodsReviewMp[pg.OrderGoodsId] = pg.ReviewNum
@@ -498,8 +514,10 @@ func TaskEndDeliveryUpdateOrders(
 		//订单商品出货数量 = 历史出货数量 + 本次出货数量
 		orderJoinGoods[i].OutCount = good.OutCount + orderGoodsReviewNum
 
-		//商品还有欠货，即订单为欠货单
-		if lackCount > 0 {
+		_, reviewedNumbersMpOk := reviewedNumbersMp[good.Number]
+
+		//商品还有欠货,且当前单不在其他已接未复核完成的单里，即订单为欠货单
+		if lackCount > 0 && reviewedNumbersMpOk {
 			lackNumbersMap[good.Number] = struct{}{}
 		}
 	}

@@ -239,8 +239,17 @@ func BatchPickByParams(db *gorm.DB, form req.BatchPickForm, prePicks []model.Pre
 			//将传过来的id转换成map
 			idsMp := slice.SliceToMap(form.Ids)
 
+			//prePickGoodsIdsMap 解决刚更新的数据，查询数据不及时问题
+			prePickGoodsIdsMp := slice.SliceToMap(prePickGoodsIds)
+
 			//去除未处理的预拣池id
 			for _, good := range prePickGoods {
+				_, prePickGoodsIdsMpOk := prePickGoodsIdsMp[good.Id]
+
+				if prePickGoodsIdsMpOk {
+					continue
+				}
+
 				delete(idsMp, good.PrePickId)
 			}
 
@@ -283,7 +292,7 @@ func MergePick(db *gorm.DB, form req.MergePickForm) (err error) {
 		return
 	}
 
-	err = MergePickByParams(db, form, batch.Id)
+	err = MergePickByParams(db, form, batch.TaskId)
 
 	return
 }
@@ -404,8 +413,17 @@ func MergePickByParams(db *gorm.DB, form req.MergePickForm, taskId int) (err err
 		//将传过来的id转换成map
 		idsMp := slice.SliceToMap(form.Ids)
 
+		//prePickGoodsIdsMap 解决刚更新的数据，查询数据不及时问题
+		prePickGoodsIdsMp := slice.SliceToMap(prePickGoodsIds)
+
 		//去除未处理的预拣池id
 		for _, good := range prePickGoods {
+			_, prePickGoodsIdsMpOk := prePickGoodsIdsMp[good.Id]
+
+			if prePickGoodsIdsMpOk {
+				continue
+			}
+
 			delete(idsMp, good.PrePickId)
 		}
 

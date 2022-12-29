@@ -508,7 +508,7 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 	}
 
 	//消息中处理了是否发送消息逻辑
-	err = SendBatchMsgToPurchase(db, batch.Id, 0, picks)
+	err = SendBatchMsgToPurchase(batch.Id, 0, picks)
 
 	if err != nil {
 		tx.Rollback()
@@ -670,7 +670,7 @@ func SendMsgQueue(topic string, messages []string) error {
 }
 
 // 批次结束 || 确认出库 订货系统MQ交互逻辑
-func SendBatchMsgToPurchase(tx *gorm.DB, batchId int, pickId int, picks []model.Pick) (err error) {
+func SendBatchMsgToPurchase(batchId int, pickId int, picks []model.Pick) (err error) {
 
 	var isSend = true
 
