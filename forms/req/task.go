@@ -17,6 +17,12 @@ type GetPickDetailForm struct {
 	PickId int `json:"pick_id" form:"pick_id"`
 }
 
+type VoidExpressBillForm struct {
+}
+
+type ReprintExpressBillForm struct {
+}
+
 type ChangeNumReq struct {
 	Id  int  `json:"id" binding:"required"`
 	Num *int `json:"num" binding:"required"`

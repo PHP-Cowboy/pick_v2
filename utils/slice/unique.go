@@ -19,6 +19,19 @@ func UniqueSlice[T comparable](arr []T) []T {
 	return ret
 }
 
+func DelVal[T comparable](arr []T, val T) (ret []T) {
+
+	ret = make([]T, 0, len(arr))
+
+	for _, t := range arr {
+		if t != val {
+			ret = append(ret, t)
+		}
+	}
+
+	return
+}
+
 // map 转 slice
 func MapToSlice[T comparable](mp map[T]struct{}) (arr []T) {
 	for id, _ := range mp {

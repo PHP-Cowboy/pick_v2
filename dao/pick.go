@@ -613,3 +613,12 @@ func GetPickDetail(db *gorm.DB, form req.GetPickDetailForm) (err error, res rsp.
 
 	return
 }
+
+func VoidExpressBill(db *gorm.DB, form req.VoidExpressBillForm) (err error) {
+	_ = slice.DelVal([]string{"a", "b", "c"}, "c")
+	return
+}
+
+func ReprintExpressBill(db *gorm.DB, form req.ReprintExpressBillForm) (err error) {
+	return
+}

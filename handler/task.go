@@ -207,6 +207,48 @@ func GetPickDetail(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
+// 作废快递单
+func VoidExpressBill(c *gin.Context) {
+	var form req.VoidExpressBillForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err := dao.VoidExpressBill(global.DB, form)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+}
+
+// 重打快递单
+func ReprintExpressBill(c *gin.Context) {
+	var form req.ReprintExpressBillForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err := dao.ReprintExpressBill(global.DB, form)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+}
+
 // 集中拣货明细
 func CentralizedPickDetailPDA(c *gin.Context) {
 	var form req.CentralizedPickDetailPDAForm

@@ -13,6 +13,10 @@ func TaskRoute(g *gin.RouterGroup) {
 		taskGroup.GET("/list", handler.PickList)
 		//详情
 		taskGroup.GET("/pick_detail", handler.GetPickDetail)
+		//作废快递单
+		taskGroup.POST("/voidExpressBill", handler.VoidExpressBill)
+		//重打快递单
+		taskGroup.POST("/reprintExpressBill", handler.ReprintExpressBill)
 		//修改已出库件数
 		taskGroup.POST("/change_num", handler.ChangeNum)
 		//拣货置顶
