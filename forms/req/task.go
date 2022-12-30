@@ -21,6 +21,7 @@ type VoidExpressBillForm struct {
 }
 
 type ReprintExpressBillForm struct {
+	CourierNumber string `json:"courier_number"`
 }
 
 type ChangeNumReq struct {

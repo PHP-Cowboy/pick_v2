@@ -649,12 +649,14 @@ func CustomsDeclarationReminder(db *gorm.DB, form req.CustomsDeclarationReminder
 
 		if !ok {
 			pickGoodsSkuMp[goods.Sku] = rsp.MergePickGoods{
-				NeedNum:  goods.NeedNum,
-				CloseNum: goods.CloseNum,
+				NeedNum:   goods.NeedNum,
+				CloseNum:  goods.CloseNum,
+				GoodsName: goods.GoodsName,
 			}
 		} else {
 			val.NeedNum += goods.NeedNum
 			val.CloseNum += goods.CloseNum
+			val.GoodsName = goods.GoodsName
 			pickGoodsSkuMp[goods.Sku] = val
 		}
 	}
@@ -669,8 +671,9 @@ func CustomsDeclarationReminder(db *gorm.DB, form req.CustomsDeclarationReminder
 
 		if val.NeedNum > needNum.NeedNum {
 			res = append(res, rsp.CustomsDeclarationReminderRsp{
-				Sku:      val.Sku,
-				CloseNum: needNum.CloseNum,
+				Sku:       val.Sku,
+				CloseNum:  needNum.CloseNum,
+				GoodsName: needNum.GoodsName,
 			})
 		}
 	}

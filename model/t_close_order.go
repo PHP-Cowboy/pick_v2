@@ -1,33 +1,40 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+	"time"
+)
 
 // 关闭订单表
 type CloseOrder struct {
-	Base
-	Number           string  `gorm:"type:varchar(64);index;comment:订单编号"`
-	ShopName         string  `gorm:"type:varchar(64);not null;comment:店铺名称"`
-	PayAt            *MyTime `gorm:"type:datetime;comment:支付时间"`
-	PayTotal         int     `gorm:"type:int;default:0;comment:下单总数"`
-	NeedCloseTotal   int     `gorm:"type:int;default:0;comment:需关闭总数"`
-	ShopType         string  `gorm:"type:varchar(64);not null;comment:店铺类型"`
-	DistributionType int     `gorm:"type:tinyint;comment:配送方式"`
-	Province         string  `gorm:"type:varchar(64);comment:省"`
-	City             string  `gorm:"type:varchar(64);comment:市"`
-	District         string  `gorm:"type:varchar(64);comment:区"`
-	OrderRemark      string  `gorm:"type:varchar(512);comment:订单备注"`
-	Typ              int     `gorm:"type:tinyint;default:1;comment:状态:1:部分关闭,2:全单关闭"`
-	Status           int     `gorm:"type:tinyint;default:1;comment:状态:1:处理中,2:已完成,3:异常"`
-	Applicant        string  `gorm:"type:varchar(64);comment:申请人"`
-	ApplyTime        *MyTime `gorm:"type:datetime;comment:申请时间"`
-	CloseUser        string  `gorm:"type:varchar(32);comment:关单处理人昵称"`
+	Id               int       `gorm:"primaryKey;type:int(11) unsigned;comment:id"`
+	CreateTime       time.Time `gorm:"autoCreateTime;type:datetime;comment:创建时间"`
+	UpdateTime       time.Time `gorm:"autoCreateTime;type:datetime;comment:更新时间"`
+	DeleteTime       time.Time `gorm:"type:datetime;default:null;comment:删除时间"`
+	Number           string    `gorm:"type:varchar(64);index;comment:订单编号"`
+	ShopName         string    `gorm:"type:varchar(64);not null;comment:店铺名称"`
+	PayAt            *MyTime   `gorm:"type:datetime;comment:支付时间"`
+	PayTotal         int       `gorm:"type:int;default:0;comment:下单总数"`
+	NeedCloseTotal   int       `gorm:"type:int;default:0;comment:需关闭总数"`
+	ShopType         string    `gorm:"type:varchar(64);not null;comment:店铺类型"`
+	DistributionType int       `gorm:"type:tinyint;comment:配送方式"`
+	Province         string    `gorm:"type:varchar(64);comment:省"`
+	City             string    `gorm:"type:varchar(64);comment:市"`
+	District         string    `gorm:"type:varchar(64);comment:区"`
+	OrderRemark      string    `gorm:"type:varchar(512);comment:订单备注"`
+	Typ              int       `gorm:"type:tinyint;default:1;comment:状态:1:部分关闭,2:全单关闭"`
+	Status           int       `gorm:"type:tinyint;default:1;comment:状态:1:处理中,2:已完成,3:异常"`
+	Applicant        string    `gorm:"type:varchar(64);comment:申请人"`
+	ApplyTime        *MyTime   `gorm:"type:datetime;comment:申请时间"`
+	CloseUser        string    `gorm:"type:varchar(32);comment:关单处理人昵称"`
 }
 
 const (
-	CloseOrderStatus          = iota
+	_                         = iota
 	CloseOrderStatusPending   //处理中
 	CloseOrderStatusComplete  //已完成
 	CloseOrderStatusException //异常
+	CloseOrderStatusClosed    //任务关闭
 )
 
 const (

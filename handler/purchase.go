@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/apache/rocketmq-client-go/v2/consumer"
 	"github.com/apache/rocketmq-client-go/v2/primitive"
 	"github.com/gin-gonic/gin"
@@ -101,9 +102,10 @@ func TestCall(c *gin.Context) {
 func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (consumeRes consumer.ConsumeResult, err error) {
 
 	var (
-		number string
-		form   req.CloseOrderInfo
-		result rsp.CloseOrderRsp
+		number   string
+		form     req.CloseOrderInfo
+		result   rsp.CloseOrderRsp
+		isCommit bool
 	)
 
 	for i := range messages {
@@ -156,17 +158,15 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 		status = 2
 
 		var (
-			closeGoodsMp  = make(map[int]int, 0)
-			orderGoodsIds []int
+			closeGoodsMp = make(map[int]int, 0)
 		)
 
 		for _, info := range goodsInfo {
 			closeGoodsMp[info.ID] = info.CloseCount
-			orderGoodsIds = append(orderGoodsIds, info.ID)
 		}
 
 		//关闭订单逻辑处理
-		err = dao.CloseOrderHandle(tx, closeOrder.Number, closeOrder.Typ, closeGoodsMp, orderGoodsIds)
+		err, isCommit, _ = dao.OrderDataHandle(tx, closeOrder.Number, closeOrder.Typ, closeGoodsMp)
 		if err != nil {
 			tx.Rollback()
 			return consumer.ConsumeRetryLater, err
@@ -188,17 +188,15 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 			status = 2
 
 			var (
-				closeGoodsMp  = make(map[int]int, 0)
-				orderGoodsIds []int
+				closeGoodsMp = make(map[int]int, 0)
 			)
 
 			for _, info := range goodsInfo {
 				closeGoodsMp[info.ID] = info.CloseCount
-				orderGoodsIds = append(orderGoodsIds, info.ID)
 			}
 
 			//关闭订单逻辑处理
-			err = dao.CloseOrderHandle(tx, closeOrder.Number, closeOrder.Typ, closeGoodsMp, orderGoodsIds)
+			err, isCommit, _ = dao.OrderDataHandle(tx, closeOrder.Number, closeOrder.Typ, closeGoodsMp)
 			if err != nil {
 				tx.Rollback()
 				return consumer.ConsumeRetryLater, err
@@ -226,6 +224,15 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 	if err != nil {
 		tx.Rollback()
 		return consumer.ConsumeRetryLater, err
+	}
+
+	if isCommit {
+		err = dao.SendMsgQueue("close_order_result", []string{fmt.Sprintf("%s %s", modelCloseOrder.Number, modelCloseOrder.Number)})
+
+		if err != nil {
+			tx.Rollback()
+			return consumer.ConsumeRetryLater, err
+		}
 	}
 
 	tx.Commit()

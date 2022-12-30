@@ -206,6 +206,30 @@ func CloseOrderAndGoodsList(db *gorm.DB) (err error, res []rsp.CloseOrderAndGood
 	return
 }
 
+// 关闭关单任务
+func CloseCloseOrderTask(db *gorm.DB, form req.CloseCloseOrderTaskForm) (err error) {
+	var closeOrder model.CloseOrder
+
+	err, closeOrder = model.GetCloseOrderByPk(db, form.Id)
+
+	if err != nil {
+		return
+	}
+
+	if closeOrder.Status == model.CloseOrderStatusComplete {
+		err = errors.New("已完成任务不允许关闭")
+		return
+	}
+
+	err = model.UpdateCloseOrderByPk(db, form.Id, map[string]interface{}{"status": model.CloseOrderStatusClosed})
+
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 // 关闭预拣池
 func ClosePrePick(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId int) (err error, prePickGoodsIds []int) {
 	var (
@@ -321,32 +345,7 @@ func ClosePick(tx *gorm.DB, closeGoodsMp map[int]int, prePickGoodsIds []int) (er
 		return
 	}
 
-	//一个品可能被拣多次，但只有结束后才能进入新的任务、批次。
-	//更新拣货池id最大的 map[order_goods_id]id
-	//TODO 第二次拣货，只进入了预拣池时，这样更新的是第一次拣货的数据 预拣池返回map[order_good_id]pre_pick_id
-	pickCloseMp := make(map[int]int, 0)
-
 	for _, good := range pickGoods {
-
-		id, pickCloseMpOk := pickCloseMp[good.OrderGoodsId]
-
-		if !pickCloseMpOk || good.Id > id {
-			pickCloseMp[good.OrderGoodsId] = good.Id
-		}
-
-	}
-
-	for _, good := range pickGoods {
-		id, pickCloseMpOk := pickCloseMp[good.OrderGoodsId]
-
-		if !pickCloseMpOk {
-			err = errors.New("预拣池商品map异常")
-			return
-		}
-		//订单商品id与对应的预拣池id不匹配，则为历史预拣池数据，跳过
-		if id != good.Id {
-			continue
-		}
 
 		closeCount, closeGoodsMpOk := closeGoodsMp[good.OrderGoodsId]
 
@@ -356,7 +355,7 @@ func ClosePick(tx *gorm.DB, closeGoodsMp map[int]int, prePickGoodsIds []int) (er
 		}
 
 		updatePickGoodsData := model.PickGoods{
-			Base:     model.Base{Id: id},
+			Base:     model.Base{Id: good.Id},
 			NeedNum:  good.NeedNum - closeCount,
 			CloseNum: good.CloseNum + closeCount,
 		}
@@ -421,7 +420,7 @@ func CloseOrderExecNew(db *gorm.DB, form req.CloseOrder) (err error) {
 	for _, co := range closeOrders {
 		tx := db.Begin()
 
-		err = CloseOrderHandle(tx, co.Number, co.Typ, closeGoodsMp, orderGoodsIds)
+		err, _ = CloseOrderHandle(tx, co.Number, co.Typ, closeGoodsMp, orderGoodsIds)
 
 		if err != nil {
 			tx.Rollback()
@@ -436,7 +435,7 @@ func CloseOrderExecNew(db *gorm.DB, form req.CloseOrder) (err error) {
 			continue
 		}
 
-		err = SendMsgQueue("close_order_result", []string{co.Number})
+		err = SendMsgQueue("close_order_result", []string{fmt.Sprintf("%s %s", co.Number, co.Number)})
 
 		if err != nil {
 			tx.Rollback()
@@ -451,10 +450,10 @@ func CloseOrderExecNew(db *gorm.DB, form req.CloseOrder) (err error) {
 }
 
 // 关单处理
-func CloseOrderHandle(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]int, orderGoodsIds []int) (err error) {
+func CloseOrderHandle(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]int, orderGoodsIds []int) (err error, isCommit bool) {
 	var (
-		isCommit bool //用于判断是否提交事务，是否还需要继续执行后续流程
-		taskId   int
+		//isCommit bool //用于判断是否提交事务，是否还需要继续执行后续流程
+		taskId int
 	)
 
 	err, isCommit, taskId = OrderDataHandle(tx, number, typ, closeGoodsMp)
@@ -497,6 +496,7 @@ func BatchDataHandle(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskI
 	var prePickGoodsIds []int
 
 	err, prePickGoodsIds = ClosePrePick(tx, closeGoodsMp, number, taskId)
+
 	if err != nil {
 		return
 	}
@@ -506,6 +506,7 @@ func BatchDataHandle(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskI
 	if err != nil {
 		return
 	}
+
 	return
 }
 

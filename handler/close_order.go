@@ -73,6 +73,27 @@ func CloseOrderAndGoodsList(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
+// 关闭关单任务
+func CloseCloseOrderTask(c *gin.Context) {
+	var form req.CloseCloseOrderTaskForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err := dao.CloseCloseOrderTask(global.DB, form)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+}
+
 // 关单处理
 func CloseOrderExec(c *gin.Context) {
 	var form req.CloseOrder

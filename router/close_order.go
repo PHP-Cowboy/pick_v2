@@ -17,6 +17,8 @@ func CloseOrderRoute(g *gin.RouterGroup) {
 		closeOrderGroup.GET("/closeOrderDetail", handler.CloseOrderDetail)
 		//关闭订单&&详情列表
 		closeOrderGroup.GET("/closeOrderAndGoodsList", handler.CloseOrderAndGoodsList)
+		//关闭关单任务
+		closeOrderGroup.POST("/closeCloseOrderTask", handler.CloseCloseOrderTask)
 		//关单处理
 		closeOrderGroup.POST("/closeOrderExec", handler.CloseOrderExec)
 		//

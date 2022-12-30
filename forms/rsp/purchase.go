@@ -107,3 +107,8 @@ type OutGoods struct {
 	Number        string `json:"number"`
 	CkNumber      string `json:"ck_number"`
 }
+
+type CloseOrderResult struct {
+	Id  int `json:"id"`
+	Typ int `json:"typ"`
+}

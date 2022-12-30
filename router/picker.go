@@ -30,6 +30,6 @@ func PickerRoute(g *gin.RouterGroup) {
 		//拣货记录明细
 		pickerGroup.GET("/detail", handler.PickingRecordDetail)
 		//关单提醒
-		pickerGroup.GET("/customsDeclarationReminder", handler.CustomsDeclarationReminder)
+		pickerGroup.POST("/customsDeclarationReminder", handler.CustomsDeclarationReminder)
 	}
 }

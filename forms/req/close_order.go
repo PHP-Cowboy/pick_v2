@@ -14,6 +14,10 @@ type CloseOrder struct {
 	Number []string `json:"number"`
 }
 
+type CloseCloseOrderTaskForm struct {
+	Id int `json:"id" form:"id" binding:"required"`
+}
+
 type CloseOrderExecExceptionForm struct {
 	Number string `json:"number" binding:"required"`
 }

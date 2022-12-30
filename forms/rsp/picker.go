@@ -94,6 +94,7 @@ type PickingRecord struct {
 }
 
 type CustomsDeclarationReminderRsp struct {
-	Sku      string `json:"sku"`
-	CloseNum int    `json:"close_num"`
+	Sku       string `json:"sku"`
+	CloseNum  int    `json:"close_num"`
+	GoodsName string `json:"goods_name"`
 }
