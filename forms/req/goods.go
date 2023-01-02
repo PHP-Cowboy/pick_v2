@@ -37,6 +37,10 @@ type GetOrderDetailForm struct {
 	IsLack int    `json:"is_lack" form:"is_lack"`
 }
 
+type CommodityListForm struct {
+	Name string `json:"name" form:"name"`
+}
+
 type OrderShippingRecordReq struct {
 	DeliveryOrderNo []string `json:"delivery_order_no" form:"delivery_order_no"`
 }

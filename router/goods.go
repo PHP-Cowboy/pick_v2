@@ -14,7 +14,7 @@ func GoodsRoute(g *gin.RouterGroup) {
 		//明细
 		goodsGroup.GET("/detail", handler.GetOrderDetail)
 		//商品列表
-		goodsGroup.GET("/commodity_list", handler.CommodityList)
+		goodsGroup.POST("/commodity_list", handler.CommodityList)
 		//订单出货记录
 		goodsGroup.POST("/order_shipping_record", handler.OrderShippingRecord)
 		//订单出货记录明细

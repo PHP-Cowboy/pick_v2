@@ -169,6 +169,11 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 		prePickRemarks         []model.PrePickRemark
 	)
 
+	if len(form.Number) == 0 {
+		err := errors.New("订单编号不能为空")
+		return err
+	}
+
 	tx := db.Begin()
 
 	//生成批次

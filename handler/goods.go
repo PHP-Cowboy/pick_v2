@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -259,24 +258,20 @@ func GetOrderDetail(c *gin.Context) {
 
 // 商品列表
 func CommodityList(c *gin.Context) {
-	var result rsp.CommodityListRsp
+	var (
+		form   req.CommodityListForm
+		result rsp.CommodityListRsp
+	)
 
-	body, err := request.Post("api/v1/remote/shop/sku", nil)
-
-	if err != nil {
+	if err := c.ShouldBind(&form); err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
-	err = json.Unmarshal(body, &result)
+	err := request.Call("api/v1/remote/shop/sku", form, &result)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
-		return
-	}
-
-	if result.Code != 200 {
-		xsq_net.ErrorJSON(c, errors.New(result.Msg))
 		return
 	}
 
