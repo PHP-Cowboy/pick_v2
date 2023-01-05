@@ -382,10 +382,9 @@ func ClosePick(tx *gorm.DB, closeGoodsMp map[int]int, prePickGoodsIds []int) (er
 // 关单处理
 func CloseOrderExecNew(db *gorm.DB, form req.CloseOrder) (err error) {
 	var (
-		closeOrders   []model.CloseOrder
-		closeGoods    []model.CloseGoods
-		orderGoodsIds []int
-		closeGoodsMp  = make(map[int]int, 0)
+		closeOrders  []model.CloseOrder
+		closeGoods   []model.CloseGoods
+		closeGoodsMp = make(map[int]int, 0)
 	)
 
 	//校验是否所有批次全部暂停
@@ -412,15 +411,13 @@ func CloseOrderExecNew(db *gorm.DB, form req.CloseOrder) (err error) {
 	}
 
 	for _, good := range closeGoods {
-		orderGoodsIds = append(orderGoodsIds, good.OrderGoodsId)
-
 		closeGoodsMp[good.OrderGoodsId] = good.CloseCount
 	}
 
 	for _, co := range closeOrders {
 		tx := db.Begin()
 
-		err, _ = CloseOrderHandle(tx, co.Number, co.Typ, closeGoodsMp, orderGoodsIds)
+		err, _ = CloseOrderHandle(tx, co.Number, co.Typ, closeGoodsMp)
 
 		if err != nil {
 			tx.Rollback()
@@ -450,7 +447,7 @@ func CloseOrderExecNew(db *gorm.DB, form req.CloseOrder) (err error) {
 }
 
 // 关单处理
-func CloseOrderHandle(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]int, orderGoodsIds []int) (err error, isCommit bool) {
+func CloseOrderHandle(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]int) (err error, isCommit bool) {
 	var (
 		//isCommit bool //用于判断是否提交事务，是否还需要继续执行后续流程
 		taskId int
