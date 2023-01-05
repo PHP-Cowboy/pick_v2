@@ -14,8 +14,8 @@ type CloseOrder struct {
 	Number           string    `gorm:"type:varchar(64);index;comment:订单编号"`
 	ShopName         string    `gorm:"type:varchar(64);not null;comment:店铺名称"`
 	PayAt            *MyTime   `gorm:"type:datetime;comment:支付时间"`
-	PayTotal         int       `gorm:"type:int;default:0;comment:下单总数"`
-	NeedCloseTotal   int       `gorm:"type:int;default:0;comment:需关闭总数"`
+	PayTotal         int       `gorm:"type:int(11);default:0;comment:下单总数"`
+	NeedCloseTotal   int       `gorm:"type:int(11);default:0;comment:需关闭总数"`
 	ShopType         string    `gorm:"type:varchar(64);not null;comment:店铺类型"`
 	DistributionType int       `gorm:"type:tinyint;comment:配送方式"`
 	Province         string    `gorm:"type:varchar(64);comment:省"`

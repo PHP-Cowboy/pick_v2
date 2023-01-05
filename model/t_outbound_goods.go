@@ -19,15 +19,15 @@ type OutboundGoods struct {
 	GoodsType       string    `gorm:"type:varchar(64);comment:商品类型"`
 	GoodsSpe        string    `gorm:"type:varchar(128);comment:商品规格"`
 	Shelves         string    `gorm:"type:varchar(64);comment:货架"`
-	DiscountPrice   int       `gorm:"comment:折扣价"`
+	DiscountPrice   int       `gorm:"type:int(11);comment:折扣价"`
 	GoodsUnit       string    `gorm:"type:varchar(64);comment:商品单位"`
 	SaleUnit        string    `gorm:"type:varchar(64);comment:销售单位"`
 	SaleCode        string    `gorm:"comment:销售编码"`
-	PayCount        int       `gorm:"comment:下单数量"`
-	CloseCount      int       `gorm:"type:int;default:0;comment:关闭数量"`
-	LackCount       int       `gorm:"type:int;comment:欠货数量"`
-	OutCount        int       `gorm:"type:int;comment:出库数量"`
-	LimitNum        int       `gorm:"type:int;default:0;comment:限发数量"`
+	PayCount        int       `gorm:"type:int(11);comment:下单数量"`
+	CloseCount      int       `gorm:"type:int(11);default:0;comment:关闭数量"`
+	LackCount       int       `gorm:"type:int(11);comment:欠货数量"`
+	OutCount        int       `gorm:"type:int(11);comment:出库数量"`
+	LimitNum        int       `gorm:"type:int(11);default:0;comment:限发数量"`
 	GoodsRemark     string    `gorm:"type:varchar(255);comment:商品备注"`
 	Status          int       `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:拣货中,2:已出库"`
 	DeliveryOrderNo GormList  `gorm:"type:varchar(255);comment:出库单号"`
@@ -62,11 +62,11 @@ type OutboundGoodsJoinOrder struct {
 	GoodsType         string   `gorm:"type:varchar(64);comment:商品类型"`
 	GoodsSpe          string   `gorm:"type:varchar(128);comment:商品规格"`
 	Shelves           string   `gorm:"type:varchar(64);comment:货架"`
-	DiscountPrice     int      `gorm:"comment:折扣价"`
+	DiscountPrice     int      `gorm:"type:int;comment:折扣价"`
 	GoodsUnit         string   `gorm:"type:varchar(64);comment:商品单位"`
 	SaleUnit          string   `gorm:"type:varchar(64);comment:销售单位"`
-	SaleCode          string   `gorm:"comment:销售编码"`
-	PayCount          int      `gorm:"comment:下单数量"`
+	SaleCode          string   `gorm:"type:varchar(255);comment:销售编码"`
+	PayCount          int      `gorm:"type:int;comment:下单数量"`
 	CloseCount        int      `gorm:"type:int;default:0;comment:关闭数量"`
 	LackCount         int      `gorm:"type:int;comment:欠货数量"`
 	OutCount          int      `gorm:"type:int;comment:出库数量"`

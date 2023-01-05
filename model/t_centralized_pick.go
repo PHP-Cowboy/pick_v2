@@ -12,14 +12,14 @@ type CentralizedPick struct {
 	GoodsType      string  `gorm:"type:varchar(64);comment:商品类型"`
 	GoodsSpe       string  `gorm:"type:varchar(128);comment:商品规格"`
 	Shelves        string  `gorm:"type:varchar(64);comment:货架"`
-	NeedNum        int     `gorm:"type:int;default:0;comment:需拣数量"`
-	CompleteNum    int     `gorm:"type:int;default:0;comment:拣货数量"`
+	NeedNum        int     `gorm:"type:int(11);default:0;comment:需拣数量"`
+	CompleteNum    int     `gorm:"type:int(11);default:0;comment:拣货数量"`
 	PickUser       string  `gorm:"type:varchar(32);default:'';comment:拣货人"`
 	TakeOrdersTime *MyTime `gorm:"type:datetime;default:null;comment:接单时间"`
 	GoodsRemark    string  `gorm:"type:varchar(255);comment:商品备注"`
 	GoodsUnit      string  `gorm:"type:varchar(64);comment:商品单位"`
 	Status         int     `gorm:"type:tinyint;comment:状态:0:待拣货,1:已完成"`
-	Version        int     `gorm:"type:int;default:0;comment:版本"`
+	Version        int     `gorm:"type:int(11);default:0;comment:版本"`
 	Sort           int     `gorm:"type:int(11) unsigned;comment:排序"`
 }
 

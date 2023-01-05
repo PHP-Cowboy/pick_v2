@@ -22,15 +22,8 @@ type Batch struct {
 	Status            int     `gorm:"type:tinyint;comment:状态:0:进行中,1:已结束,2:暂停"`
 	Sort              int     `gorm:"type:int(11) unsigned;comment:排序"`
 	PayEndTime        *MyTime `gorm:"type:datetime;comment:支付截止时间"`
-	Version           int     `gorm:"type:int;default:0;comment:版本"`
+	Version           int     `gorm:"type:int(11);default:0;comment:版本"`
 	Typ               int     `gorm:"type:tinyint;default:1;comment:批次类型:1:常规批次,2:快递批次"`
-
-	//ShopNum         int `gorm:"type:int(11);comment:门店数量"`
-	//OrderNum        int `gorm:"type:int(11);comment:订单数量"`
-	//GoodsNum        int `gorm:"type:int(11);comment:商品数量"`
-	//PrePickNum      int `gorm:"type:tinyint;comment:预拣单数"`
-	//PickNum         int `gorm:"type:tinyint;comment:拣货单数"`
-	//RecheckSheetNum int `gorm:"type:tinyint;comment:复核单数"`
 }
 
 const (

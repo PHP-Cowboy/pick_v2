@@ -21,11 +21,11 @@ type PrePickGoods struct {
 	GoodsSpe         string `gorm:"type:varchar(128);comment:商品规格"`
 	Unit             string `gorm:"type:varchar(64);comment:单位"`
 	Shelves          string `gorm:"type:varchar(64);comment:货架"`
-	DiscountPrice    int    `gorm:"comment:折扣价"`
-	NeedNum          int    `gorm:"type:int;not null;comment:需拣数量"`
-	CloseNum         int    `gorm:"type:int;not null;comment:关闭数量"`
-	OutCount         int    `gorm:"type:int;comment:出库数量"`
-	NeedOutNum       int    `gorm:"type:int;comment:需出库数量"`
+	DiscountPrice    int    `gorm:"type:int(11);comment:折扣价"`
+	NeedNum          int    `gorm:"type:int(11);not null;comment:需拣数量"`
+	CloseNum         int    `gorm:"type:int(11);not null;comment:关闭数量"`
+	OutCount         int    `gorm:"type:int(11);comment:出库数量"`
+	NeedOutNum       int    `gorm:"type:int(11);comment:需出库数量"`
 	Status           int    `gorm:"type:tinyint;default:0;comment:状态:0:未处理,1:已进入拣货池,2:关闭"`
 	Typ              int    `gorm:"type:tinyint;default:1;comment:批次类型:1:常规批次,2:快递批次"`
 }

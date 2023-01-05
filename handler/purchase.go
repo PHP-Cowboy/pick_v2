@@ -7,16 +7,12 @@ import (
 	"fmt"
 	"github.com/apache/rocketmq-client-go/v2/consumer"
 	"github.com/apache/rocketmq-client-go/v2/primitive"
-	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
 	"pick_v2/dao"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
 	"pick_v2/model"
-	"pick_v2/utils/ecode"
 	"pick_v2/utils/request"
-	"pick_v2/utils/xsq_net"
 )
 
 func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.ConsumeResult, error) {
@@ -38,7 +34,7 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 	orderRsp, err := GetOrderInfo(form)
 
 	if err != nil {
-		global.Logger["err"].Infof(err.Error())
+		global.Logger["err"].Infof("获取订单信息失败,错误信息:%s", err.Error())
 		return consumer.ConsumeRetryLater, err
 	}
 
@@ -51,52 +47,17 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 		} else {
 			return dao.Shipping(db, form, info)
 		}
+
 	}
 
 	return consumer.ConsumeRetryLater, errors.New("异常")
 }
 
-func GetOrderInfo(responseData interface{}) (rsp.OrderRsp, error) {
-	var result rsp.OrderRsp
+func GetOrderInfo(responseData interface{}) (result rsp.OrderRsp, err error) {
 
-	body, err := request.Post("api/v1/remote/get/goods/by/id", responseData)
+	err = request.Call("api/v1/remote/get/goods/by/id", responseData, &result)
 
-	if err != nil {
-		return result, err
-	}
-
-	err = json.Unmarshal(body, &result)
-
-	if err != nil {
-		return result, err
-	}
-
-	if result.Code != 200 {
-		return result, errors.New(result.Msg)
-	}
-
-	return result, nil
-}
-
-func TestCall(c *gin.Context) {
-	var (
-		form   req.PurchaseOrderForm
-		result rsp.OrderRsp
-	)
-
-	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
-
-	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
-		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
-		return
-	}
-
-	err := request.Call("api/v1/remote/get/goods/by/id", form, &result)
-	if err != nil {
-		xsq_net.ErrorJSON(c, err)
-		return
-	}
-	xsq_net.SucJson(c, result.Data)
+	return
 }
 
 func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (consumeRes consumer.ConsumeResult, err error) {
