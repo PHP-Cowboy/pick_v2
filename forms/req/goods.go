@@ -6,7 +6,7 @@ type PurchaseOrderForm struct {
 }
 
 type CloseOrderInfo struct {
-	Number []string `json:"number"`
+	OccId int `json:"occ_id"`
 }
 
 type GoodsListForm struct {

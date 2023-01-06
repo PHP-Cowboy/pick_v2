@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/apache/rocketmq-client-go/v2/consumer"
 	"github.com/apache/rocketmq-client-go/v2/primitive"
+	"gorm.io/gorm"
 	"pick_v2/dao"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
@@ -63,34 +63,44 @@ func GetOrderInfo(responseData interface{}) (result rsp.OrderRsp, err error) {
 func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (consumeRes consumer.ConsumeResult, err error) {
 
 	var (
-		number   string
-		form     req.CloseOrderInfo
-		result   rsp.CloseOrderRsp
-		isCommit bool
+		form       req.CloseOrderInfo
+		result     rsp.CloseOrderRsp
+		isCommit   bool
+		closeOrder model.CloseOrder
 	)
 
 	for i := range messages {
-		err = json.Unmarshal(messages[i].Body, &number)
+		err = json.Unmarshal(messages[i].Body, &form.OccId)
 		if err != nil {
 			global.Logger["err"].Infof("解析json失败:%s", err.Error())
 			return consumer.ConsumeRetryLater, nil
 		}
-		form.Number = append(form.Number, number)
+	}
+
+	db := global.DB
+
+	err, closeOrder = model.GetCloseOrderByPk(db, form.OccId)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return consumer.ConsumeRetryLater, err
+	}
+
+	if closeOrder.Id > 0 {
+		return consumer.ConsumeSuccess, errors.New("对应的关单任务已存在")
 	}
 
 	//调用订货系统接口
-	err = request.Call("api/v1/close/info", form, &result)
+	err = request.Call("api/v1/remote/close/info/v2", form, &result)
 
 	if err != nil {
 		global.Logger["err"].Infof("接口调用失败:%s", err.Error())
 		return consumer.ConsumeRetryLater, nil
 	}
 
-	closeOrder := result.Data
+	closeOrderRes := result.Data
 
-	goodsInfo := closeOrder.GoodsInfo
+	goodsInfo := closeOrderRes.GoodsInfo
 
-	if closeOrder.Number == "" {
+	if closeOrderRes.Number == "" {
 		return consumer.ConsumeSuccess, errors.New("订货系统查询订单数据不存在")
 	}
 
@@ -102,10 +112,10 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 		order model.Order
 	)
 
-	tx := global.DB.Begin()
+	tx := db.Begin()
 
 	//订单状态
-	err, order = model.GetOrderByNumber(tx, closeOrder.Number)
+	err, order = model.GetOrderByNumber(tx, closeOrderRes.Number)
 
 	if err != nil {
 		return
@@ -123,11 +133,11 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 		)
 
 		for _, info := range goodsInfo {
-			closeGoodsMp[info.ID] = info.CloseCount
+			closeGoodsMp[info.ID] = info.NeedCloseCount
 		}
 
 		//关闭订单逻辑处理
-		err, isCommit, _ = dao.OrderDataHandle(tx, closeOrder.Number, closeOrder.Typ, closeGoodsMp)
+		err, isCommit, _ = dao.OrderDataHandle(tx, closeOrderRes.OccId, closeOrderRes.Number, closeOrderRes.Typ, closeGoodsMp)
 		if err != nil {
 			tx.Rollback()
 			return consumer.ConsumeRetryLater, err
@@ -137,7 +147,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 		//不是新订单,查询是否在任务中是新订单
 		var outboundOrder model.OutboundOrder
 
-		err, outboundOrder = model.GetOutboundOrderByNumberFirstSortByTaskId(tx, closeOrder.Number)
+		err, outboundOrder = model.GetOutboundOrderByNumberFirstSortByTaskId(tx, closeOrderRes.Number)
 
 		if err != nil {
 			return
@@ -153,11 +163,11 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 			)
 
 			for _, info := range goodsInfo {
-				closeGoodsMp[info.ID] = info.CloseCount
+				closeGoodsMp[info.ID] = info.NeedCloseCount
 			}
 
 			//关闭订单逻辑处理
-			err, isCommit, _ = dao.OrderDataHandle(tx, closeOrder.Number, closeOrder.Typ, closeGoodsMp)
+			err, isCommit, _ = dao.OrderDataHandle(tx, closeOrderRes.OccId, closeOrderRes.Number, closeOrderRes.Typ, closeGoodsMp)
 			if err != nil {
 				tx.Rollback()
 				return consumer.ConsumeRetryLater, err
@@ -168,10 +178,10 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 
 	closeTotal := GetCloseTotal(goodsInfo)
 
-	modelCloseOrder := GetModelCloseOrderData(closeOrder, closeTotal, status)
+	modelCloseOrder := GetModelCloseOrderData(closeOrderRes, closeTotal, status)
 
 	//需关闭总数
-	err = model.SaveCloseOrder(tx, modelCloseOrder)
+	err = model.CloseOrderReplaceSave(tx, modelCloseOrder, []string{"shop_name", "shop_type"})
 
 	if err != nil {
 		tx.Rollback()
@@ -188,7 +198,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 	}
 
 	if isCommit {
-		err = dao.SendMsgQueue("close_order_result", []string{fmt.Sprintf("%s %s", modelCloseOrder.Number, modelCloseOrder.Number)})
+		err = dao.CloseOrderResult(modelCloseOrder.Id, 1)
 
 		if err != nil {
 			tx.Rollback()
@@ -203,6 +213,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 
 func GetModelCloseOrderData(closeOrder rsp.CloseOrder, closeTotal, status int) (modelCloseOrder *model.CloseOrder) {
 	modelCloseOrder = &model.CloseOrder{
+		Id:               closeOrder.OccId,
 		Number:           closeOrder.Number,
 		ShopName:         closeOrder.ShopName,
 		ShopType:         closeOrder.ShopType,

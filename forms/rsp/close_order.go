@@ -61,3 +61,8 @@ type CloseOrderAndGoodsList struct {
 	OrderRemark string           `json:"order_remark"`
 	List        []CloseGoodsList `json:"list"`
 }
+
+type CloseTips struct {
+	Colour string `json:"colour"`
+	Tips   string `json:"tips"`
+}

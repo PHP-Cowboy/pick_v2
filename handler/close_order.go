@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"pick_v2/dao"
@@ -106,18 +105,6 @@ func CloseOrderExec(c *gin.Context) {
 	}
 
 	err := dao.CloseOrderExecNew(global.DB, form)
-
-	if err != nil {
-		xsq_net.ErrorJSON(c, err)
-		return
-	}
-
-	xsq_net.Success(c)
-}
-
-func TestMsgQueue(c *gin.Context) {
-
-	err := errors.New("err")
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)

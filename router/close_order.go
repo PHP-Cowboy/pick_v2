@@ -21,8 +21,6 @@ func CloseOrderRoute(g *gin.RouterGroup) {
 		closeOrderGroup.POST("/closeCloseOrderTask", handler.CloseCloseOrderTask)
 		//关单处理
 		closeOrderGroup.POST("/closeOrderExec", handler.CloseOrderExec)
-		//
-		closeOrderGroup.GET("/testMsgQueue", handler.TestMsgQueue)
 	}
 
 }

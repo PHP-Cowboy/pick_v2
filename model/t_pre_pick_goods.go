@@ -155,7 +155,7 @@ func GetPrePickGoodsJoinPrePickListByTaskId(db *gorm.DB, taskId int, number stri
 	err = db.Table("t_pre_pick_goods pg").
 		Select("pg.id as pre_pick_goods_id,pg.*,pp.id as pre_pick_id").
 		Joins("left join t_pre_pick pp on pg.pre_pick_id = pp.id").
-		Where(" pp.task_id = ? and pp.number = ?", taskId, number).
+		Where(" pp.task_id = ? and pg.number = ?", taskId, number).
 		Find(&list).
 		Error
 

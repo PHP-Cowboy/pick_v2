@@ -3,15 +3,20 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
+
 	"github.com/apache/rocketmq-client-go/v2"
 	"github.com/apache/rocketmq-client-go/v2/primitive"
 	"github.com/apache/rocketmq-client-go/v2/producer"
 	"github.com/spf13/viper"
-	"os"
-	"strconv"
 )
 
 func main() {
+
+	topicName := "close_order"
+	//topicName := "purchase_order"
+
 	v := viper.New()
 
 	v.SetConfigFile("mq.json")
@@ -46,11 +51,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	topic := "purchase_order"
-
 	for _, id := range orderIds.Ids {
 		msg := &primitive.Message{
-			Topic: topic,
+			Topic: topicName,
 			Body:  []byte(strconv.Itoa(id)),
 		}
 

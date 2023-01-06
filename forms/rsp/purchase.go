@@ -52,6 +52,7 @@ type CloseOrderRsp struct {
 }
 
 type CloseOrder struct {
+	OccId            int              `json:"occ_id"`
 	Number           string           `json:"number"`            //订单编号
 	ShopName         string           `json:"shop_name"`         //店铺名称
 	ShopType         string           `json:"shop_type"`         //店铺类型

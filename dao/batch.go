@@ -1,19 +1,14 @@
 package dao
 
 import (
-	"context"
 	"errors"
 	"strconv"
 	"strings"
 
-	"github.com/apache/rocketmq-client-go/v2"
-	"github.com/apache/rocketmq-client-go/v2/primitive"
-	"github.com/apache/rocketmq-client-go/v2/producer"
 	"gorm.io/gorm"
 
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
-	"pick_v2/global"
 	"pick_v2/middlewares"
 	"pick_v2/model"
 	"pick_v2/utils/ecode"
@@ -627,51 +622,6 @@ func GetBatchOrderAndGoods(db *gorm.DB, form req.GetBatchOrderAndGoodsForm) (err
 
 	res.List = list
 	return
-}
-
-// 推送批次信息到消息队列
-func SendMsgQueue(topic string, messages []string) error {
-	p, _ := rocketmq.NewProducer(
-		producer.WithNsResolver(primitive.NewPassthroughResolver([]string{global.ServerConfig.RocketMQ})),
-		producer.WithRetry(2),
-	)
-
-	err := p.Start()
-
-	if err != nil {
-		global.Logger["err"].Infof("start producer error: %s", err.Error())
-		return err
-	}
-
-	mq := make([]*primitive.Message, 0, len(messages))
-
-	for _, m := range messages {
-
-		msg := &primitive.Message{
-			Topic: topic,
-			Body:  []byte(m),
-		}
-
-		mq = append(mq, msg)
-	}
-
-	res, err := p.SendSync(context.Background(), mq...)
-
-	if err != nil {
-		global.Logger["err"].Infof("send message error: %s", err.Error())
-		return err
-	} else {
-		global.Logger["info"].Infof("send message success: result=%s", res.String())
-	}
-
-	err = p.Shutdown()
-
-	if err != nil {
-		global.Logger["err"].Infof("shutdown producer error: %s", err.Error())
-		return err
-	}
-
-	return nil
 }
 
 // 批次结束 || 确认出库 订货系统MQ交互逻辑

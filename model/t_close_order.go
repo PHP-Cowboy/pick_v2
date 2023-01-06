@@ -2,6 +2,7 @@ package model
 
 import (
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"time"
 )
 
@@ -27,6 +28,8 @@ type CloseOrder struct {
 	Applicant        string    `gorm:"type:varchar(64);comment:申请人"`
 	ApplyTime        *MyTime   `gorm:"type:datetime;comment:申请时间"`
 	CloseUser        string    `gorm:"type:varchar(32);comment:关单处理人昵称"`
+	Colour           string    `gorm:"type:varchar(32);comment:颜色"`
+	Tips             string    `gorm:"type:varchar(32);comment:提示"`
 }
 
 const (
@@ -43,8 +46,16 @@ const (
 	CloseOrderTypAll  //全单关闭
 )
 
-func SaveCloseOrder(db *gorm.DB, data *CloseOrder) (err error) {
-	err = db.Model(&CloseOrder{}).Save(data).Error
+func CloseOrderReplaceSave(db *gorm.DB, data *CloseOrder, values []string) (err error) {
+
+	err = db.Model(&CloseOrder{}).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns(values),
+		}).
+		Create(data).
+		Error
+
 	return
 }
 

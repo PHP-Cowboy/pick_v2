@@ -221,17 +221,29 @@ func CloseCloseOrderTask(db *gorm.DB, form req.CloseCloseOrderTaskForm) (err err
 		return
 	}
 
-	err = model.UpdateCloseOrderByPk(db, form.Id, map[string]interface{}{"status": model.CloseOrderStatusClosed})
+	tx := db.Begin()
+
+	err = model.UpdateCloseOrderByPk(tx, form.Id, map[string]interface{}{"status": model.CloseOrderStatusClosed})
 
 	if err != nil {
+		tx.Rollback()
 		return
 	}
+
+	err = CloseOrderResult(closeOrder.Id, 2)
+
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	tx.Commit()
 
 	return
 }
 
 // 关闭预拣池
-func ClosePrePick(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId int) (err error, prePickGoodsIds []int) {
+func ClosePrePick(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId int) (err error, prePickGoodsIds []int, tips rsp.CloseTips) {
 	var (
 		prePickGoodsJoinPrePick []model.PrePickGoodsJoinPrePick
 		prePickGoodsUpdate      []model.PrePickGoods
@@ -323,6 +335,11 @@ func ClosePrePick(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId i
 		}
 	}
 
+	tips = rsp.CloseTips{
+		Colour: "#67C23A",
+		Tips:   "预拣池订单关闭",
+	}
+
 	return
 }
 
@@ -332,12 +349,17 @@ func CloseCentralizedPick(tx *gorm.DB) (err error) {
 }
 
 // 关闭拣货池
-func ClosePick(tx *gorm.DB, closeGoodsMp map[int]int, prePickGoodsIds []int) (err error) {
+func ClosePick(tx *gorm.DB, closeGoodsMp map[int]int, prePickGoodsIds []int) (err error, tips rsp.CloseTips) {
 	var (
 		pickGoods       []model.PickGoods
 		pickGoodsUpdate []model.PickGoods
 		pickIds         []int
 	)
+
+	tips = rsp.CloseTips{
+		Colour: "#67C23A",
+		Tips:   "拣货池订单关闭",
+	}
 
 	err, pickGoods = model.GetPickGoodsByOrderGoodsIds(tx, prePickGoodsIds)
 
@@ -411,13 +433,15 @@ func CloseOrderExecNew(db *gorm.DB, form req.CloseOrder) (err error) {
 	}
 
 	for _, good := range closeGoods {
-		closeGoodsMp[good.OrderGoodsId] = good.CloseCount
+		closeGoodsMp[good.OrderGoodsId] = good.NeedCloseCount
 	}
+
+	var tips rsp.CloseTips
 
 	for _, co := range closeOrders {
 		tx := db.Begin()
 
-		err, _ = CloseOrderHandle(tx, co.Number, co.Typ, closeGoodsMp)
+		err, _, tips = CloseOrderHandle(tx, co.Id, co.Number, co.Typ, closeGoodsMp)
 
 		if err != nil {
 			tx.Rollback()
@@ -425,14 +449,18 @@ func CloseOrderExecNew(db *gorm.DB, form req.CloseOrder) (err error) {
 		}
 
 		//更新关单任务状态
-		err = model.UpdateCloseOrderByPk(tx, co.Id, map[string]interface{}{"status": model.CloseOrderStatusComplete})
+		err = model.UpdateCloseOrderByPk(tx, co.Id, map[string]interface{}{
+			"status": model.CloseOrderStatusComplete,
+			"colour": tips.Colour,
+			"tips":   tips.Tips,
+		})
 
 		if err != nil {
 			tx.Rollback()
 			continue
 		}
 
-		err = SendMsgQueue("close_order_result", []string{fmt.Sprintf("%s %s", co.Number, co.Number)})
+		err = CloseOrderResult(co.Id, 1)
 
 		if err != nil {
 			tx.Rollback()
@@ -447,20 +475,20 @@ func CloseOrderExecNew(db *gorm.DB, form req.CloseOrder) (err error) {
 }
 
 // 关单处理
-func CloseOrderHandle(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]int) (err error, isCommit bool) {
+func CloseOrderHandle(tx *gorm.DB, closeOrderId int, number string, typ int, closeGoodsMp map[int]int) (err error, isCommit bool, tips rsp.CloseTips) {
 	var (
 		//isCommit bool //用于判断是否提交事务，是否还需要继续执行后续流程
 		taskId int
 	)
 
-	err, isCommit, taskId = OrderDataHandle(tx, number, typ, closeGoodsMp)
+	err, isCommit, taskId, tips = OrderDataHandle(tx, closeOrderId, number, typ, closeGoodsMp)
 
 	if err != nil || isCommit {
 		return
 	}
 
 	//批次数据处理
-	err, isCommit = BatchDataHandle(tx, closeGoodsMp, number, taskId)
+	err, isCommit, tips = BatchDataHandle(tx, closeGoodsMp, number, taskId)
 
 	if err != nil || isCommit {
 		return
@@ -470,18 +498,26 @@ func CloseOrderHandle(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]
 }
 
 // 订单数据处理(包括订单相关表和任务订单相关表)
-func OrderDataHandle(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]int) (err error, isCommit bool, taskId int) {
+func OrderDataHandle(tx *gorm.DB, closeOrderId int, number string, typ int, closeGoodsMp map[int]int) (err error, isCommit bool, taskId int, tips rsp.CloseTips) {
 	//关闭订单&&订单商品逻辑
 	err, isCommit = CloseGoodsAndOrderLogic(tx, number, typ, closeGoodsMp)
 
 	if err != nil || isCommit {
+		tips = rsp.CloseTips{
+			Colour: "#67C23A",
+			Tips:   "新订单关闭完成",
+		}
 		return
 	}
 
 	//关闭出库任务订单&&订单商品
-	err, isCommit, taskId = CloseTaskLogic(tx, number, typ, closeGoodsMp)
+	err, isCommit, taskId = CloseTaskLogic(tx, closeOrderId, number, typ, closeGoodsMp)
 
 	if err != nil || isCommit {
+		tips = rsp.CloseTips{
+			Colour: "#67C23A",
+			Tips:   "任务中新订单关闭完成",
+		}
 		return
 	}
 
@@ -489,16 +525,16 @@ func OrderDataHandle(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]i
 }
 
 // 批次数据处理
-func BatchDataHandle(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId int) (err error, isCommit bool) {
+func BatchDataHandle(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId int) (err error, isCommit bool, tips rsp.CloseTips) {
 	var prePickGoodsIds []int
 
-	err, prePickGoodsIds = ClosePrePick(tx, closeGoodsMp, number, taskId)
+	err, prePickGoodsIds, tips = ClosePrePick(tx, closeGoodsMp, number, taskId)
 
 	if err != nil {
 		return
 	}
 
-	err = ClosePick(tx, closeGoodsMp, prePickGoodsIds)
+	err, tips = ClosePick(tx, closeGoodsMp, prePickGoodsIds)
 
 	if err != nil {
 		return
@@ -511,8 +547,9 @@ func BatchDataHandle(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskI
 func CloseGoodsAndOrderLogic(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]int) (err error, isCommit bool) {
 
 	var (
-		order      model.Order
-		orderGoods []model.OrderGoods
+		order            model.Order
+		orderGoods       []model.OrderGoods
+		updateOrderGoods []model.OrderGoods
 	)
 
 	err, order = model.GetOrderByNumber(tx, number)
@@ -538,12 +575,12 @@ func CloseGoodsAndOrderLogic(tx *gorm.DB, number string, typ int, closeGoodsMp m
 	}
 
 	//订单商品关闭
-	for i, og := range orderGoods {
+	for _, og := range orderGoods {
 		closeCount, closeGoodsMpOk := closeGoodsMp[og.Id]
 
 		if !closeGoodsMpOk {
-			err = errors.New("订单商品map异常")
-			return
+			//closeGoodsMp 是关闭订单中的商品信息，orderGoods是根据关闭订单的单号查询的商品
+			continue
 		}
 
 		if og.LackCount < closeCount {
@@ -551,11 +588,14 @@ func CloseGoodsAndOrderLogic(tx *gorm.DB, number string, typ int, closeGoodsMp m
 			return
 		}
 
-		orderGoods[i].CloseCount += closeCount
-		orderGoods[i].LackCount -= closeCount
+		updateOrderGoods = append(updateOrderGoods, model.OrderGoods{
+			Id:         og.Id,
+			CloseCount: og.CloseCount + closeCount,
+			LackCount:  og.LackCount - closeCount,
+		})
 	}
 
-	err = model.OrderGoodsReplaceSave(tx, &orderGoods, []string{"update_time", "lack_count", "close_count"})
+	err = model.OrderGoodsReplaceSave(tx, &updateOrderGoods, []string{"update_time", "lack_count", "close_count"})
 
 	if err != nil {
 		return
@@ -570,7 +610,7 @@ func CloseGoodsAndOrderLogic(tx *gorm.DB, number string, typ int, closeGoodsMp m
 }
 
 // 关闭任务订单以及商品逻辑
-func CloseTaskLogic(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]int) (err error, isCommit bool, taskId int) {
+func CloseTaskLogic(tx *gorm.DB, closeOrderId int, number string, typ int, closeGoodsMp map[int]int) (err error, isCommit bool, taskId int) {
 
 	var (
 		outboundOrder model.OutboundOrder
@@ -611,7 +651,7 @@ func CloseTaskLogic(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]in
 	}
 
 	//关闭订单商品数据
-	err, closeGoods = model.GetCloseGoodsListByNumbers(tx, []string{number})
+	err, closeGoods = model.GetCloseGoodsListByCloseOrderIds(tx, []int{closeOrderId})
 
 	if err != nil {
 		return
