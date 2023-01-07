@@ -110,6 +110,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 
 	var (
 		order model.Order
+		tips  rsp.CloseTips
 	)
 
 	tx := db.Begin()
@@ -137,7 +138,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 		}
 
 		//关闭订单逻辑处理
-		err, isCommit, _ = dao.OrderDataHandle(tx, closeOrderRes.OccId, closeOrderRes.Number, closeOrderRes.Typ, closeGoodsMp)
+		err, isCommit, _, tips = dao.OrderDataHandle(tx, closeOrderRes.OccId, closeOrderRes.Number, closeOrderRes.Typ, closeGoodsMp)
 		if err != nil {
 			tx.Rollback()
 			return consumer.ConsumeRetryLater, err
@@ -167,7 +168,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 			}
 
 			//关闭订单逻辑处理
-			err, isCommit, _ = dao.OrderDataHandle(tx, closeOrderRes.OccId, closeOrderRes.Number, closeOrderRes.Typ, closeGoodsMp)
+			err, isCommit, _, tips = dao.OrderDataHandle(tx, closeOrderRes.OccId, closeOrderRes.Number, closeOrderRes.Typ, closeGoodsMp)
 			if err != nil {
 				tx.Rollback()
 				return consumer.ConsumeRetryLater, err
@@ -178,7 +179,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 
 	closeTotal := GetCloseTotal(goodsInfo)
 
-	modelCloseOrder := GetModelCloseOrderData(closeOrderRes, closeTotal, status)
+	modelCloseOrder := GetModelCloseOrderData(closeOrderRes, closeTotal, status, tips)
 
 	//需关闭总数
 	err = model.CloseOrderReplaceSave(tx, modelCloseOrder, []string{"shop_name", "shop_type"})
@@ -211,7 +212,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 	return
 }
 
-func GetModelCloseOrderData(closeOrder rsp.CloseOrder, closeTotal, status int) (modelCloseOrder *model.CloseOrder) {
+func GetModelCloseOrderData(closeOrder rsp.CloseOrder, closeTotal, status int, tips rsp.CloseTips) (modelCloseOrder *model.CloseOrder) {
 	modelCloseOrder = &model.CloseOrder{
 		Id:               closeOrder.OccId,
 		Number:           closeOrder.Number,
@@ -228,6 +229,8 @@ func GetModelCloseOrderData(closeOrder rsp.CloseOrder, closeTotal, status int) (
 		Status:           status,
 		Applicant:        closeOrder.Applicant,
 		ApplyTime:        closeOrder.ApplyTime,
+		Colour:           tips.Colour,
+		Tips:             tips.Tips,
 	}
 
 	return
