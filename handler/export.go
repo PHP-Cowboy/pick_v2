@@ -598,7 +598,7 @@ func BatchTask(c *gin.Context) {
 		return
 	}
 
-	err, pickGoods := model.GetPickGoodsJoinOrderByPickId(db, form.Id)
+	err, pickGoods := model.GetPickGoodsJoinOrderByPickIdAndTaskId(db, form.Id, pick.TaskId)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)

@@ -13,7 +13,7 @@ type PickGoods struct {
 	PickId           int    `gorm:"type:int(11) unsigned;index:pick_and_batch_idx;comment:拣货表id"`
 	BatchId          int    `gorm:"type:int(11) unsigned;index:pick_and_batch_idx;comment:批次表id"`
 	PrePickGoodsId   int    `gorm:"type:int(11);index;comment:预拣货商品表id"`
-	OrderGoodsId     int    `gorm:"type:int(11) unsigned;index;comment:订单商品表ID"` //t_pick_order_goods 表 id
+	OrderGoodsId     int    `gorm:"type:int(11) unsigned;index;comment:订单商品表ID"` //t_order_goods 表 id
 	Number           string `gorm:"type:varchar(64);comment:订单编号"`
 	ShopId           int    `gorm:"type:int(11);comment:店铺id"`
 	DistributionType int    `gorm:"type:tinyint unsigned;comment:配送方式:1:公司配送,2:用户自提,3:三方物流,4:快递配送,5:首批物料|设备单"`
@@ -139,11 +139,11 @@ func GetPickGoodsJoinPickByNumbers(db *gorm.DB, numbers []string) (err error, li
 }
 
 // 根据拣货ID查询拣货池商品数据并获取相关订单数据
-func GetPickGoodsJoinOrderByPickId(db *gorm.DB, pickId int) (err error, list []PickGoodsJoinOrder) {
+func GetPickGoodsJoinOrderByPickIdAndTaskId(db *gorm.DB, pickId, taskId int) (err error, list []PickGoodsJoinOrder) {
 	err = db.Table("t_pick_goods pg").
 		Select("shop_code,goods_name,goods_spe,unit,sku,pg.need_num,pg.review_num").
-		Where("pg.pick_id = ?", pickId).
-		Joins("left join t_pick_order po on po.number = pg.number").
+		Where("pg.pick_id = ? and oo.task_id = ?", pickId, taskId).
+		Joins("left join t_outbound_order oo on oo.number = pg.number").
 		Scan(&list).
 		Error
 

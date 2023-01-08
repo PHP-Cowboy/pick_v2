@@ -180,7 +180,7 @@ func GetPickListByDeliveryNo(db *gorm.DB, deliveryNo []string) (err error, list 
 
 // 获取两天内拣货记录
 func GetPickingRecord(db *gorm.DB, pickUser, towDaysAgo string, status *int, page, size int) (err error, total int64, list []Pick) {
-	local := db.Where("pick_user = ? and take_orders_time >= ?", pickUser, towDaysAgo)
+	local := db.Model(&Pick{}).Where("pick_user = ? and take_orders_time >= ?", pickUser, towDaysAgo)
 
 	if status != nil && *status == 0 {
 		local.Where("status = ?", *status)
