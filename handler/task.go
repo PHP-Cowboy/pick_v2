@@ -160,6 +160,7 @@ func PickList(c *gin.Context) {
 			PrintNum:       p.PrintNum,
 			ReviewUser:     p.ReviewUser,
 			ReviewTime:     p.ReviewTime,
+			OutboundType:   p.OutboundType,
 		})
 	}
 

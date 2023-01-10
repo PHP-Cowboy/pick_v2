@@ -627,7 +627,7 @@ func BatchTask(c *gin.Context) {
 		for _, code := range shopCodes {
 			_, has := subMp[code]
 			if !has {
-				subMp[code] = "0"
+				subMp[code] = ""
 			}
 
 			if code == pg.ShopCode {

@@ -50,6 +50,7 @@ type Pick struct {
 	ReviewUser     string        `json:"review_user"` //复核人
 	ReviewTime     *model.MyTime `json:"review_time"` //复核时间
 	PrintNum       int           `json:"print_num"`
+	OutboundType   int           `json:"outbound_type"` //1.正常,2.无需出库
 	//Shelves    string `json:"shelves"`     //货位号不要了
 }
 
