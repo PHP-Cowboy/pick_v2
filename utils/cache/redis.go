@@ -88,3 +88,35 @@ func ExpireAt(key string, second int) error {
 
 	return err
 }
+
+/*
+Redis Sadd 命令将一个或多个成员元素加入到集合中，已经存在于集合的成员元素将被忽略。
+假如集合 key 不存在，则创建一个只包含添加的元素作成员的集合。
+当集合 key 不是集合类型时，返回一个错误。
+注意：在 Redis2.4 版本以前， SADD 只接受单个成员值。
+*/
+func SAdd(key string, members []string) (err error) {
+	_, err = global.Redis.SAdd(context.Background(), key, members).Result()
+
+	return
+}
+
+/*
+Redis Srem 命令用于移除集合中的一个或多个成员元素，不存在的成员元素会被忽略。
+当 key 不是集合类型，返回一个错误。
+在 Redis 2.4 版本以前， SREM 只接受单个成员值。
+*/
+func SRem(key string, members []string) (err error) {
+	_, err = global.Redis.SRem(context.Background(), key, members).Result()
+
+	return
+}
+
+/*
+Redis Smembers 命令返回集合中的所有的成员。 不存在的集合 key 被视为空集合。
+*/
+func SMembers(key string) (err error) {
+	_, err = global.Redis.SMembers(context.Background(), key).Result()
+
+	return
+}

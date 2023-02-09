@@ -161,7 +161,7 @@ func ReceivingOrders(db *gorm.DB, form req.ReceivingOrdersForm) (err error, res 
 }
 
 func CompletePick(db *gorm.DB, form req.CompletePickForm) (err error) {
-	// 这里是否需要做并发处理
+
 	var (
 		pick           model.Pick
 		pickGoods      []model.PickGoods
@@ -174,7 +174,7 @@ func CompletePick(db *gorm.DB, form req.CompletePickForm) (err error) {
 		return
 	}
 
-	if pick.Status == 1 {
+	if pick.Status == model.ToBeReviewedStatus {
 		err = ecode.OrderPickingCompleted
 		return
 	}

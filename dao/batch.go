@@ -152,7 +152,7 @@ func BatchSaveLogic(db *gorm.DB, form req.NewCreateBatchForm, claims *middleware
 }
 
 // 快递批次
-func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.CustomClaims) error {
+func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.CustomClaims) (err error) {
 
 	var (
 		orderGoodsIds          []int
@@ -165,7 +165,7 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 	)
 
 	if len(form.Number) == 0 {
-		err := errors.New("订单编号不能为空")
+		err = errors.New("订单编号不能为空")
 		return err
 	}
 
@@ -176,18 +176,15 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 
 	if err != nil {
 		tx.Rollback()
-		return err
+		return
 	}
 
 	//生成预拣池
-	//todo 在快递批次时直接把状态设置成已进入拣货池？
-	//todo 拣货池逻辑中就可以不修改状态了，但是后续是否会快递批次被改成先集中拣货完成再到二次分拣？
-	//TODO 个人觉得集中拣货和二次分拣同时进行在实际业务中是有问题的
 	err, orderGoodsIds, outboundGoods, outboundGoodsJoinOrder, prePickIds, prePicks, prePickGoods, prePickRemarks = CreatePrePickLogic(tx, form, claims, batch.Id)
 
 	if err != nil {
 		tx.Rollback()
-		return err
+		return
 	}
 
 	//批量更新 t_order_goods batch_id
@@ -195,7 +192,7 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 
 	if err != nil {
 		tx.Rollback()
-		return err
+		return
 	}
 
 	//构造更新 t_outbound_order 表 order_type 数据
@@ -214,20 +211,20 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 	err = model.OutboundOrderReplaceSave(db, outboundOrder, []string{"order_type"})
 
 	if err != nil {
-		return err
+		return
 	}
 
 	//批量更新 t_outbound_goods 状态
 	if err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"batch_id", "status"}); err != nil {
 		tx.Rollback()
-		return err
+		return
 	}
 
 	//生成集中拣货
 	err = CreateCentralizedPick(db, outboundGoodsJoinOrder, batch.Id)
 	if err != nil {
 		tx.Rollback()
-		return err
+		return
 	}
 
 	pick := req.BatchPickForm{
@@ -243,12 +240,12 @@ func CourierBatch(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.
 	err = BatchPickByParams(db, pick, prePicks, prePickGoods, prePickRemarks)
 	if err != nil {
 		tx.Rollback()
-		return err
+		return
 	}
 
 	tx.Commit()
 
-	return nil
+	return
 }
 
 // 根据sku,number,shop_id查批次id

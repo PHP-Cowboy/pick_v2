@@ -53,6 +53,8 @@ func InitRouter() *gin.Engine {
 	router.ConfigRoute(group)
 	//关闭订单
 	router.CloseOrderRoute(group)
+	//test
+	router.TestRoute(group)
 
 	return r
 }
