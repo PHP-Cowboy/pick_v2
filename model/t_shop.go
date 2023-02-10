@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"gorm.io/gorm"
+	"time"
+)
 
 // 店铺 先同步后勾选批量设置线路
 type Shop struct {
@@ -19,4 +22,9 @@ type Shop struct {
 	DistributionType int       `gorm:"type:tinyint;default:null;comment:配送方式" json:"distribution_type"`
 	CreateAt         time.Time `gorm:"autoCreateTime;type:datetime;comment:创建时间" json:"create_at"`
 	UpdateAt         time.Time `gorm:"autoUpdateTime;type:datetime;not null;comment:更新时间" json:"update_at"`
+}
+
+func GetShopListByIds(db *gorm.DB, fields string, ids []int) (err error, list []Shop) {
+	err = db.Model(&Shop{}).Select(fields).Where("id in (?)", ids).Find(&list).Error
+	return
 }

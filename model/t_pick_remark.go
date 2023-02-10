@@ -26,3 +26,8 @@ func GetPickRemarkByPickId(db *gorm.DB, pickId int) (err error, list []PickRemar
 	err = db.Model(&PickRemark{}).Where("pick_id = ?", pickId).Find(&list).Error
 	return
 }
+
+func GetPickRemarkListByPickIds(db *gorm.DB, pickIds []int) (err error, list []PickRemark) {
+	err = db.Model(&PickRemark{}).Where("pick_id in (?)", pickIds).Find(&list).Error
+	return
+}

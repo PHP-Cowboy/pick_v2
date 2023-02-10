@@ -22,5 +22,7 @@ func ExportRoute(g *gin.RouterGroup) {
 		exportGroup.GET("/batchTask", handler.BatchTask)
 		//货品汇总单
 		exportGroup.GET("/goodsSummaryList", handler.GoodsSummaryList)
+		//导出店铺地址
+		exportGroup.GET("/shopAddress", handler.ShopAddress)
 	}
 }

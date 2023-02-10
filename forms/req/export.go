@@ -25,5 +25,11 @@ type BatchShopMaterialForm struct {
 }
 
 type GoodsSummaryListForm struct {
-	BatchId int `json:"batch_id"`
+	BatchId    int      `form:"batch_id" binding:"required"`
+	Typ        int      `form:"typ"`
+	GoodsTypes []string `json:"goods_typs"`
+}
+
+type ShopAddressReq struct {
+	BatchId int `json:"batch_id" form:"batch_id" binding:"required"`
 }

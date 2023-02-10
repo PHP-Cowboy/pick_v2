@@ -712,7 +712,19 @@ func GoodsSummaryList(c *gin.Context) {
 		return
 	}
 
-	err, mp, column, shopCodes := dao.GoodsSummaryList(global.DB, form.BatchId)
+	form.GoodsTypes = []string{}
+
+	if form.Typ == 1 {
+		//全部 默认值
+	} else if form.Typ == 2 {
+		//冻品
+		form.GoodsTypes = []string{"冷藏类", "冷冻类"}
+	} else {
+		//常温
+		form.GoodsTypes = []string{"常温类"}
+	}
+
+	err, mp, column, shopCodes := dao.GoodsSummaryList(global.DB, form)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
@@ -777,4 +789,64 @@ func GetDeliveryMethod(db *gorm.DB, deliveryMethod int) (err error, methodName s
 	methodName = dict.Name
 
 	return
+}
+
+// 导出店铺地址
+func ShopAddress(c *gin.Context) {
+	var form req.ShopAddressReq
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err, addrListMp := dao.ShopAddress(form)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xFile := excelize.NewFile()
+	sheet := xFile.NewSheet("sheet1")
+	// 设置单元格的值
+	xFile.SetCellValue("Sheet1", "A1", "收件人姓名")
+	xFile.SetCellValue("Sheet1", "B1", "手机/电话")
+	xFile.SetCellValue("Sheet1", "C1", "省")
+	xFile.SetCellValue("Sheet1", "D1", "市")
+	xFile.SetCellValue("Sheet1", "E1", "区")
+	xFile.SetCellValue("Sheet1", "F1", "地址")
+	xFile.SetCellValue("Sheet1", "G1", "物品名称")
+	xFile.SetCellValue("Sheet1", "H1", "备注")
+	xFile.SetActiveSheet(sheet)
+	// 指定列宽
+	xFile.SetColWidth("Sheet1", "F", "F", 100)
+
+	startCount := 2
+
+	idx := 0
+
+	for _, val := range addrListMp {
+		item := make([]interface{}, 0)
+		item = append(item, val["consignee_name"])
+		item = append(item, val["consignee_tel"])
+		item = append(item, val["province"])
+		item = append(item, val["city"])
+		item = append(item, val["district"])
+		item = append(item, val["address"])
+		item = append(item, "")
+		item = append(item, "")
+
+		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+idx), &item)
+		idx++
+	}
+
+	var buffer bytes.Buffer
+	_ = xFile.Write(&buffer)
+	content := bytes.NewReader(buffer.Bytes())
+	data, _ := io.ReadAll(content)
+	date := time.Now().Format("20060102")
+	c.Writer.Header().Add("Content-Type", "application/octet-stream;charset=utf-8")
+	c.Writer.Header().Add("Access-Control-Expose-Headers", "Content-Disposition")
+	c.Writer.Header().Add("Content-Disposition", "attachment; filename=\""+fmt.Sprintf("%s-.xlsx", date)+"\"")
+	c.Writer.Write(data)
 }

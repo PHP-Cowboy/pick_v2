@@ -53,6 +53,8 @@ func InitRouter() *gin.Engine {
 	router.ConfigRoute(group)
 	//关闭订单
 	router.CloseOrderRoute(group)
+	//后台拣货
+	router.AdminRoute(group)
 	//test
 	router.TestRoute(group)
 

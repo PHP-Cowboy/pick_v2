@@ -140,13 +140,17 @@ func GetPrePickGoodsJoinPrePickListByNumber(db *gorm.DB, numbers []string) (err 
 	return
 }
 
-func GetPrePickGoodsJoinPrePickListByBatchId(db *gorm.DB, batchId int) (err error, list []PrePickGoodsJoinPrePick) {
-	err = db.Table("t_pre_pick_goods pg").
+func GetPrePickGoodsJoinPrePickListByBatchId(db *gorm.DB, batchId int, goodsTypes []string) (err error, list []PrePickGoodsJoinPrePick) {
+	local := db.Table("t_pre_pick_goods pg").
 		Select("pg.id as pre_pick_goods_id,pg.*,pp.*").
 		Joins("left join t_pre_pick pp on pg.pre_pick_id = pp.id").
-		Where("pg.batch_id = ?", batchId).
-		Find(&list).
-		Error
+		Where("pg.batch_id = ?", batchId)
+
+	if len(goodsTypes) > 0 {
+		local.Where("goods_type in (?)", goodsTypes)
+	}
+
+	err = local.Find(&list).Error
 
 	return
 }
