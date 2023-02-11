@@ -46,8 +46,8 @@ type ChangeReviewNumForm struct {
 }
 
 type SkuReview struct {
-	Sku string `json:"sku" binding:"required"`
-	Num *int   `json:"num" binding:"required"`
+	Sku       string `json:"sku" binding:"required"`
+	ReviewNum *int   `json:"review_num" binding:"required"`
 }
 
 type CancelPickForm struct {

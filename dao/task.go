@@ -215,7 +215,7 @@ func ChangeReviewNum(db *gorm.DB, form req.ChangeReviewNumForm) (err error) {
 	}
 
 	for _, review := range form.SkuReview {
-		mpForm[review.Sku] = *review.Num        //sku 修改的复核数量 map
+		mpForm[review.Sku] = *review.ReviewNum  //sku 修改的复核数量 map
 		skuSlice = append(skuSlice, review.Sku) //被修改复核数量的sku切片
 	}
 
@@ -272,7 +272,7 @@ func ChangeReviewNum(db *gorm.DB, form req.ChangeReviewNumForm) (err error) {
 			return
 		}
 
-		if *sr.Num > num {
+		if *sr.ReviewNum > num {
 			err = errors.New("修改后的复核数大于需拣数，请核对")
 			return
 		}
@@ -284,7 +284,7 @@ func ChangeReviewNum(db *gorm.DB, form req.ChangeReviewNumForm) (err error) {
 			return
 		}
 
-		reviewNumDiffMp[sr.Sku] = *sr.Num - mpReviewNum
+		reviewNumDiffMp[sr.Sku] = *sr.ReviewNum - mpReviewNum
 
 		reviewNumDiffTotal += reviewNumDiffMp[sr.Sku]
 	}

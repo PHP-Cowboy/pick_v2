@@ -1,6 +1,7 @@
 package req
 
 type AdminPickListReq struct {
+	Paging
 	BatchId   int    `json:"batch_id" form:"batch_id" binding:"required"`
 	ShopId    int    `json:"shop_id" form:"shop_id"`
 	GoodsName string `json:"goods_name" form:"goods_name"`
@@ -15,6 +16,5 @@ type AdminPickDetailReq struct {
 }
 
 type BatchShopGoodsListReq struct {
-	BatchId int `json:"batch_id" form:"batch_id" binding:"required"`
-	ShopId  int `json:"shop_id" form:"shop_id"`
+	PickId int `json:"pick_id" form:"pick_id" binding:"required"`
 }

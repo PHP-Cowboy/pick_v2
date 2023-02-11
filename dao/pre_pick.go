@@ -10,7 +10,10 @@ import (
 	"pick_v2/model"
 	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
+	"pick_v2/utils/slice"
 	"strconv"
+	"strings"
+	"time"
 )
 
 func CheckTyp(typ, distributionType int) bool {
@@ -58,9 +61,6 @@ func CreatePrePickLogic(
 		prePickStatus,
 		prePickGoodsStatus,
 		prePickRemarkStatus int
-		picks       []model.Pick
-		pickGoods   []model.PickGoods
-		pickRemarks []model.PickRemark
 	)
 
 	if form.Typ == 1 { // 常规批次，所有的状态都是待处理
@@ -131,46 +131,6 @@ func CreatePrePickLogic(
 		prePickMp[pp.ShopId] = pp.Id
 		//预拣池ID
 		prePickIds = append(prePickIds, pp.Id)
-		if form.Typ == 2 {
-			picks = append(picks, model.Pick{
-				WarehouseId:     pp.WarehouseId,
-				TaskId:          pp.TaskId,
-				BatchId:         pp.BatchId,
-				PrePickIds:      strconv.Itoa(pp.Id),
-				TaskName:        "",
-				ShopCode:        pp.ShopCode,
-				ShopName:        pp.ShopName,
-				Line:            pp.Line,
-				Num:             0,
-				PrintNum:        0,
-				PickUser:        "",
-				TakeOrdersTime:  nil,
-				ReviewUser:      "",
-				ReviewTime:      nil,
-				Sort:            0,
-				Version:         0,
-				Status:          1,
-				OutboundType:    1,
-				DeliveryNo:      "",
-				Typ:             pp.Typ,
-				DeliveryOrderNo: nil,
-			})
-		}
-	}
-
-	var prePickIdAndPickIdMp = make(map[string]int, 0)
-
-	//拣货池任务数据保存
-	if form.Typ == 2 {
-		err = model.PickBatchSave(db, &picks)
-		if err != nil {
-			return
-		}
-
-		//构造预拣池id和拣货池id对应关系map
-		for _, pk := range picks {
-			prePickIdAndPickIdMp[pk.PrePickIds] = pk.Id
-		}
 	}
 
 	for _, og := range outboundGoodsJoinOrder {
@@ -257,7 +217,6 @@ func CreatePrePickLogic(
 			BatchId: batchId,
 			Status:  model.OutboundGoodsStatusPicking,
 		})
-
 	}
 
 	//预拣池商品
@@ -266,100 +225,175 @@ func CreatePrePickLogic(
 		return
 	}
 
-	if form.Typ == 2 {
-
-		for _, og := range prePickGoods {
-			prePickId, ppMpOk := prePickMp[og.ShopId]
-
-			if !ppMpOk {
-				err = errors.New(fmt.Sprintf("店铺ID: %v 无预拣池数据", og.ShopId))
-				return
-			}
-			pickId, prePickIdAndPickIdMpOk := prePickIdAndPickIdMp[strconv.Itoa(prePickId)]
-
-			if !prePickIdAndPickIdMpOk {
-				err = errors.New("拣货池id有误")
-				return
-			}
-
-			needNum := og.NeedNum
-
-			pickGoods = append(pickGoods, model.PickGoods{
-				WarehouseId:      claims.WarehouseId,
-				PickId:           pickId,
-				BatchId:          og.BatchId,
-				PrePickGoodsId:   og.Id,
-				OrderGoodsId:     og.OrderGoodsId,
-				Number:           og.Number,
-				ShopId:           og.ShopId,
-				DistributionType: og.DistributionType,
-				Sku:              og.Sku,
-				GoodsName:        og.GoodsName,
-				GoodsType:        og.GoodsType,
-				GoodsSpe:         og.GoodsSpe,
-				Shelves:          og.Shelves,
-				DiscountPrice:    og.DiscountPrice,
-				NeedNum:          needNum,
-				CompleteNum:      needNum,
-				ReviewNum:        needNum,
-				CloseNum:         og.CloseNum,
-				Status:           1,
-				Unit:             og.Unit,
-			})
-
-		}
-
-		//拣货池商品
-		err = model.PickGoodsSave(db, &pickGoods)
-		if err != nil {
-			return
-		}
-
-	}
-
 	//预拣池商品备注，可能没有备注
 	if len(prePickRemarks) > 0 {
 		err = model.PrePickRemarkBatchSave(db, &prePickRemarks)
 		if err != nil {
 			return
 		}
+	}
 
-		if form.Typ == 2 {
-			for _, remark := range prePickRemarks {
-
-				prePickId, ppMpOk := prePickMp[remark.ShopId]
-
-				if !ppMpOk {
-					err = errors.New(fmt.Sprintf("店铺ID: %v 无预拣池数据", remark.ShopId))
-					return
-				}
-
-				pickId, prePickIdAndPickIdMpOk := prePickIdAndPickIdMp[strconv.Itoa(prePickId)]
-
-				if !prePickIdAndPickIdMpOk {
-					err = errors.New("拣货池id有误")
-					return
-				}
-
-				pickRemarks = append(pickRemarks, model.PickRemark{
-					WarehouseId:     claims.WarehouseId,
-					BatchId:         remark.BatchId,
-					PickId:          pickId,
-					PrePickRemarkId: remark.Id,
-					OrderGoodsId:    remark.OrderGoodsId,
-					Number:          remark.Number,
-					OrderRemark:     remark.OrderRemark,
-					GoodsRemark:     remark.GoodsRemark,
-					ShopName:        remark.ShopName,
-					Line:            remark.Line,
-				})
-			}
-
-			err = model.PickRemarkBatchSave(db, &pickRemarks)
-			if err != nil {
-				return
-			}
+	if form.Typ == 3 {
+		err = CreatePickLogic(db, prePicks, prePickGoods, prePickRemarks)
+		if err != nil {
+			return
 		}
+	}
+
+	return
+}
+
+// 后台拣货生成拣货池 [相同门店的合并]
+func CreatePickLogic(db *gorm.DB, prePicks []model.PrePick, prePickGoods []model.PrePickGoods, prePickRemarks []model.PrePickRemark) (err error) {
+	var (
+		prePickIdsMp = make(map[int][]string, 0)
+		picks        []model.Pick
+		pickGoods    []model.PickGoods
+		pickRemarks  []model.PickRemark
+	)
+
+	//构造预拣货ids
+	for _, pp := range prePicks {
+		idSlice, prePickIdsMpOk := prePickIdsMp[pp.ShopId]
+
+		if !prePickIdsMpOk {
+			idSlice = make([]string, 0)
+		}
+
+		idSlice = append(idSlice, strconv.Itoa(pp.Id))
+
+		prePickIdsMp[pp.ShopId] = idSlice
+	}
+
+	now := time.Now()
+
+	//去重
+	pickMp := make(map[int]interface{}, 0)
+
+	for _, pp := range prePicks {
+		_, pickMpOk := pickMp[pp.ShopId]
+
+		if pickMpOk {
+			continue
+		}
+
+		idSlice, prePickIdsMpOk := prePickIdsMp[pp.ShopId]
+
+		if !prePickIdsMpOk {
+			err = errors.New("预拣池id有误")
+			return
+		}
+
+		prePickIds := slice.SliceToString(idSlice, ",")
+
+		picks = append(picks, model.Pick{
+			WarehouseId:     pp.WarehouseId,
+			TaskId:          pp.TaskId,
+			BatchId:         pp.BatchId,
+			PrePickIds:      prePickIds,
+			TaskName:        pp.ShopName,
+			ShopCode:        pp.ShopCode,
+			ShopName:        pp.ShopName,
+			Line:            pp.Line,
+			Num:             0,
+			PrintNum:        0,
+			PickUser:        "新时沏1号",
+			TakeOrdersTime:  (*model.MyTime)(&now),
+			ReviewUser:      "新时沏1号",
+			ReviewTime:      (*model.MyTime)(&now),
+			Sort:            0,
+			Version:         0,
+			Status:          model.ToBeReviewedStatus,
+			OutboundType:    1,
+			DeliveryNo:      "",
+			Typ:             pp.Typ,
+			DeliveryOrderNo: nil,
+		})
+
+		pickMp[pp.ShopId] = struct{}{}
+	}
+
+	err = model.PickBatchSave(db, &picks)
+	if err != nil {
+		return
+	}
+
+	pickIdsMp := make(map[string]int, 0)
+	for _, p := range picks {
+		prePickIdSlice := strings.Split(p.PrePickIds, ",")
+
+		//prePickId 对应 pickId
+		for _, s := range prePickIdSlice {
+			pickIdsMp[s] = p.Id
+		}
+	}
+
+	//构造拣货池商品数据
+	for _, pg := range prePickGoods {
+		pickId, pickIdsMpOk := pickIdsMp[strconv.Itoa(pg.PrePickId)]
+
+		if !pickIdsMpOk {
+			err = errors.New("拣货池商品对应拣货池ID出错")
+			return
+		}
+
+		needNum := pg.NeedNum
+
+		pickGoods = append(pickGoods, model.PickGoods{
+			WarehouseId:      pg.WarehouseId,
+			PickId:           pickId,
+			BatchId:          pg.BatchId,
+			PrePickGoodsId:   pg.Id,
+			OrderGoodsId:     pg.OrderGoodsId,
+			Number:           pg.Number,
+			ShopId:           pg.ShopId,
+			DistributionType: pg.DistributionType,
+			Sku:              pg.Sku,
+			GoodsName:        pg.GoodsName,
+			GoodsType:        pg.GoodsType,
+			GoodsSpe:         pg.GoodsSpe,
+			Shelves:          pg.Shelves,
+			DiscountPrice:    pg.DiscountPrice,
+			NeedNum:          needNum,
+			CompleteNum:      needNum,
+			ReviewNum:        needNum,
+			CloseNum:         pg.CloseNum,
+			Status:           1,
+			Unit:             pg.Unit,
+		})
+	}
+
+	//构造拣货池备注数据
+	for _, remark := range prePickRemarks {
+		pickId, pickIdsMpOk := pickIdsMp[strconv.Itoa(remark.PrePickId)]
+
+		if !pickIdsMpOk {
+			err = errors.New("拣货池商品对应拣货池ID出错")
+			return
+		}
+
+		pickRemarks = append(pickRemarks, model.PickRemark{
+			WarehouseId:     remark.WarehouseId,
+			BatchId:         remark.BatchId,
+			PickId:          pickId,
+			PrePickRemarkId: remark.Id,
+			OrderGoodsId:    remark.OrderGoodsId,
+			Number:          remark.Number,
+			OrderRemark:     remark.OrderRemark,
+			GoodsRemark:     remark.GoodsRemark,
+			ShopName:        remark.ShopName,
+			Line:            remark.Line,
+		})
+	}
+
+	err = model.PickGoodsSave(db, &pickGoods)
+	if err != nil {
+		return
+	}
+
+	err = model.PickRemarkBatchSave(db, &pickRemarks)
+	if err != nil {
+		return
 	}
 
 	return

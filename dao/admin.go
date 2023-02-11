@@ -106,7 +106,9 @@ func AdminPickList(form req.AdminPickListReq) (err error, res rsp.AdminPickListR
 
 	res.Total = len(list)
 
-	res.List = list
+	start := (form.Page - 1) * form.Size
+
+	res.List = list[start : start+form.Size]
 
 	return
 }
@@ -284,7 +286,7 @@ func BatchShopGoodsList(form req.BatchShopGoodsListReq) (err error, list []rsp.B
 		goodsMp       = make(map[string]model.PickGoods, 0)
 	)
 
-	err, pickGoodsList = model.GetPickGoodsList(db, &model.PickGoods{BatchId: form.BatchId, ShopId: form.ShopId, Status: 1})
+	err, pickGoodsList = model.GetPickGoodsList(db, &model.PickGoods{PickId: form.PickId, Status: 1})
 	if err != nil {
 		return
 	}
@@ -301,6 +303,7 @@ func BatchShopGoodsList(form req.BatchShopGoodsListReq) (err error, list []rsp.B
 		if !goodsMpOk {
 			goods = pg
 		} else {
+			goods.NeedNum += pg.NeedNum
 			goods.CompleteNum += pg.CompleteNum
 			goods.ReviewNum += pg.ReviewNum
 		}
@@ -321,6 +324,7 @@ func BatchShopGoodsList(form req.BatchShopGoodsListReq) (err error, list []rsp.B
 		list = append(list, rsp.BatchShopGoodsList{
 			Sku:         goods.Sku,
 			GoodsName:   goods.GoodsName,
+			NeedNum:     goods.NeedNum,
 			CompleteNum: goods.CompleteNum,
 			ReviewNum:   goods.ReviewNum,
 		})

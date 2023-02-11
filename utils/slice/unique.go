@@ -1,5 +1,10 @@
 package slice
 
+import (
+	"fmt"
+	"strings"
+)
+
 // 泛型版 slice 去重
 func UniqueSlice[T comparable](arr []T) []T {
 	ret := make([]T, 0)
@@ -38,4 +43,17 @@ func MapToSlice[T comparable](mp map[T]struct{}) (arr []T) {
 		arr = append(arr, id)
 	}
 	return arr
+}
+
+// slice 转 string
+func SliceToString[T comparable](arr []T, separator string) (res string) {
+	for _, t := range arr {
+		res += fmt.Sprintf("%s%s", t, separator)
+	}
+
+	return strings.TrimRight(res, separator)
+}
+
+func StringToSlice(str string, separator string) (res []string) {
+	return strings.Split(str, separator)
 }

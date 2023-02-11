@@ -36,6 +36,7 @@ type AdminPickDetailRsp struct {
 type BatchShopGoodsList struct {
 	Sku         string `json:"sku"`
 	GoodsName   string `json:"goods_name"`
+	NeedNum     int    `json:"need_num"`
 	CompleteNum int    `json:"complete_num"`
 	ReviewNum   int    `json:"review_num"`
 }

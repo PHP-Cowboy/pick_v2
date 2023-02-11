@@ -10,7 +10,7 @@ type NewCreateBatchForm struct {
 	TaskId    int      `json:"task_id" binding:"required"`
 	Number    []string `json:"number" binding:"required"`
 	BatchName string   `json:"batch_name" binding:"required"`
-	Typ       int      `json:"typ"` //1:常规批次,2:快递批次
+	Typ       int      `json:"typ"` //1:常规批次,2:快递批次,3:后台拣货
 }
 
 type CentralizedPickListForm struct {

@@ -85,7 +85,12 @@ func NewBatch(c *gin.Context) {
 		return
 	}
 
-	form.Typ = 1 // 常规批次
+	if form.Typ == 0 {
+		//form.Typ = 1
+		err := errors.New("typ 异常")
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
 
 	tx := global.DB.Begin()
 
