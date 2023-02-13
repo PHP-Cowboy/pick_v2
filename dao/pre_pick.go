@@ -356,9 +356,9 @@ func CreatePickLogic(db *gorm.DB, prePicks []model.PrePick, prePickGoods []model
 			DiscountPrice:    pg.DiscountPrice,
 			NeedNum:          needNum,
 			CompleteNum:      needNum,
-			ReviewNum:        needNum,
+			ReviewNum:        0,
 			CloseNum:         pg.CloseNum,
-			Status:           1,
+			Status:           model.PickGoodsStatusNormal,
 			Unit:             pg.Unit,
 		})
 	}

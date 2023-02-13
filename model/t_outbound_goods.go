@@ -114,6 +114,12 @@ func GetOutboundGoodsListByTaskIdAndNumber(db *gorm.DB, taskId int, number strin
 	return
 }
 
+// 获取出库任务商品列表
+func GetOutboundGoodsListByTaskIdAndNumbers(db *gorm.DB, taskId int, numbers []string) (err error, list []OutboundGoods) {
+	err = db.Model(&OutboundGoods{}).Where("task_id = ? and number in (?)", taskId, numbers).Find(&list).Error
+	return
+}
+
 // 根据 order_goods_id 获取出库任务商品列表
 func GetOutboundGoodsListByOrderGoodsIdAndTaskId(db *gorm.DB, orderGoodsIds []int, taskId int) (err error, list []OutboundGoods) {
 	err = db.Model(&OutboundGoods{}).Where("order_goods_id in (?) and task_id = ?", orderGoodsIds, taskId).Find(&list).Error

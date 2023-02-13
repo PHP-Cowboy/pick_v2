@@ -499,11 +499,6 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 
 	//结束批次时，如果批次中还有已接单未完成复核的任务先不发消息到订货系统
 	//复核出库时再发送消息到MQ
-	if len(picksMp) > 0 {
-		//订货系统MQ交互逻辑
-
-	}
-
 	//消息中处理了是否发送消息逻辑
 	err = SendBatchMsgToPurchase(batch.Id, 0, picks)
 
@@ -514,6 +509,121 @@ func EndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
 
 	//过滤掉 未拣货的
 	err = YongYouLog(tx, pickGoods, orderJoinGoods, batch.Id)
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	tx.Commit()
+
+	return
+}
+
+// 后台拣货结束批次
+func AdminEndBatch(db *gorm.DB, form req.EndBatchForm) (err error) {
+	var (
+		batch          model.Batch
+		picks          []model.Pick
+		pickGoods      []model.PickGoods
+		orderJoinGoods []model.GoodsJoinOrder
+	)
+
+	tx := db.Begin()
+
+	err, batch = model.GetBatchByPk(db, form.Id)
+	if err != nil {
+		return
+	}
+
+	//不是后台拣货不通过,不需要校验状态
+	if batch.Typ != 3 {
+		err = errors.New("不是后台拣货批次")
+		return
+	}
+
+	//修改批次状态为已结束
+	err = model.UpdateBatchByPk(tx, form.Id, map[string]interface{}{"status": model.BatchClosedStatus})
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	// 根据批次id查询订单&&订单商品数据
+	err, orderJoinGoods = model.GetOrderGoodsJoinOrderByBatchId(db, form.Id)
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	//查询批次下全部订单商品数据
+	err, pickGoods = model.GetPickGoodsByBatchId(db, form.Id)
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	//查询拣货任务状态
+	err, picks = model.GetPickList(db, &model.Pick{BatchId: form.Id})
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	var (
+		numbers        = make([]string, 0, len(orderJoinGoods))
+		hasNotComplete bool
+	)
+
+	//后台拣货未复核完成
+	for i, p := range picks {
+		if p.PickUser != "" && p.Status < model.ReviewCompletedStatus {
+			hasNotComplete = true
+			picks[i].Status = model.ReviewCompletedStatus
+		}
+	}
+
+	if hasNotComplete {
+		// 更新拣货任务未已完成状态
+		err = model.PickReplaceSave(tx, &picks, []string{"status"})
+		if err != nil {
+			return
+		}
+	}
+
+	// 批次结束时如果有已接单但未复核完成的，不变更任务订单状态为完成
+	for _, good := range pickGoods {
+		numbers = append(numbers, good.Number)
+	}
+
+	//后台拣货不需要管预拣池，生成时就是进入拣货池了
+
+	taskId := picks[0].TaskId
+
+	//更新 OutboundOrder 为已完成
+	err = model.UpdateOutboundOrderByTaskIdAndNumbers(db, taskId, numbers, map[string]interface{}{"order_type": model.OutboundOrderTypeComplete})
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	//结束批次时，如果批次中还有已接单未完成复核的任务先不发消息到订货系统
+	//复核出库时再发送消息到MQ
+	//消息中处理了是否发送消息逻辑
+	err = SendBatchMsgToPurchase(form.Id, 0, picks)
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	//过滤掉 未拣货的
+	err = YongYouLog(tx, pickGoods, orderJoinGoods, form.Id)
 
 	if err != nil {
 		tx.Rollback()

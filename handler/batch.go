@@ -207,6 +207,27 @@ func EndBatch(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
+// 后台拣货结束批次
+func AdminEndBatch(c *gin.Context) {
+	var form req.EndBatchForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err := dao.AdminEndBatch(global.DB, form)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+}
+
 // 编辑批次
 func EditBatch(c *gin.Context) {
 	var form req.EditBatchForm

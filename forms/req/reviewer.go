@@ -23,3 +23,8 @@ type CompleteReviewDetail struct {
 	ParamsId  []ParamsId `json:"params_id"`
 	ReviewNum int        `json:"review_num"`
 }
+
+type QuickDeliveryReq struct {
+	Ids     []int `json:"ids" binding:"required"`
+	BatchId int   `json:"batch_id" binding:"required"`
+}

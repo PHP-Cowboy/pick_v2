@@ -530,3 +530,219 @@ func TaskEndDeliveryUpdateOrders(
 
 	return
 }
+
+// 快捷出库
+func QuickDelivery(db *gorm.DB, form req.QuickDeliveryReq) (err error) {
+
+	var (
+		picks                   []model.Pick
+		pickGoods               []model.PickGoods
+		batch                   model.Batch
+		pickIdDeliveryOrderNoMp = make(map[int]string, 0)
+	)
+
+	//根据id获取拣货数据
+	err, picks = model.GetPickListByIds(db, form.Ids)
+
+	if err != nil {
+		return
+	}
+
+	//当前时间
+	now := time.Now()
+
+	for i, p := range picks {
+		//不是待复核状态
+		if p.Status != model.ToBeReviewedStatus {
+			err = ecode.OrderNotToBeReviewed
+			return
+		}
+
+		var deliveryOrderNo string
+
+		//生成出库单号
+		deliveryOrderNo, err = cache.GetIncrNumberByKey(constant.DELIVERY_ORDER_NO, 3)
+
+		if err != nil {
+			return
+		}
+
+		pickIdDeliveryOrderNoMp[p.Id] = deliveryOrderNo
+
+		no := model.GormList{deliveryOrderNo}
+
+		picks[i].Status = model.ReviewCompletedStatus
+		picks[i].ReviewTime = (*model.MyTime)(&now)
+		picks[i].DeliveryOrderNo = no
+		picks[i].DeliveryNo = deliveryOrderNo
+		picks[i].PrintNum += 1
+		picks[i].OutboundType = model.OutboundTypeNormal
+
+	}
+
+	//获取批次数据
+	err, batch = model.GetBatchByPk(db, form.BatchId)
+
+	if err != nil {
+		return
+	}
+
+	err, pickGoods = model.GetPickGoodsByPickIds(db, form.Ids)
+
+	if err != nil {
+		return
+	}
+
+	var (
+		printChMp      = make(map[int]int, 0)               //构造打印 chan 结构体数据
+		orderNumbers   = make([]string, 0)                  //构造更新 出库任务订单表数据 使用
+		skuCompleteNum = make(map[string]map[string]int, 0) //订单号对应的sku的拣货数量 map[number][sku] = CompleteNum
+		numberPickIdMp = make(map[string]int, 0)            //订单号对应的拣货id，在后台拣货中一个订单只会对应一个拣货id，其他的拣货任务中不一定【合并拣货一个单可能对应多个拣货ID】
+	)
+
+	for k, pg := range pickGoods {
+
+		numberSkuMp, skuCompleteNumOk := skuCompleteNum[pg.Number]
+
+		if !skuCompleteNumOk {
+			numberSkuMp = make(map[string]int, 0)
+		}
+
+		numberSkuMp[pg.Sku] = pg.CompleteNum
+
+		skuCompleteNum[pg.Number] = numberSkuMp
+
+		_, printChOk := printChMp[pg.ShopId]
+
+		if !printChOk {
+			printChMp[pg.ShopId] = pg.PickId
+		}
+
+		pickGoods[k].ReviewNum = pg.CompleteNum
+
+		numberPickIdMp[pg.Number] = pg.PickId
+
+		//更新订单表
+		orderNumbers = append(orderNumbers, pg.Number)
+
+	}
+
+	orderNumbers = slice.UniqueSlice(orderNumbers)
+
+	//出库订单
+	outboundOrder := make([]model.OutboundOrder, 0, len(orderNumbers))
+
+	//构造更新出库订单数据
+	for _, number := range orderNumbers {
+		outboundOrder = append(outboundOrder, model.OutboundOrder{
+			TaskId:            batch.TaskId,
+			Number:            number,
+			LatestPickingTime: (*model.MyTime)(&now),
+			OrderType:         model.PickingOrderType,
+		})
+	}
+
+	//出库订单商品
+	outboundGoods := make([]model.OutboundGoods, 0)
+
+	err, outboundGoods = model.GetOutboundGoodsListByTaskIdAndNumbers(db, batch.TaskId, orderNumbers)
+
+	if err != nil {
+		return
+	}
+
+	for _, og := range outboundGoods {
+		pickId, numberPickIdMpOk := numberPickIdMp[og.Number]
+
+		if !numberPickIdMpOk {
+			err = errors.New("订单编号和拣货任务ID对应关系出错")
+			return
+		}
+
+		deliveryOrderNo, pickIdDeliveryOrderNoMpOK := pickIdDeliveryOrderNoMp[pickId]
+
+		if !pickIdDeliveryOrderNoMpOK {
+			err = errors.New("拣货任务对应的出库单号出错")
+			return
+		}
+
+		numberSkuMp, skuCompleteNumOk := skuCompleteNum[og.Number]
+
+		if !skuCompleteNumOk {
+			err = errors.New("任务商品订单数据有误")
+			return
+		}
+
+		completeNum, numberSkuMpOk := numberSkuMp[og.Sku]
+
+		if !numberSkuMpOk {
+			continue
+		}
+
+		deliveryOrderNoArr := make(model.GormList, 0)
+		//一个任务下一个商品只会有一个出库单
+		deliveryOrderNoArr = append(deliveryOrderNoArr, deliveryOrderNo)
+
+		//构造更新出库单商品表数据
+		outboundGoods = append(outboundGoods, model.OutboundGoods{
+			TaskId:          batch.TaskId,
+			Number:          og.Number,
+			Sku:             og.Sku,
+			LackCount:       og.LackCount - completeNum,
+			OutCount:        completeNum,
+			Status:          model.OutboundGoodsStatusOutboundDelivery,
+			DeliveryOrderNo: deliveryOrderNoArr,
+		})
+	}
+
+	tx := db.Begin()
+
+	//更新出库任务商品表数据
+	err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"lack_count", "out_count", "status", "delivery_order_no"})
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	//拣货任务数据更新
+	err = model.PickReplaceSave(tx, &picks, []string{"status", "review_time", "delivery_order_no", "delivery_no", "print_num", "outbound_type"})
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	//更新拣货商品数据
+	err = model.PickGoodsReplaceSave(tx, &pickGoods, []string{"review_num"})
+
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	//变更出库任务订单表最近拣货时间&&订单类型
+	err = model.OutboundOrderReplaceSave(tx, outboundOrder, []string{"latest_picking_time", "order_type"})
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	tx.Commit()
+
+	//拆单 -打印
+	for shopId, pickId := range printChMp {
+		deliveryOrderNo, pickIdDeliveryOrderNoMpOk := pickIdDeliveryOrderNoMp[pickId]
+
+		if !pickIdDeliveryOrderNoMpOk {
+			continue
+		}
+
+		AddPrintJobMap(constant.JH_HUOSE_CODE, &global.PrintCh{
+			DeliveryOrderNo: deliveryOrderNo,
+			ShopId:          shopId,
+			Type:            3, // 1-全部打印 2-打印箱单 3-打印出库单
+		})
+	}
+
+	return
+}

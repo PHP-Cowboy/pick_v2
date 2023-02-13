@@ -15,5 +15,7 @@ func AdminRoute(g *gin.RouterGroup) {
 		adminGroup.GET("/pickDetail", handler.AdminPickDetail)
 		//后台拣货数据详情
 		adminGroup.GET("/batchShopGoodsList", handler.BatchShopGoodsList)
+		//快捷出库
+		adminGroup.POST("/quickDelivery", handler.QuickDelivery)
 	}
 }

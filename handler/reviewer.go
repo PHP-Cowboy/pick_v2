@@ -235,3 +235,26 @@ func ConfirmDelivery(c *gin.Context) {
 
 	xsq_net.Success(c)
 }
+
+// 快捷出库
+func QuickDelivery(c *gin.Context) {
+	var (
+		form req.QuickDeliveryReq
+	)
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err := dao.QuickDelivery(global.DB, form)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+}
