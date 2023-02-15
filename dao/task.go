@@ -290,10 +290,10 @@ func ChangeReviewNum(db *gorm.DB, form req.ChangeReviewNumForm) (err error) {
 	}
 
 	var (
-		numberConsumeMp       = make(map[string]int, 0) //order相关消费复核差值map
-		orderGoodsIdConsumeMp = make(map[int]int, 0)    //orderGoods相关消费复核差值map
-		outboundGoodsIdSlice  []int                     //outbound_goods 表 id
-		orderGoodsIdSlice     []int                     //order_goods 表 id 处理后可能和 outboundGoodsIdSlice 是一致的
+		//numberConsumeMp       = make(map[string]int, 0) //order相关消费复核差值map
+		orderGoodsIdConsumeMp = make(map[int]int, 0) //orderGoods相关消费复核差值map
+		outboundGoodsIdSlice  []int                  //outbound_goods 表 id
+		orderGoodsIdSlice     []int                  //order_goods 表 id 处理后可能和 outboundGoodsIdSlice 是一致的
 	)
 
 	//pick_goods pay_at
@@ -308,11 +308,11 @@ func ChangeReviewNum(db *gorm.DB, form req.ChangeReviewNumForm) (err error) {
 			continue
 		}
 
-		numberConsumeNum, numberConsumeOk := numberConsumeMp[good.Number]
-
-		if !numberConsumeOk {
-			numberConsumeNum = 0
-		}
+		//numberConsumeNum, numberConsumeOk := numberConsumeMp[good.Number]
+		//
+		//if !numberConsumeOk {
+		//	numberConsumeNum = 0
+		//}
 
 		orderGoodsIdConsumeNum, orderGoodsIdConsumeOk := orderGoodsIdConsumeMp[good.OrderGoodsId]
 
@@ -328,11 +328,11 @@ func ChangeReviewNum(db *gorm.DB, form req.ChangeReviewNumForm) (err error) {
 					//pickGoods[i].NeedNum = 0 需拣数不会变，拣货和复核时都不修改需拣数
 					reviewNumDiff -= surplus
 					orderGoodsIdConsumeNum += surplus //这里复核数加了
-					numberConsumeNum += surplus
+					//numberConsumeNum += surplus
 				} else { //修改的复核数差值 比 当前单还剩的复核数量 小 当前单可以消耗完差值
 					pickGoods[i].ReviewNum += reviewNumDiff //复核数可以消耗完，直接把复核数往上加
 					orderGoodsIdConsumeNum += reviewNumDiff //这里增加的复核数被这个单消耗完了
-					numberConsumeNum += reviewNumDiff
+					//numberConsumeNum += reviewNumDiff
 					//pickGoods[i].NeedNum -= reviewNumDiff
 					reviewNumDiff = 0
 				}
@@ -345,13 +345,13 @@ func ChangeReviewNum(db *gorm.DB, form req.ChangeReviewNumForm) (err error) {
 			if good.ReviewNum > int(reviewDiffAbs) { //复核数大于 复核数差值的绝对值 差值直接被消耗完了
 				pickGoods[i].ReviewNum = good.ReviewNum + reviewNumDiff //reviewNumDiff	小于0 这里的加的是负数
 				orderGoodsIdConsumeNum += reviewNumDiff                 //这里扣减的复核数被这个单消耗完了 这里的加的是负数
-				numberConsumeNum += reviewNumDiff
+				//numberConsumeNum += reviewNumDiff
 				reviewNumDiff = 0
 			} else { //当复核数本来就是0时，其实相当于什么都没做
 				pickGoods[i].ReviewNum = 0               //复核数扣到0
 				reviewNumDiff += good.ReviewNum          //差值 被消耗掉 good.ReviewNum 复核数个
 				orderGoodsIdConsumeNum -= good.ReviewNum //这里把整单复核数扣光了
-				numberConsumeNum -= good.ReviewNum
+				//numberConsumeNum -= good.ReviewNum
 			}
 		}
 
@@ -360,7 +360,7 @@ func ChangeReviewNum(db *gorm.DB, form req.ChangeReviewNumForm) (err error) {
 		//变更orderGoods相关消费复核差值map
 		orderGoodsIdConsumeMp[good.OrderGoodsId] = orderGoodsIdConsumeNum
 		//变更 order相关消费复核差值map
-		numberConsumeMp[good.Number] = numberConsumeNum
+		//numberConsumeMp[good.Number] = numberConsumeNum
 
 		outboundGoodsIdSlice = append(outboundGoodsIdSlice, good.OrderGoodsId)
 	}
@@ -430,6 +430,164 @@ func ChangeReviewNum(db *gorm.DB, form req.ChangeReviewNumForm) (err error) {
 	}
 
 	tx.Commit()
+
+	return
+}
+
+// 修改已拣数量
+func ChangeCompleteNum(db *gorm.DB, form req.ChangeCompleteNumForm) (err error) {
+
+	var (
+		mpForm    = make(map[string]int, len(form.SkuComplete)) // sku 变更 数量 map
+		skuSlice  []string                                      //查询
+		batch     model.Batch
+		pick      model.Pick
+		pickGoods []model.PickGoods
+	)
+
+	err, batch = model.GetBatchByPk(db, form.BatchId)
+
+	if err != nil {
+		return
+	}
+
+	//只允许改进行中的批次数据
+	if batch.Status != 0 {
+		err = errors.New("只能修改进行中的批次数据")
+		return
+	}
+
+	err, pick = model.GetPickByPk(db, form.PickId)
+
+	if err != nil {
+		return
+	}
+
+	//只允许修改待复核状态的数据
+	if pick.Status != model.ToBeReviewedStatus {
+		err = errors.New("只能修改待复核的数据")
+		return
+	}
+
+	for _, review := range form.SkuComplete {
+		mpForm[review.Sku] = *review.CompleteNum //sku 修改的完成数量 map
+		skuSlice = append(skuSlice, review.Sku)  //被修改完成数量的sku切片
+	}
+
+	err, pickGoods = model.GetPickGoodsByPickIdAndSku(db, form.PickId, skuSlice)
+
+	if err != nil {
+		return
+	}
+
+	var (
+		skuCompleteTotalMp = make(map[string]int) //当前拣货商品表中sku完成总数
+		skuNeedTotalMp     = make(map[string]int) //当前拣货商品表中sku需拣总数
+	)
+
+	//计算 pick_goods sku 完成总数 需拣总数
+	for _, good := range pickGoods {
+
+		//计算 当前拣货商品表中sku完成总数 开始
+		completeNum, completeOk := skuCompleteTotalMp[good.Sku]
+
+		if !completeOk {
+			completeNum = 0
+		}
+
+		completeNum += good.CompleteNum
+
+		skuCompleteTotalMp[good.Sku] = completeNum
+		//计算 当前拣货商品表中sku完成总数 结束
+
+		//计算 当前拣货商品表中sku需拣总数 开始
+		needNum, needOk := skuNeedTotalMp[good.Sku]
+
+		if !needOk {
+			needNum = 0
+		}
+
+		needNum += good.NeedNum
+
+		skuNeedTotalMp[good.Sku] = needNum
+		//计算 当前拣货商品表中sku需拣总数 结束
+	}
+
+	//完成数 差值 = 原来sku完成总数 - form.Num
+	var (
+		completeNumDiffMp    = make(map[string]int, len(form.SkuComplete)) //每个sku的完成数差值map
+		completeNumDiffTotal = 0                                           //完成数 总差值
+	)
+
+	for _, sr := range form.SkuComplete {
+		num, sntOk := skuNeedTotalMp[sr.Sku]
+
+		if !sntOk {
+			err = errors.New("sku:" + sr.Sku + "需拣数未找到")
+			return
+		}
+
+		if *sr.CompleteNum > num {
+			err = errors.New("修改后的完成数大于需拣数，请核对")
+			return
+		}
+
+		mpCompleteNum, srtOK := skuCompleteTotalMp[sr.Sku] //当前拣货商品表中sku完成总数
+
+		if !srtOK {
+			err = errors.New("sku:" + sr.Sku + "完成数未找到")
+			return
+		}
+
+		completeNumDiffMp[sr.Sku] = *sr.CompleteNum - mpCompleteNum
+
+		completeNumDiffTotal += completeNumDiffMp[sr.Sku]
+	}
+
+	//pick_goods pay_at
+	for i, good := range pickGoods {
+		completeNumDiff, completeNumDiffOk := completeNumDiffMp[good.Sku]
+
+		if !completeNumDiffOk || completeNumDiff == 0 {
+			continue
+		}
+
+		if completeNumDiff > 0 { //修改后的完成数比原来大 已拣要加 未拣要减
+			if good.NeedNum > good.CompleteNum { //需拣大于完成数，还有欠货，完成数可以加
+				surplus := good.NeedNum - good.CompleteNum //当前单还剩的可以完成数量
+				if completeNumDiff > surplus {             //修改的完成数差值 比 当前单还剩的完成数量 大 完成数可以加满
+					pickGoods[i].CompleteNum = good.NeedNum
+					completeNumDiff -= surplus
+				} else { //修改的完成数差值 比 当前单还剩的完成数量 小 当前单可以消耗完差值
+					pickGoods[i].CompleteNum += completeNumDiff //完成数可以消耗完，直接把完成数往上加
+					completeNumDiff = 0
+				}
+			} //没有 else 需拣小于等于完成数表明这单拣货完成，completeNumDiff > 0 已拣加不上去了
+
+		} else { //修改后的完成数比原来小 已拣要扣，未拣要增
+
+			reviewDiffAbs := math.Abs(float64(completeNumDiff))
+
+			if good.CompleteNum > int(reviewDiffAbs) { //完成数大于 完成数差值的绝对值 差值直接被消耗完了
+				pickGoods[i].CompleteNum = good.CompleteNum + completeNumDiff //completeNumDiff	小于0 这里的加的是负数
+				completeNumDiff = 0
+			} else { //当完成数本来就是0时，其实相当于什么都没做
+				pickGoods[i].CompleteNum = 0        //完成数扣到0
+				completeNumDiff += good.CompleteNum //差值 被消耗掉 good.completeNum 完成数个
+			}
+		}
+
+		//变更map中sku的差值
+		completeNumDiffMp[good.Sku] = completeNumDiff
+
+	}
+
+	//更新拣货商品表 完成数量 [need_num,review_num not null]
+	err = model.PickGoodsReplaceSave(db, &pickGoods, []string{"need_num", "complete_num", "review_num"})
+
+	if err != nil {
+		return
+	}
 
 	return
 }

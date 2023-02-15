@@ -765,7 +765,23 @@ func PrintCallGet(c *gin.Context) {
 
 	err, orderJoinGoods := model.GetOrderGoodsJoinOrderByIds(db, orderGoodsIds)
 	if err != nil {
+		xsq_net.ErrorJSON(c, err)
 		return
+	}
+
+	var (
+		compOrderJoinGoods []model.GoodsJoinOrder
+	)
+
+	err, compOrderJoinGoods = model.GetCompleteOrderJoinGoodsByOrderGoodsId(db, orderGoodsIds)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	for _, good := range compOrderJoinGoods {
+		orderJoinGoods = append(orderJoinGoods, good)
 	}
 
 	if len(orderJoinGoods) <= 0 {

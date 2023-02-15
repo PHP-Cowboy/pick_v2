@@ -2,11 +2,13 @@ package req
 
 type PickListForm struct {
 	Paging
-	BatchId int    `json:"batch_id" form:"batch_id" binding:"required"`
-	ShopId  int    `json:"shop_id" form:"shop_id"`
-	Goods   string `json:"goods" form:"goods"`
-	Number  string `json:"number" form:"number"`
-	Status  *int   `json:"status" form:"status"`
+	BatchId   int    `json:"batch_id" form:"batch_id" binding:"required"`
+	ShopId    int    `json:"shop_id" form:"shop_id"`
+	GoodsName string `json:"goods_name" form:"goods_name"`
+	GoodsType string `json:"goods_type" form:"goods_type"`
+	Number    string `json:"number" form:"number"`
+	Status    *int   `json:"status" form:"status"`
+	HasRemark int    `json:"has_remark" form:"has_remark"` //0:全部;1:有备注;2:无备注
 }
 
 type PickToppingForm struct {
@@ -48,6 +50,17 @@ type ChangeReviewNumForm struct {
 type SkuReview struct {
 	Sku       string `json:"sku" binding:"required"`
 	ReviewNum *int   `json:"review_num" binding:"required"`
+}
+
+type ChangeCompleteNumForm struct {
+	BatchId     int           `json:"batch_id" binding:"required"`
+	PickId      int           `json:"pick_id" binding:"required"`
+	SkuComplete []SkuComplete `json:"sku_complete"`
+}
+
+type SkuComplete struct {
+	Sku         string `json:"sku" binding:"required"`
+	CompleteNum *int   `json:"complete_num" binding:"required"`
 }
 
 type CancelPickForm struct {

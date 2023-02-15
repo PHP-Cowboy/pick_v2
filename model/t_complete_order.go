@@ -16,6 +16,7 @@ type CompleteOrder struct {
 	ShopCode       string  `gorm:"type:varchar(255);not null;comment:店铺编号"`
 	Line           string  `gorm:"type:varchar(255);not null;comment:线路"`
 	DeliveryMethod int     `gorm:"type:tinyint;not null;comment:配送方式"`
+	HouseCode      string  `gorm:"type:varchar(64);not null;comment:仓库编码"`
 	Province       string  `gorm:"type:varchar(64);comment:省"`
 	City           string  `gorm:"type:varchar(64);comment:市"`
 	District       string  `gorm:"type:varchar(64);comment:区"`

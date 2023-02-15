@@ -1,0 +1,105 @@
+package cainiao
+
+import (
+	"errors"
+
+	"crypto/md5"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"net/url"
+
+	"github.com/go-resty/resty/v2"
+)
+
+var (
+	ErrCallAPIFailed = errors.New("call API failed")
+	ErrAPIBizError   = errors.New("API biz error")
+)
+
+type body map[string]string
+
+func newBody(config Config, data interface{}) body {
+	b := body{
+		"msg_type":             config.MsgType,
+		"logistic_provider_id": config.LogisticProviderId,
+		"to_code":              config.ToCode,
+	}
+
+	if bs, err := json.Marshal(data); err == nil {
+		d := string(bs)
+		b["logistics_interface"] = d
+		b["data_digest"] = sign(d, config.AppKey)
+	}
+
+	return b
+}
+
+func (b body) EncodeToString() string {
+	str := ""
+	for k, v := range b {
+		str += k + "=" + v + "&"
+	}
+
+	return url.QueryEscape(str[:len(str)-1])
+}
+
+type Config struct {
+	BaseURL            string
+	AppKey             string
+	AppSecret          string
+	MsgType            string
+	LogisticProviderId string // 货主编码
+	ToCode             string
+	PartnerCode        string
+	FromCode           string
+}
+
+type Request struct {
+	config Config
+}
+
+func New(config Config) Request {
+	req := Request{
+		config: config,
+	}
+
+	return req
+}
+
+func (req Request) execute(r *resty.Request, method, url string) (Values, error) {
+	resp, err := r.
+		SetResult(Values{}).
+		Execute(method, url)
+
+	if err != nil {
+		return nil, fmt.Errorf("%w error: %s", ErrCallAPIFailed, err.Error())
+	}
+
+	if resp.StatusCode() != 200 {
+		return nil, fmt.Errorf("%w error: %s", ErrCallAPIFailed, resp.String())
+	}
+
+	result, ok := resp.Result().(*Values)
+	if !ok {
+		return Values{}, fmt.Errorf("%w: type of result is not Values", ErrCallAPIFailed)
+	}
+
+	return *result, err
+}
+
+func (req Request) Post(data interface{}) (Values, error) {
+	b := newBody(req.config, data)
+
+	r := resty.New().R().
+		EnableTrace().
+		SetBody(b.EncodeToString())
+
+	return req.execute(r, resty.MethodPost, req.config.BaseURL)
+}
+
+func sign(content, key string) string {
+	signature := md5.Sum([]byte(content + key))
+
+	return base64.StdEncoding.EncodeToString(signature[:])
+}

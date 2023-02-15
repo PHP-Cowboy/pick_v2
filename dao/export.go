@@ -14,7 +14,7 @@ func GoodsSummaryList(db *gorm.DB, form req.GoodsSummaryListForm) (err error, mp
 
 	var list []model.PrePickGoodsJoinPrePick
 
-	err, list = model.GetPrePickGoodsJoinPrePickListByBatchId(db, form.BatchId, []string{})
+	err, list = model.GetPrePickGoodsJoinPrePickListByBatchId(db, form.BatchId, form.GoodsTypes)
 
 	for _, l := range list {
 		shopCodes = append(shopCodes, l.ShopCode)
@@ -48,6 +48,7 @@ func GoodsSummaryList(db *gorm.DB, form req.GoodsSummaryListForm) (err error, mp
 
 		subMp["商品名称"] = pg.GoodsName
 		subMp["规格"] = pg.GoodsSpe
+		subMp["分类"] = pg.GoodsType
 		subMp["单位"] = pg.Unit
 
 		_, msOk := mpSum[pg.Sku]
@@ -62,7 +63,7 @@ func GoodsSummaryList(db *gorm.DB, form req.GoodsSummaryListForm) (err error, mp
 		mp[pg.Sku] = subMp
 	}
 
-	column = []string{"商品名称", "规格", "单位", "总计"}
+	column = []string{"商品名称", "规格", "分类", "单位", "总计"}
 
 	shopCodes = slice.UniqueSlice(shopCodes)
 
@@ -113,7 +114,7 @@ func ShopAddress(form req.ShopAddressReq) (err error, mp map[int]map[string]stri
 
 		if !mpOk {
 			val = make(map[string]string, 0)
-
+			val["shop_name"] = o.ShopName
 			val["consignee_name"] = o.ConsigneeName
 			val["consignee_tel"] = o.ConsigneeTel
 			val["province"] = o.Province

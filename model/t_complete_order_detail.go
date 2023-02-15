@@ -5,6 +5,7 @@ import "gorm.io/gorm"
 // 完成订单明细表
 type CompleteOrderDetail struct {
 	Base
+	OrderGoodsId    int      `gorm:"type:int(11) unsigned;comment:订单商品ID"`
 	Number          string   `gorm:"type:varchar(64);index;comment:订单编号"`
 	GoodsName       string   `gorm:"type:varchar(64);comment:商品名称"`
 	Sku             string   `gorm:"type:varchar(64);comment:sku"`
@@ -15,6 +16,7 @@ type CompleteOrderDetail struct {
 	CloseCount      int      `gorm:"type:int(11);comment:关闭数量"`
 	ReviewCount     int      `gorm:"type:int(11);comment:出库数量"`
 	GoodsRemark     string   `gorm:"type:varchar(255);comment:商品备注"`
+	DiscountPrice   int      `gorm:"type:int(11);comment:折扣价"`
 	DeliveryOrderNo GormList `gorm:"type:varchar(255);comment:出库单号"`
 }
 
@@ -32,6 +34,18 @@ func GetCompleteOrderDetailBySku(db *gorm.DB, sku string) (err error, list []Com
 	result := db.Model(&CompleteOrderDetail{}).Where("sku = ?", sku).Find(&list)
 
 	return result.Error, list
+}
+
+func GetCompleteOrderJoinGoodsByOrderGoodsId(db *gorm.DB, orderGoodsIds []int) (err error, list []GoodsJoinOrder) {
+	err = db.Table("t_complete_order_detail od").
+		Select("*,delivery_method as distribution_type").
+		Joins("left join t_complete_order o on od.number = o.number").
+		Where("od.order_goods_id in (?)", orderGoodsIds).
+		Order("pay_at ASC").
+		Find(&list).
+		Error
+
+	return
 }
 
 type CompleteOrderNums struct {

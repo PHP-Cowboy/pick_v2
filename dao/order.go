@@ -126,16 +126,18 @@ func NoShipping(db *gorm.DB, form req.PurchaseOrderForm, info rsp.OrderInfo) (co
 	for _, goods := range info.GoodsInfo {
 
 		completeOrderDetail = append(completeOrderDetail, model.CompleteOrderDetail{
-			Number:      info.Number,
-			GoodsName:   goods.Name,
-			Sku:         goods.Sku,
-			GoodsType:   goods.GoodsType,
-			GoodsSpe:    goods.GoodsSpe,
-			Shelves:     goods.Shelves,
-			PayCount:    goods.PayCount,
-			CloseCount:  0,
-			ReviewCount: goods.PayCount,
-			GoodsRemark: goods.GoodsRemark,
+			OrderGoodsId:  goods.ID,
+			Number:        info.Number,
+			GoodsName:     goods.Name,
+			Sku:           goods.Sku,
+			GoodsType:     goods.GoodsType,
+			GoodsSpe:      goods.GoodsSpe,
+			Shelves:       goods.Shelves,
+			PayCount:      goods.PayCount,
+			CloseCount:    0,
+			ReviewCount:   goods.PayCount,
+			DiscountPrice: goods.DiscountPrice,
+			GoodsRemark:   goods.GoodsRemark,
 		})
 	}
 
@@ -150,6 +152,7 @@ func NoShipping(db *gorm.DB, form req.PurchaseOrderForm, info rsp.OrderInfo) (co
 		ShopCode:       info.ShopCode,
 		Line:           info.Line,
 		DeliveryMethod: info.DistributionType,
+		HouseCode:      info.HouseCode,
 		Province:       info.Province,
 		City:           info.City,
 		District:       info.District,

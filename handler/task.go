@@ -14,6 +14,7 @@ import (
 	"pick_v2/model"
 	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
+	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"strings"
@@ -53,7 +54,7 @@ func PickList(c *gin.Context) {
 	var form req.PickListForm
 
 	if err := c.ShouldBind(&form); err != nil {
-		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		xsq_net.ErrorJSON(c, err)
 		return
 	}
 
@@ -68,8 +69,16 @@ func PickList(c *gin.Context) {
 		result     *gorm.DB
 	)
 
-	if form.Goods != "" || form.Number != "" || form.ShopId > 0 {
-		result = db.Where(model.PickGoods{BatchId: form.BatchId, GoodsName: form.Goods, Number: form.Number, ShopId: form.ShopId}).Find(&pickGoods)
+	if form.GoodsName != "" || form.Number != "" || form.ShopId > 0 {
+		result = db.Where(model.PickGoods{
+			BatchId:   form.BatchId,
+			Number:    form.Number,
+			ShopId:    form.ShopId,
+			Status:    model.PickGoodsStatusNormal,
+			GoodsType: form.GoodsType,
+		}).Where("goods_name like ?", "%"+form.GoodsName+"%").
+			Find(&pickGoods)
+
 		if result.Error != nil {
 			xsq_net.ErrorJSON(c, result.Error)
 			return
@@ -90,14 +99,10 @@ func PickList(c *gin.Context) {
 
 	result = localDb.Find(&pick)
 
-	res.Total = result.RowsAffected
-
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
 		return
 	}
-
-	result = localDb.Order("sort desc").Scopes(model.Paginate(form.Page, form.Size)).Find(&pick)
 
 	//拣货ids
 	pickIds := make([]int, 0, len(pick))
@@ -112,6 +117,39 @@ func PickList(c *gin.Context) {
 		return
 	}
 
+	//构建pickId 对应的订单 是否有备注map
+	remarkMp := make(map[int]struct{}, 0) //key 存在即为有
+	remarkPickIds := make([]int, 0)
+	for _, remark := range pickRemark {
+		remarkMp[remark.PickId] = struct{}{}
+
+		if form.HasRemark > 0 {
+			remarkPickIds = append(remarkPickIds, remark.PickId)
+		}
+	}
+
+	if form.HasRemark == 1 {
+		//有备注
+		pickIds = remarkPickIds
+	} else if form.HasRemark == 2 {
+		//无备注
+		pickIds = slice.Diff(pickIds, remarkPickIds)
+	}
+
+	//覆盖查询条件
+	localDb = db.Table("t_pick")
+
+	//这里ids可能变了，要重新查询，不然统计数量可能不对
+	if len(pickIds) > 0 {
+		localDb.Where("id in (?)", pickIds)
+	}
+
+	localDb.Where("batch_id = ? and status = ?", form.BatchId, form.Status)
+
+	result = localDb.Find(&pick)
+
+	res.Total = result.RowsAffected
+
 	query := "pick_id,count(distinct(shop_id)) as shop_num,count(distinct(number)) as order_num,sum(need_num) as need_num,sum(complete_num) as complete_num,sum(review_num) as review_num"
 
 	err, numsMp := model.CountPickPoolNumsByPickIds(db, pickIds, query)
@@ -120,11 +158,7 @@ func PickList(c *gin.Context) {
 		return
 	}
 
-	//构建pickId 对应的订单 是否有备注map
-	remarkMp := make(map[int]struct{}, 0) //key 存在即为有
-	for _, remark := range pickRemark {
-		remarkMp[remark.PickId] = struct{}{}
-	}
+	result = localDb.Order("sort desc").Scopes(model.Paginate(form.Page, form.Size)).Find(&pick)
 
 	isRemark := false
 
@@ -452,6 +486,27 @@ func ChangeReviewNum(c *gin.Context) {
 	}
 
 	err := dao.ChangeReviewNum(global.DB, form)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+}
+
+// 修改已拣数量
+func ChangeCompleteNum(c *gin.Context) {
+	var form req.ChangeCompleteNumForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err := dao.ChangeCompleteNum(global.DB, form)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)

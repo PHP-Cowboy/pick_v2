@@ -27,6 +27,8 @@ func TaskRoute(g *gin.RouterGroup) {
 		taskGroup.POST("/assign", handler.Assign)
 		//修改复核数
 		taskGroup.POST("/changeReviewNum", handler.ChangeReviewNum)
+		//修改已拣数量
+		taskGroup.POST("/changeCompleteNum", handler.ChangeCompleteNum)
 		//取消拣货
 		taskGroup.POST("/cancelPick", handler.CancelPick)
 	}

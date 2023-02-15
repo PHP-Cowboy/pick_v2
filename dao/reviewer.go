@@ -551,11 +551,67 @@ func QuickDelivery(db *gorm.DB, form req.QuickDeliveryReq) (err error) {
 	//当前时间
 	now := time.Now()
 
+	//获取批次数据
+	err, batch = model.GetBatchByPk(db, form.BatchId)
+
+	if err != nil {
+		return
+	}
+
+	err, pickGoods = model.GetPickGoodsByPickIds(db, form.Ids)
+
+	if err != nil {
+		return
+	}
+
+	var (
+		pickNumsMp     = make(map[int]int, 0)
+		printChMp      = make(map[int]int, 0)               //构造打印 chan 结构体数据
+		orderNumbers   = make([]string, 0)                  //构造更新 出库任务订单表数据 使用
+		skuCompleteNum = make(map[string]map[string]int, 0) //订单号对应的sku的拣货数量 map[number][sku] = CompleteNum
+		numberPickIdMp = make(map[string]int, 0)            //订单号对应的拣货id，在后台拣货中一个订单只会对应一个拣货id，其他的拣货任务中不一定【合并拣货一个单可能对应多个拣货ID】
+	)
+
+	for k, pg := range pickGoods {
+
+		numberSkuMp, skuCompleteNumOk := skuCompleteNum[pg.Number]
+
+		if !skuCompleteNumOk {
+			numberSkuMp = make(map[string]int, 0)
+		}
+
+		numberSkuMp[pg.Sku] = pg.CompleteNum
+
+		skuCompleteNum[pg.Number] = numberSkuMp
+
+		pickNumsMp[pg.PickId] += pg.NeedNum
+
+		_, printChOk := printChMp[pg.ShopId]
+
+		if !printChOk {
+			printChMp[pg.ShopId] = pg.PickId
+		}
+
+		pickGoods[k].ReviewNum = pg.CompleteNum
+
+		numberPickIdMp[pg.Number] = pg.PickId
+
+		//更新订单表
+		orderNumbers = append(orderNumbers, pg.Number)
+
+	}
+
 	for i, p := range picks {
 		//不是待复核状态
 		if p.Status != model.ToBeReviewedStatus {
 			err = ecode.OrderNotToBeReviewed
 			return
+		}
+
+		num, pickNumsMpOk := pickNumsMp[p.Id]
+
+		if !pickNumsMpOk {
+			num = 0
 		}
 
 		var deliveryOrderNo string
@@ -577,53 +633,7 @@ func QuickDelivery(db *gorm.DB, form req.QuickDeliveryReq) (err error) {
 		picks[i].DeliveryNo = deliveryOrderNo
 		picks[i].PrintNum += 1
 		picks[i].OutboundType = model.OutboundTypeNormal
-
-	}
-
-	//获取批次数据
-	err, batch = model.GetBatchByPk(db, form.BatchId)
-
-	if err != nil {
-		return
-	}
-
-	err, pickGoods = model.GetPickGoodsByPickIds(db, form.Ids)
-
-	if err != nil {
-		return
-	}
-
-	var (
-		printChMp      = make(map[int]int, 0)               //构造打印 chan 结构体数据
-		orderNumbers   = make([]string, 0)                  //构造更新 出库任务订单表数据 使用
-		skuCompleteNum = make(map[string]map[string]int, 0) //订单号对应的sku的拣货数量 map[number][sku] = CompleteNum
-		numberPickIdMp = make(map[string]int, 0)            //订单号对应的拣货id，在后台拣货中一个订单只会对应一个拣货id，其他的拣货任务中不一定【合并拣货一个单可能对应多个拣货ID】
-	)
-
-	for k, pg := range pickGoods {
-
-		numberSkuMp, skuCompleteNumOk := skuCompleteNum[pg.Number]
-
-		if !skuCompleteNumOk {
-			numberSkuMp = make(map[string]int, 0)
-		}
-
-		numberSkuMp[pg.Sku] = pg.CompleteNum
-
-		skuCompleteNum[pg.Number] = numberSkuMp
-
-		_, printChOk := printChMp[pg.ShopId]
-
-		if !printChOk {
-			printChMp[pg.ShopId] = pg.PickId
-		}
-
-		pickGoods[k].ReviewNum = pg.CompleteNum
-
-		numberPickIdMp[pg.Number] = pg.PickId
-
-		//更新订单表
-		orderNumbers = append(orderNumbers, pg.Number)
+		picks[i].Num = num
 
 	}
 
@@ -705,7 +715,7 @@ func QuickDelivery(db *gorm.DB, form req.QuickDeliveryReq) (err error) {
 	}
 
 	//拣货任务数据更新
-	err = model.PickReplaceSave(tx, &picks, []string{"status", "review_time", "delivery_order_no", "delivery_no", "print_num", "outbound_type"})
+	err = model.PickReplaceSave(tx, &picks, []string{"num", "status", "review_time", "delivery_order_no", "delivery_no", "print_num", "outbound_type"})
 
 	if err != nil {
 		tx.Rollback()

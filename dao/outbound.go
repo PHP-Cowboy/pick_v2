@@ -1033,6 +1033,7 @@ func OrderUpdateHandle(
 
 			//完成订单详情
 			completeOrderDetail = append(completeOrderDetail, model.CompleteOrderDetail{
+				OrderGoodsId:    goodsJoinOrder.OrderGoodsId,
 				Number:          goodsJoinOrder.Number,
 				GoodsName:       goodsJoinOrder.GoodsName,
 				Sku:             goodsJoinOrder.Sku,
@@ -1043,6 +1044,7 @@ func OrderUpdateHandle(
 				CloseCount:      goodsJoinOrder.CloseCount,
 				ReviewCount:     goodsJoinOrder.OutCount,
 				GoodsRemark:     goodsJoinOrder.GoodsRemark,
+				DiscountPrice:   goodsJoinOrder.DiscountPrice,
 				DeliveryOrderNo: deliveryOrderNoArr,
 			})
 
@@ -1068,6 +1070,7 @@ func OrderUpdateHandle(
 				ShopCode:       goodsJoinOrder.ShopCode,
 				Line:           goodsJoinOrder.Line,
 				DeliveryMethod: goodsJoinOrder.DistributionType,
+				HouseCode:      goodsJoinOrder.HouseCode,
 				Province:       goodsJoinOrder.Province,
 				City:           goodsJoinOrder.City,
 				District:       goodsJoinOrder.District,
