@@ -1,8 +1,8 @@
 package request
 
 import (
-	"topsdk/defaultability/domain"
-	"topsdk/util"
+	"pick_v2/dao/waybill/defaultability/domain"
+	"pick_v2/dao/waybill/util"
 )
 
 type CainiaoWaybillIiQueryByTradecodeRequest struct {
