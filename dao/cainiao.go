@@ -70,7 +70,7 @@ func Sign(content, key string) string {
 	return base64.StdEncoding.EncodeToString(signature[:])
 }
 
-type CreateRequest struct {
+type WayBillGetForm struct {
 	BaseURL     string
 	AppKey      string
 	FromCode    string
@@ -140,16 +140,13 @@ var (
 	appSecret = "olmT3icH12h5n2Q0978x3BZnD89g722q"
 )
 
-func Create(req CreateRequest) (CreateResponse, error) {
+func WayBillGet(req WayBillGetForm) (CreateResponse, error) {
 	apiReq := cainiao.New(cainiao.Config{
 		BaseURL:            baseURL,
 		AppKey:             appKey,
 		AppSecret:          appSecret,
 		MsgType:            "TMS_WAYBILL_GET",
-		LogisticProviderId: "",
-		ToCode:             "",
-		PartnerCode:        req.PartnerCode,
-		FromCode:           req.FromCode,
+		LogisticProviderId: "", //中通
 	})
 
 	vals, err := apiReq.Post(req.Data)
