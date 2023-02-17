@@ -2,14 +2,28 @@ package waybill
 
 import (
 	"fmt"
+	"pick_v2/dao/waybill/ability229"
+	ability229Domain "pick_v2/dao/waybill/ability229/domain"
+	ability229req "pick_v2/dao/waybill/ability229/request"
 	"pick_v2/dao/waybill/defaultability"
 	"pick_v2/dao/waybill/defaultability/domain"
 	"pick_v2/dao/waybill/defaultability/request"
 )
 
-func WaybillIiGet() {
+func NewAbility() *defaultability.Defaultability {
 	client := NewDefaultTopClient(AppKey, AppSecret, GatewayUrl, 20000, 20000)
-	ability := defaultability.NewDefaultability(&client)
+	return defaultability.NewDefaultability(&client)
+}
+
+func NewAbility229() *ability229.Ability229 {
+
+	client := NewDefaultTopClient(AppKey, AppSecret, GatewayUrl, 20000, 20000)
+	return ability229.NewAbility229(&client)
+}
+
+// 获取电子面单
+func WaybillIiGet() {
+	ability := NewAbility()
 
 	cainiaoWaybillIiGetAddressDto := domain.CainiaoWaybillIiGetAddressDto{}
 	cainiaoWaybillIiGetAddressDto.SetCity("北京市")
@@ -94,6 +108,118 @@ func WaybillIiGet() {
 	req.SetParamWaybillCloudPrintApplyNewRequest(cainiaoWaybillIiGetWaybillCloudPrintApplyNewRequest)
 
 	resp, err := ability.CainiaoWaybillIiGet(&req, UserSession)
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println(resp.Body)
+	}
+}
+
+// 取消获取的电子面单号
+func WaybillIiCancel() {
+
+	ability := NewAbility()
+
+	req := request.CainiaoWaybillIiCancelRequest{}
+	req.SetCpCode("POSTB")
+	req.SetWaybillCode("1111")
+
+	resp, err := ability.CainiaoWaybillIiCancel(&req, UserSession)
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println(resp.Body)
+	}
+}
+
+// 电子面单更新
+func WaybillIiUpdate() {
+
+	ability := NewAbility()
+
+	cainiaoWaybillIiUpdateItem := domain.CainiaoWaybillIiUpdateItem{}
+	cainiaoWaybillIiUpdateItem.SetCount(1)
+	cainiaoWaybillIiUpdateItem.SetName("鞋子")
+	cainiaoWaybillIiUpdatePackageInfoDto := domain.CainiaoWaybillIiUpdatePackageInfoDto{}
+	//
+	cainiaoWaybillIiUpdatePackageInfoDto.SetItems([]domain.CainiaoWaybillIiUpdateItem{})
+	cainiaoWaybillIiUpdatePackageInfoDto.SetVolume(1)
+	cainiaoWaybillIiUpdatePackageInfoDto.SetWeight(1)
+	cainiaoWaybillIiUpdateAddressDto := domain.CainiaoWaybillIiUpdateAddressDto{}
+	cainiaoWaybillIiUpdateAddressDto.SetCity("杭州市")
+	cainiaoWaybillIiUpdateAddressDto.SetDetail("西溪园区")
+	cainiaoWaybillIiUpdateAddressDto.SetDistrict("余杭区")
+	cainiaoWaybillIiUpdateAddressDto.SetProvince("浙江省")
+	cainiaoWaybillIiUpdateAddressDto.SetTown("文一西路")
+	cainiaoWaybillIiUpdateUserInfoDto := domain.CainiaoWaybillIiUpdateUserInfoDto{}
+	cainiaoWaybillIiUpdateUserInfoDto.SetAddress(cainiaoWaybillIiUpdateAddressDto)
+	cainiaoWaybillIiUpdateUserInfoDto.SetMobile("132432323")
+	cainiaoWaybillIiUpdateUserInfoDto.SetName("Foo")
+	cainiaoWaybillIiUpdateUserInfoDto.SetPhone("05712323241")
+	cainiaoWaybillIiUpdateUserInfoDto.SetOaid("abcdefghijklmn")
+	cainiaoWaybillIiUpdateUserInfoDto.SetCaid("abcdefghijklmn")
+
+	cainiaoWaybillIiUpdateUserInfoDto = domain.CainiaoWaybillIiUpdateUserInfoDto{}
+	cainiaoWaybillIiUpdateUserInfoDto.SetMobile("1352353325")
+	cainiaoWaybillIiUpdateUserInfoDto.SetName("Foo")
+	cainiaoWaybillIiUpdateUserInfoDto.SetPhone("05714232523")
+	cainiaoWaybillIiUpdateWaybillCloudPrintUpdateRequest := domain.CainiaoWaybillIiUpdateWaybillCloudPrintUpdateRequest{}
+	cainiaoWaybillIiUpdateWaybillCloudPrintUpdateRequest.SetCpCode("POSTB")
+	cainiaoWaybillIiUpdateWaybillCloudPrintUpdateRequest.SetLogisticsServices(`{     "SVC-COD": {         "value": "200"     } }`)
+	cainiaoWaybillIiUpdateWaybillCloudPrintUpdateRequest.SetPackageInfo(cainiaoWaybillIiUpdatePackageInfoDto)
+	cainiaoWaybillIiUpdateWaybillCloudPrintUpdateRequest.SetRecipient(cainiaoWaybillIiUpdateUserInfoDto)
+	cainiaoWaybillIiUpdateWaybillCloudPrintUpdateRequest.SetSender(cainiaoWaybillIiUpdateUserInfoDto)
+	cainiaoWaybillIiUpdateWaybillCloudPrintUpdateRequest.SetTemplateUrl("http://cloudprint.cainiao.com/cloudprint/template/getStandardTemplate.json?template_id=1001")
+	cainiaoWaybillIiUpdateWaybillCloudPrintUpdateRequest.SetWaybillCode("9890000160004")
+	cainiaoWaybillIiUpdateWaybillCloudPrintUpdateRequest.SetObjectId("x")
+
+	req := request.CainiaoWaybillIiUpdateRequest{}
+	req.SetParamWaybillCloudPrintUpdateRequest(cainiaoWaybillIiUpdateWaybillCloudPrintUpdateRequest)
+
+	resp, err := ability.CainiaoWaybillIiUpdate(&req, UserSession)
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println(resp.Body)
+	}
+}
+
+// 获取所有的菜鸟标准电子面单模板
+func StdTemplatesGet() {
+
+}
+
+// 通过打印机命令打印
+func Print() {
+
+	ability := NewAbility229()
+
+	cainiaoCloudprintCmdprintRenderRenderContent := ability229Domain.CainiaoCloudprintCmdprintRenderRenderContent{}
+	cainiaoCloudprintCmdprintRenderRenderContent.SetPrintData("{}")
+	cainiaoCloudprintCmdprintRenderRenderContent.SetTemplateUrl("http://cloudprint.cainiao.com/template/standard/401")
+	cainiaoCloudprintCmdprintRenderRenderContent.SetEncrypted(true)
+	cainiaoCloudprintCmdprintRenderRenderContent.SetVer("waybill_print_secret_version_1")
+	cainiaoCloudprintCmdprintRenderRenderContent.SetSignature("MD:8jyWc0A8m/4CkO9bw9oqHA==")
+	cainiaoCloudprintCmdprintRenderRenderContent.SetAddData("{ sender:{ address:{ detail:蒋村街道西溪诚园小区2-1-101 } } }")
+	cainiaoCloudprintCmdprintRenderRenderDocument := ability229Domain.CainiaoCloudprintCmdprintRenderRenderDocument{}
+	//
+	cainiaoCloudprintCmdprintRenderRenderDocument.SetContents([]ability229Domain.CainiaoCloudprintCmdprintRenderRenderContent{})
+	cainiaoCloudprintCmdprintRenderRenderConfig := ability229Domain.CainiaoCloudprintCmdprintRenderRenderConfig{}
+	cainiaoCloudprintCmdprintRenderRenderConfig.SetOrientation("normal")
+	cainiaoCloudprintCmdprintRenderRenderConfig.SetNeedBottomLogo(true)
+	cainiaoCloudprintCmdprintRenderRenderConfig.SetNeedMiddleLogo(true)
+	cainiaoCloudprintCmdprintRenderRenderConfig.SetNeedTopLogo(true)
+	cainiaoCloudprintCmdprintRenderCmdRenderParams := ability229Domain.CainiaoCloudprintCmdprintRenderCmdRenderParams{}
+	cainiaoCloudprintCmdprintRenderCmdRenderParams.SetDocument(cainiaoCloudprintCmdprintRenderRenderDocument)
+	cainiaoCloudprintCmdprintRenderCmdRenderParams.SetPrinterName("KM-300S-EB13")
+	cainiaoCloudprintCmdprintRenderCmdRenderParams.SetClientId("abc123")
+	cainiaoCloudprintCmdprintRenderCmdRenderParams.SetClientType("alipay")
+	cainiaoCloudprintCmdprintRenderCmdRenderParams.SetConfig(cainiaoCloudprintCmdprintRenderRenderConfig)
+
+	req := ability229req.CainiaoCloudprintCmdprintRenderRequest{}
+	req.SetParams(cainiaoCloudprintCmdprintRenderCmdRenderParams)
+
+	resp, err := ability.CainiaoCloudprintCmdprintRender(&req, UserSession)
 	if err != nil {
 		fmt.Println(err)
 	} else {
