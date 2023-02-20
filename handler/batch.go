@@ -722,7 +722,7 @@ func PrintCallGet(c *gin.Context) {
 		return
 	}
 
-	printCh := dao.GetPrintJobMap(form.HouseCode)
+	printCh := dao.GetPrintJobMap(form.HouseCode, form.Typ)
 
 	//通道中没有任务
 	if printCh == nil {
@@ -735,9 +735,15 @@ func PrintCallGet(c *gin.Context) {
 		pickGoods []model.PickGoods
 	)
 
+	typ := []int{1}
+
+	if form.Typ > 0 {
+		typ = []int{2, 3}
+	}
+
 	db := global.DB
 
-	result := db.Model(&model.Pick{}).Where("delivery_no = ?", printCh.DeliveryOrderNo).Find(&pick)
+	result := db.Model(&model.Pick{}).Where("delivery_no = ? and typ in (?)", printCh.DeliveryOrderNo, typ).Find(&pick)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

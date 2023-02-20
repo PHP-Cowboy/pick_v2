@@ -8,20 +8,31 @@ import (
 var BaseNum = 3
 
 // 打印 写入
-func AddPrintJobMap(warehouseCode string, printCh *global.PrintCh) {
-	_, ok := global.PrintMapCh[warehouseCode]
+func AddPrintJobMap(warehouseCode string, typ int, printCh *global.PrintCh) {
+	_, ok := global.PrintMapCh[warehouseCode][typ]
 
 	if !ok {
-		ch := make(chan *global.PrintCh, 1000)
-		global.PrintMapCh[warehouseCode] = ch
+		printMapCh, printMapChOk := global.PrintMapCh[warehouseCode]
+
+		if !printMapChOk {
+			ch := make(chan *global.PrintCh, 1000)
+			ch <- printCh
+			global.PrintMapCh[warehouseCode][typ] = ch
+			return
+		}
+
+		printMapCh[typ] <- printCh
+
+		global.PrintMapCh[warehouseCode] = printMapCh
+		return
 	}
 
-	global.PrintMapCh[warehouseCode] <- printCh
+	global.PrintMapCh[warehouseCode][typ] <- printCh
 }
 
 // 打印 读取消费
-func GetPrintJobMap(warehouseCode string) *global.PrintCh {
-	job, ok := global.PrintMapCh[warehouseCode]
+func GetPrintJobMap(warehouseCode string, typ int) *global.PrintCh {
+	job, ok := global.PrintMapCh[warehouseCode][typ]
 
 	if !ok {
 		return nil

@@ -403,7 +403,7 @@ func ConfirmDelivery(db *gorm.DB, form req.ConfirmDeliveryReq) (err error) {
 
 	//拆单 -打印
 	for shopId := range printChMp {
-		AddPrintJobMap(constant.JH_HUOSE_CODE, &global.PrintCh{
+		AddPrintJobMap(constant.JH_HUOSE_CODE, pick.Typ, &global.PrintCh{
 			DeliveryOrderNo: deliveryOrderNo,
 			ShopId:          shopId,
 			Type:            1, // 1-全部打印 2-打印箱单 3-打印出库单 第一次全打，后边的前段选
@@ -533,12 +533,16 @@ func TaskEndDeliveryUpdateOrders(
 
 // 快捷出库
 func QuickDelivery(db *gorm.DB, form req.QuickDeliveryReq) (err error) {
+	type PickPrint struct {
+		DeliveryOrderNo string
+		Typ             int
+	}
 
 	var (
 		picks                   []model.Pick
 		pickGoods               []model.PickGoods
 		batch                   model.Batch
-		pickIdDeliveryOrderNoMp = make(map[int]string, 0)
+		pickIdDeliveryOrderNoMp = make(map[int]PickPrint, 0)
 	)
 
 	//根据id获取拣货数据
@@ -623,7 +627,10 @@ func QuickDelivery(db *gorm.DB, form req.QuickDeliveryReq) (err error) {
 			return
 		}
 
-		pickIdDeliveryOrderNoMp[p.Id] = deliveryOrderNo
+		pickIdDeliveryOrderNoMp[p.Id] = PickPrint{
+			DeliveryOrderNo: deliveryOrderNo,
+			Typ:             p.Typ,
+		}
 
 		no := model.GormList{deliveryOrderNo}
 
@@ -691,7 +698,7 @@ func QuickDelivery(db *gorm.DB, form req.QuickDeliveryReq) (err error) {
 
 		deliveryOrderNoArr := make(model.GormList, 0)
 		//一个任务下一个商品只会有一个出库单
-		deliveryOrderNoArr = append(deliveryOrderNoArr, deliveryOrderNo)
+		deliveryOrderNoArr = append(deliveryOrderNoArr, deliveryOrderNo.DeliveryOrderNo)
 
 		//构造更新出库单商品表数据
 		outboundGoods = append(outboundGoods, model.OutboundGoods{
@@ -747,8 +754,8 @@ func QuickDelivery(db *gorm.DB, form req.QuickDeliveryReq) (err error) {
 			continue
 		}
 
-		AddPrintJobMap(constant.JH_HUOSE_CODE, &global.PrintCh{
-			DeliveryOrderNo: deliveryOrderNo,
+		AddPrintJobMap(constant.JH_HUOSE_CODE, deliveryOrderNo.Typ, &global.PrintCh{
+			DeliveryOrderNo: deliveryOrderNo.DeliveryOrderNo,
 			ShopId:          shopId,
 			Type:            3, // 1-全部打印 2-打印箱单 3-打印出库单
 		})

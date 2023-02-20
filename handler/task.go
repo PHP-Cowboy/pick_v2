@@ -365,8 +365,10 @@ func PushPrint(c *gin.Context) {
 	}
 
 	pickMp := make(map[int]string, 0)
+	pickTypeMp := make(map[int]int, 0)
 
 	for i, p := range pick {
+		pickTypeMp[p.Id] = p.Typ
 		pickMp[p.Id] = strings.Join(p.DeliveryOrderNo, ",")
 		pick[i].PrintNum += 1
 	}
@@ -380,7 +382,13 @@ func PushPrint(c *gin.Context) {
 
 	shopAndPickGoodsIdMp := make(map[string]struct{})
 
-	printChSlice := make([]global.PrintCh, 0)
+	type Print struct {
+		DeliveryOrderNo string
+		ShopId          int
+		Typ             int
+	}
+
+	printChSlice := make([]Print, 0)
 	for _, good := range pickGoods {
 		deliveryOrderNo, pickOk := pickMp[good.PickId]
 
@@ -394,14 +402,23 @@ func PushPrint(c *gin.Context) {
 			continue
 		}
 		shopAndPickGoodsIdMp[mpKey] = struct{}{}
-		printChSlice = append(printChSlice, global.PrintCh{
+
+		typ, pickTypeMpOk := pickTypeMp[good.PickId]
+
+		if !pickTypeMpOk {
+			xsq_net.ErrorJSON(c, errors.New("拣货任务对应类型不存在"))
+			return
+		}
+
+		printChSlice = append(printChSlice, Print{
 			DeliveryOrderNo: deliveryOrderNo,
 			ShopId:          good.ShopId,
+			Typ:             typ,
 		})
 	}
 
 	for _, ch := range printChSlice {
-		dao.AddPrintJobMap(constant.JH_HUOSE_CODE, &global.PrintCh{
+		dao.AddPrintJobMap(constant.JH_HUOSE_CODE, ch.Typ, &global.PrintCh{
 			DeliveryOrderNo: ch.DeliveryOrderNo,
 			ShopId:          ch.ShopId,
 			Type:            form.Type, //打印类型
