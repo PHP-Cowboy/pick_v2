@@ -105,7 +105,7 @@ type BatchChangeBatchForm struct {
 
 type PrintCallGetReq struct {
 	HouseCode string `json:"house_code" form:"house_code" binding:"required"`
-	Typ       int    `json:"typ"` //默认 仓库拣货打印 1:办公室拣货[后台拣货/快递拣货]打印
+	Typ       int    `json:"typ" form:"typ" ` //默认 仓库拣货打印 1:办公室拣货[后台拣货/快递拣货]打印
 }
 
 type GetPoolNumReq struct {

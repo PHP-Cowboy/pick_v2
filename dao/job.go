@@ -15,9 +15,14 @@ func AddPrintJobMap(warehouseCode string, typ int, printCh *global.PrintCh) {
 		printMapCh, printMapChOk := global.PrintMapCh[warehouseCode]
 
 		if !printMapChOk {
-			ch := make(chan *global.PrintCh, 1000)
-			ch <- printCh
-			global.PrintMapCh[warehouseCode][typ] = ch
+			chMp := make(chan *global.PrintCh, 1000)
+			chMp <- printCh
+
+			printMapCh = make(map[int]chan *global.PrintCh, 0)
+
+			printMapCh[typ] = chMp
+
+			global.PrintMapCh[warehouseCode] = printMapCh
 			return
 		}
 
