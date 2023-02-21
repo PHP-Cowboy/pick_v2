@@ -11,6 +11,7 @@ func BatchRoute(g *gin.RouterGroup) {
 	{
 		//打印
 		group.GET("/print_call", handler.PrintCallGet)
+		group.GET("/expressPrintCallGet", handler.ExpressPrintCallGet)
 	}
 
 	batchGroup := g.Group("/batch", middlewares.JWTAuth(), middlewares.IsAdminAuth())

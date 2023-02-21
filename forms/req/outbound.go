@@ -36,6 +36,7 @@ type OutboundOrderListForm struct {
 	City             string `json:"city" form:"city" `
 	District         string `json:"district" form:"district" `
 	HasRemark        int    `json:"has_remark" form:"has_remark" `
+	GoodsType        string `json:"goods_type" form:"goods_type"`
 	OrderType        int    `json:"order_type" form:"order_type" `
 }
 

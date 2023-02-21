@@ -9,30 +9,36 @@ var BaseNum = 3
 
 // 打印 写入
 func AddPrintJobMap(warehouseCode string, typ int, printCh *global.PrintCh) {
-	_, ok := global.PrintMapCh[warehouseCode][typ]
+	housePrintMp, housePrintMpOk := global.PrintMapCh[warehouseCode] //housePrintMp
 
-	if !ok {
-		printMapCh, printMapChOk := global.PrintMapCh[warehouseCode]
+	if !housePrintMpOk {
+		housePrintMp = make(map[int]chan *global.PrintCh, 0)
 
-		if !printMapChOk {
+		chMp := make(chan *global.PrintCh, 1000)
+
+		chMp <- printCh
+
+		housePrintMp[typ] = chMp
+
+	} else {
+		typMp, typMpOk := housePrintMp[typ]
+
+		if !typMpOk {
 			chMp := make(chan *global.PrintCh, 1000)
+
 			chMp <- printCh
 
-			printMapCh = make(map[int]chan *global.PrintCh, 0)
+			typMp = chMp
 
-			printMapCh[typ] = chMp
-
-			global.PrintMapCh[warehouseCode] = printMapCh
-			return
+		} else {
+			typMp <- printCh
 		}
 
-		printMapCh[typ] <- printCh
+		housePrintMp[typ] = typMp
 
-		global.PrintMapCh[warehouseCode] = printMapCh
-		return
 	}
 
-	global.PrintMapCh[warehouseCode][typ] <- printCh
+	global.PrintMapCh[warehouseCode] = housePrintMp
 }
 
 // 打印 读取消费

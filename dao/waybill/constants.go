@@ -22,8 +22,8 @@ const (
 )
 
 const (
-	AppKey      = ""
-	AppSecret   = ""
+	AppKey      = "34285690"
+	AppSecret   = "7f559df306e78ad24540b7185d794503"
 	GatewayUrl  = "https://eco.taobao.com/router/rest"
 	UserSession = ""
 )

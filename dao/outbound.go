@@ -425,7 +425,7 @@ func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, 
 		var outboundGoods []model.OutboundGoods
 		goodsRes := db.Model(&model.OutboundGoods{}).
 			Select("number").
-			Where(&model.OutboundGoods{TaskId: form.TaskId, Sku: form.Sku}).
+			Where(&model.OutboundGoods{TaskId: form.TaskId, Sku: form.Sku, GoodsType: form.GoodsType}).
 			Find(&outboundGoods)
 
 		if goodsRes.Error != nil {

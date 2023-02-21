@@ -17,7 +17,6 @@ import (
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"strconv"
-	"time"
 )
 
 // 全量拣货 -按任务创建批次
@@ -711,6 +710,34 @@ func BatchChangeBatch(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
+func ExpressPrintCallGet(c *gin.Context) {
+	var (
+		form req.PrintCallGetReq
+	)
+
+	if err := c.ShouldBind(&form); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	form.Typ = 3
+
+	err, ret := dao.Print(form)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	//通道中没有任务
+	if len(ret) == 0 {
+		xsq_net.SucJson(c, nil)
+		return
+	}
+
+	xsq_net.SucJson(c, ret)
+}
+
 // 打印
 func PrintCallGet(c *gin.Context) {
 	var (
@@ -722,147 +749,20 @@ func PrintCallGet(c *gin.Context) {
 		return
 	}
 
-	printCh := dao.GetPrintJobMap(form.HouseCode, form.Typ)
+	form.Typ = 1
+
+	err, ret := dao.Print(form)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
 
 	//通道中没有任务
-	if printCh == nil {
+	if len(ret) == 0 {
 		xsq_net.SucJson(c, nil)
 		return
 	}
-
-	var (
-		pick      model.Pick
-		pickGoods []model.PickGoods
-	)
-
-	typ := []int{1}
-
-	if form.Typ > 0 {
-		typ = []int{2, 3}
-	}
-
-	db := global.DB
-
-	result := db.Model(&model.Pick{}).Where("delivery_no = ? and typ in (?)", printCh.DeliveryOrderNo, typ).Find(&pick)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	result = db.Model(&model.PickGoods{}).Where("pick_id = ? and shop_id = ? and review_num > 0", pick.Id, printCh.ShopId).Find(&pickGoods)
-
-	if result.Error != nil {
-		xsq_net.ErrorJSON(c, result.Error)
-		return
-	}
-
-	length := len(pickGoods) //有多少条pickGoods就有多少条OrderInfo数据，map数也是
-
-	orderGoodsIds := make([]int, 0, length)
-
-	goodsMp := make(map[int]model.PickGoods, length)
-
-	for _, good := range pickGoods {
-		orderGoodsIds = append(orderGoodsIds, good.OrderGoodsId)
-
-		goodsMp[good.OrderGoodsId] = good
-	}
-
-	err, orderJoinGoods := model.GetOrderGoodsJoinOrderByIds(db, orderGoodsIds)
-	if err != nil {
-		xsq_net.ErrorJSON(c, err)
-		return
-	}
-
-	var (
-		compOrderJoinGoods []model.GoodsJoinOrder
-	)
-
-	err, compOrderJoinGoods = model.GetCompleteOrderJoinGoodsByOrderGoodsId(db, orderGoodsIds)
-
-	if err != nil {
-		xsq_net.ErrorJSON(c, err)
-		return
-	}
-
-	for _, good := range compOrderJoinGoods {
-		orderJoinGoods = append(orderJoinGoods, good)
-	}
-
-	if len(orderJoinGoods) <= 0 {
-		xsq_net.ErrorJSON(c, ecode.OrderDataNotFound)
-		return
-	}
-
-	packages := pick.Num
-
-	//合并单不打印，ShopCode为空说明是合并单，合并单不会有店编
-	if pick.ShopCode == "" {
-		packages = 0
-	}
-
-	item := rsp.PrintCallGetRsp{
-		ShopName:    pick.ShopName,
-		JHNumber:    strconv.Itoa(pick.Id),
-		PickName:    pick.PickUser, //拣货人
-		ShopType:    orderJoinGoods[0].ShopType,
-		CheckName:   pick.ReviewUser,                                              //复核员
-		HouseName:   TransferHouse(orderJoinGoods[0].HouseCode),                   //TransferHouse(info.HouseCode)
-		Delivery:    TransferDistributionType(orderJoinGoods[0].DistributionType), //TransferDistributionType(info.DistributionType),
-		OrderRemark: orderJoinGoods[0].OrderRemark,
-		Consignee:   orderJoinGoods[0].ConsigneeName, //info.ConsigneeName
-		Shop_code:   pick.ShopCode,
-		Packages:    packages,
-		Phone:       orderJoinGoods[0].ConsigneeTel, //info.ConsigneeTel,
-		PriType:     printCh.Type,
-	}
-
-	if orderJoinGoods[0].ShopCode != "" {
-		item.ShopName = orderJoinGoods[0].ShopCode + "--" + orderJoinGoods[0].ShopName
-	}
-
-	item2Mp := make(map[string]rsp.CallGetGoodsView, 0)
-
-	for _, info := range orderJoinGoods {
-
-		pgs, ok := goodsMp[info.OrderGoodsId]
-
-		if !ok {
-			continue
-		}
-
-		item2val, item2ok := item2Mp[info.Number]
-
-		if !item2ok {
-			item2val = rsp.CallGetGoodsView{
-				SaleNumber:  info.Number,
-				Date:        timeutil.FormatToDateTime(time.Time(*info.PayAt)),
-				OrderRemark: info.OrderRemark,
-			}
-		}
-
-		item3 := rsp.CallGetGoods{
-			GoodsName:    info.GoodsName,
-			GoodsSpe:     info.GoodsSpe,
-			GoodsCount:   info.PayCount,
-			RealOutCount: pgs.ReviewNum,
-			GoodsUnit:    info.GoodsUnit,
-			Price:        int64(info.DiscountPrice) * int64(pgs.ReviewNum),
-			LackCount:    info.PayCount - pgs.ReviewNum,
-		}
-		item2val.List = append(item2val.List, item3)
-
-		item2Mp[info.Number] = item2val
-	}
-
-	for _, item2 := range item2Mp {
-		item.GoodsList = append(item.GoodsList, item2)
-	}
-
-	ret := make([]rsp.PrintCallGetRsp, 0, 1)
-
-	ret = append(ret, item)
 
 	xsq_net.SucJson(c, ret)
 }

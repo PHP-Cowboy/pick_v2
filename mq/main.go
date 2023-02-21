@@ -15,8 +15,8 @@ import (
 func main() {
 
 	//topicName := "close_order"
-	topicName := "pick_batch"
-	//topicName := "purchase_order"
+	//topicName := "pick_batch"
+	topicName := "purchase_order"
 
 	v := viper.New()
 
@@ -41,7 +41,7 @@ func main() {
 	}
 
 	p, _ := rocketmq.NewProducer(
-		producer.WithNsResolver(primitive.NewPassthroughResolver([]string{"192.168.1.40:9876"})), // 127.0.0.1:10007 192.168.1.40:9876
+		producer.WithNsResolver(primitive.NewPassthroughResolver([]string{"127.0.0.1:10007"})), // 127.0.0.1:10007 192.168.1.40:9876
 		producer.WithRetry(2),
 	)
 
