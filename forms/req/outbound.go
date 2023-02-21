@@ -9,6 +9,7 @@ type CreateOutboundForm struct {
 	PayTime           string   `json:"pay_time"  form:"pay_time" binding:"required"`                  //支付时间
 	Sku               []string `json:"sku" form:"sku"`
 	GoodsName         []string `json:"goods_name" form:"goods_name"`
+	GoodsType         []string `json:"goods_type" form:"goods_type"`
 }
 
 type OutboundTaskListForm struct {
