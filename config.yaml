@@ -1,0 +1,22 @@
+port: 8081
+mysql:
+  host: "121.196.60.92"
+  port: 3306
+  name: "pick_v2"
+  user: "root"
+  password: "bnskdfglnbbgf"
+jwt:
+  key: 'ghlasdfkgbnkadfjbgnksdfjsdfgnbjk'
+redis:
+  host: 121.196.60.92
+  port: 6379
+  expire: 1
+  password: 'testservice123'
+goods_api:
+  url: 'http://192.168.1.40'
+  port: 10001
+yong_sender: "999"
+rocket_mq: "192.168.1.40:9876"
+u8_api:
+  url: "http://192.168.1.40"
+  port: 10011
