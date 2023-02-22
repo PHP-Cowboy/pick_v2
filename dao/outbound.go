@@ -249,12 +249,11 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 	localDb := db.Table("t_order_goods og").
 		Joins("left join t_order o on og.number = o.number").
 		Select("og.*,og.id as order_goods_id,o.*,o.id as order_id").
-		Where("o.order_type in (?) and o.distribution_type = ? and o.pay_at <= ? and o.delivery_at <= ? and goods_type in (?)",
+		Where("o.order_type in (?) and o.distribution_type = ? and o.pay_at <= ? and o.delivery_at <= ? ",
 			[]int{model.NewOrderType, model.LackOrderType},
 			form.DistributionType,
 			form.PayTime,
 			form.DeliveryEndTime,
-			form.GoodsType,
 		)
 
 	if form.DeliveryStartTime != "" {
@@ -267,6 +266,10 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 
 	if len(form.Lines) > 0 {
 		localDb = localDb.Where("o.line in (?) ", form.Lines)
+	}
+
+	if len(form.GoodsType) > 0 {
+		localDb = localDb.Where("goods_type in (?) ", form.GoodsType)
 	}
 
 	//订单商品中的 新订单或欠货的订单商品数据
@@ -422,7 +425,7 @@ func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, 
 		outboundOrders []model.OutboundOrder
 	)
 
-	if form.Sku != "" {
+	if form.Sku != "" || form.GoodsType != "" {
 		var outboundGoods []model.OutboundGoods
 		goodsRes := db.Model(&model.OutboundGoods{}).
 			Select("number").
@@ -436,6 +439,11 @@ func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, 
 		for _, good := range outboundGoods {
 			numbers = append(numbers, good.Number)
 		}
+
+		if len(numbers) == 0 {
+			res.List = make([]rsp.OutboundOrderList, 0)
+			return
+		}
 	}
 
 	if form.Number != "" {
@@ -445,6 +453,7 @@ func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, 
 	localDb := db.Model(&model.OutboundOrder{}).Where("task_id = ?", form.TaskId)
 
 	if len(numbers) > 0 {
+		numbers = slice.UniqueSlice(numbers)
 		localDb.Where("number in (?)", numbers)
 	}
 

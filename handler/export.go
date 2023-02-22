@@ -14,6 +14,7 @@ import (
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/slice"
 	"pick_v2/utils/xsq_net"
+	"sort"
 	"strconv"
 	"time"
 
@@ -410,7 +411,7 @@ func BatchShop(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Model(&model.PrePick{}).Where("batch_id = ?", form.Id).Find(&prePicks)
+	result := db.Model(&model.PrePick{}).Where("batch_id = ?", form.Id).Order("shop_code ASC").Find(&prePicks)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -427,10 +428,15 @@ func BatchShop(c *gin.Context) {
 	xFile := excelize.NewFile()
 	sheet := xFile.NewSheet("sheet1")
 	// 设置单元格的值
-	xFile.MergeCell("Sheet1", "A1", "C1")
+	xFile.MergeCell("Sheet1", "A1", "H1")
 	xFile.SetCellValue("Sheet1", "A2", "序号")
 	xFile.SetCellValue("Sheet1", "B2", "门店编码")
 	xFile.SetCellValue("Sheet1", "C2", "门店名称")
+	xFile.SetCellValue("Sheet1", "D2", "配送位置")
+	xFile.SetCellValue("Sheet1", "E2", "数量")
+	xFile.SetCellValue("Sheet1", "F2", "冷冻件数")
+	xFile.SetCellValue("Sheet1", "G2", "页数")
+	xFile.SetCellValue("Sheet1", "H2", "备注")
 	xFile.SetActiveSheet(sheet)
 	//设置指定行高 指定列宽
 	xFile.SetRowHeight("Sheet1", 1, 20)
@@ -615,6 +621,8 @@ func BatchTask(c *gin.Context) {
 
 	shopCodes = slice.UniqueSlice(shopCodes)
 
+	sort.Strings(shopCodes)
+
 	for _, pg := range pickGoods {
 
 		subMp, ok := mp[pg.Sku]
@@ -624,6 +632,14 @@ func BatchTask(c *gin.Context) {
 			mp[pg.Sku] = subMp
 		}
 
+		num := 0
+
+		if form.Typ == 1 {
+			num = pg.NeedNum
+		} else if form.Typ == 3 {
+			num = pg.ReviewNum
+		}
+
 		for _, code := range shopCodes {
 			_, has := subMp[code]
 			if !has {
@@ -631,7 +647,7 @@ func BatchTask(c *gin.Context) {
 			}
 
 			if code == pg.ShopCode {
-				subMp[code] = strconv.Itoa(pg.NeedNum)
+				subMp[code] = strconv.Itoa(num)
 			}
 		}
 
@@ -641,9 +657,9 @@ func BatchTask(c *gin.Context) {
 
 		_, msOk := mpSum[pg.Sku]
 		if !msOk {
-			mpSum[pg.Sku] = pg.NeedNum
+			mpSum[pg.Sku] = num
 		} else {
-			mpSum[pg.Sku] += pg.NeedNum
+			mpSum[pg.Sku] += num
 		}
 
 		subMp["总计"] = strconv.Itoa(mpSum[pg.Sku])

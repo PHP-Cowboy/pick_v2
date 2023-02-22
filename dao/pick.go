@@ -338,7 +338,7 @@ func MergePickByParams(db *gorm.DB, form req.MergePickForm, taskId int) (err err
 		BatchId:        form.BatchId,
 		PrePickIds:     strings.Join(prePickIds, ","),
 		TaskName:       form.TaskName,
-		ShopCode:       "",
+		ShopCode:       "MergePickingTasks", //合并拣货时，店编设置为MergePickingTasks 用于判断是否打印箱单
 		ShopName:       form.TaskName,
 		Line:           "",
 		PickUser:       "",

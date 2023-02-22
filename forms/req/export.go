@@ -9,8 +9,9 @@ type OutboundBatchFormReq struct {
 }
 
 type BatchTaskForm struct {
-	Id      int `json:"id" form:"id"`             //pick_id
-	BatchId int `json:"batch_id" form:"batch_id"` //pick_id
+	Id      int `json:"id" form:"id"`                      //pick_id
+	BatchId int `json:"batch_id" form:"batch_id"`          //pick_id
+	Typ     int `json:"typ" form:"typ" binding:"required"` //导出类型：1拣货池 2复核池 3已出库
 }
 
 type LackForm struct {

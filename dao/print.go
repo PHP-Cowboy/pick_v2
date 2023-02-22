@@ -14,10 +14,6 @@ import (
 
 func Print(form req.PrintCallGetReq) (err error, ret []rsp.PrintCallGetRsp) {
 
-	if form.Typ == 0 {
-		form.Typ = 1
-	}
-
 	printCh := GetPrintJobMap(form.HouseCode, form.Typ)
 
 	//通道中没有任务
@@ -58,7 +54,7 @@ func Print(form req.PrintCallGetReq) (err error, ret []rsp.PrintCallGetRsp) {
 		goodsMp[good.OrderGoodsId] = good
 	}
 
-	err, orderJoinGoods := model.GetOrderGoodsJoinOrderByIds(db, orderGoodsIds)
+	err, orderJoinGoods := model.GetOrderGoodsJoinOrderByIdsNoSort(db, orderGoodsIds)
 	if err != nil {
 		return
 	}
@@ -84,8 +80,12 @@ func Print(form req.PrintCallGetReq) (err error, ret []rsp.PrintCallGetRsp) {
 
 	packages := pick.Num
 
-	//合并单不打印，ShopCode为空说明是合并单，合并单不会有店编
 	if pick.ShopCode == "" {
+		pick.ShopCode = "未设置店编"
+	}
+
+	//合并单不打印，ShopCode = "MergePickingTasks" 说明是合并单，合并单不打印箱单
+	if pick.ShopCode == "MergePickingTasks" {
 		packages = 0
 	}
 

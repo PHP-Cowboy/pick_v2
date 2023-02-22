@@ -41,7 +41,6 @@ func GetCompleteOrderJoinGoodsByOrderGoodsId(db *gorm.DB, orderGoodsIds []int) (
 		Select("*,delivery_method as distribution_type").
 		Joins("left join t_complete_order o on od.number = o.number").
 		Where("od.order_goods_id in (?)", orderGoodsIds).
-		Order("pay_at ASC").
 		Find(&list).
 		Error
 

@@ -31,6 +31,14 @@ func CreateOutboundTask(c *gin.Context) {
 		return
 	}
 
+	//执行完成后删除锁定时间
+	defer func(key string) {
+		_, err = cache.Del(key)
+		if err != nil {
+
+		}
+	}(rdsKey)
+
 	db := global.DB
 
 	tx := db.Begin()
@@ -60,12 +68,10 @@ func CreateOutboundTask(c *gin.Context) {
 		return
 	}
 
-	//执行完成后删除锁定时间
-	_, _ = cache.Del(rdsKey)
-
 	tx.Commit()
 
 	xsq_net.Success(c)
+	return
 }
 
 // 出库单任务列表
