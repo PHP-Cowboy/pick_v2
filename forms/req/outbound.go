@@ -10,6 +10,7 @@ type CreateOutboundForm struct {
 	Sku               []string `json:"sku" form:"sku"`
 	GoodsName         []string `json:"goods_name" form:"goods_name"`
 	GoodsType         []string `json:"goods_type" form:"goods_type"`
+	ShopIds           []int    `json:"shop_ids" form:"shop_ids"`
 }
 
 type OutboundTaskListForm struct {

@@ -272,6 +272,10 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 		localDb = localDb.Where("goods_type in (?) ", form.GoodsType)
 	}
 
+	if len(form.ShopIds) > 0 {
+		localDb = localDb.Where("shop_id in (?) ", form.ShopIds)
+	}
+
 	//订单商品中的 新订单或欠货的订单商品数据
 	result := localDb.Where("og.`status` = ?", model.OrderGoodsUnhandledStatus).
 		Find(&orderJoinGoods)
@@ -517,6 +521,7 @@ func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, 
 			PayAt:             order.PayAt,
 			ShopName:          order.ShopName,
 			ShopType:          order.ShopType,
+			ShopCode:          order.ShopCode,
 			DistributionType:  order.DistributionType,
 			GoodsNum:          nums.PayCount,
 			LimitNum:          nums.LimitNum,

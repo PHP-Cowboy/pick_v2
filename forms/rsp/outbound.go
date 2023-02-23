@@ -45,6 +45,7 @@ type OutboundOrderList struct {
 	PayAt             *model.MyTime `json:"pay_at"`
 	ShopName          string        `json:"shop_name"`
 	ShopType          string        `json:"shop_type"`
+	ShopCode          string        `json:"shop_code"`
 	DistributionType  int           `json:"distribution_type"`
 	Sku               string        `json:"sku"`
 	GoodsNum          int           `json:"goods_num"`
