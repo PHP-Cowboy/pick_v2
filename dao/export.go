@@ -47,6 +47,8 @@ func GoodsSummaryList(db *gorm.DB, form req.GoodsSummaryListForm) (err error, mp
 		}
 
 		subMp["商品名称"] = pg.GoodsName
+		subMp["商品编码"] = pg.Sku
+		subMp["货架号"] = pg.Shelves
 		subMp["规格"] = pg.GoodsSpe
 		subMp["分类"] = pg.GoodsType
 		subMp["单位"] = pg.Unit
@@ -63,7 +65,7 @@ func GoodsSummaryList(db *gorm.DB, form req.GoodsSummaryListForm) (err error, mp
 		mp[pg.Sku] = subMp
 	}
 
-	column = []string{"商品名称", "规格", "分类", "单位", "总计"}
+	column = []string{"商品名称", "商品编码", "货架号", "规格", "分类", "单位", "总计"}
 
 	shopCodes = slice.UniqueSlice(shopCodes)
 

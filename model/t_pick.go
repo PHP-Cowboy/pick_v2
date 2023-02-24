@@ -86,7 +86,18 @@ func UpdatePickByPk(db *gorm.DB, pk int, mp map[string]interface{}) (err error) 
 
 // 根据主键和版本号更新，乐观锁
 func UpdatePickByPkAndVersion(db *gorm.DB, pk, version int, mp map[string]interface{}) (err error) {
-	err = db.Model(&Pick{}).Where("id = ? and version = ?", pk, version).Updates(mp).Error
+	result := db.Model(&Pick{}).Where("id = ? and version = ?", pk, version).Updates(mp)
+
+	err = result.Error
+
+	if err != nil {
+		return
+	}
+
+	if result.RowsAffected == 0 {
+		err = errors.New("来晚了，拣货单单已被接走")
+		return
+	}
 
 	return
 }

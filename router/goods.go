@@ -13,6 +13,8 @@ func GoodsRoute(g *gin.RouterGroup) {
 		goodsGroup.GET("/list", handler.GetGoodsList)
 		//明细
 		goodsGroup.GET("/detail", handler.GetOrderDetail)
+		//修改订单配送方式
+		goodsGroup.POST("/changeDistribution", handler.ChangeDistribution)
 		//商品列表
 		goodsGroup.POST("/commodity_list", handler.CommodityList)
 		//订单出货记录

@@ -745,7 +745,15 @@ func GoodsSummaryList(c *gin.Context) {
 		form.GoodsTypes = []string{"常温类"}
 	}
 
-	err, mp, column, shopCodes := dao.GoodsSummaryList(global.DB, form)
+	db := global.DB
+
+	err, batch := model.GetBatchByPk(db, form.BatchId)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	err, mp, column, shopCodes := dao.GoodsSummaryList(db, form)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
@@ -773,6 +781,8 @@ func GoodsSummaryList(c *gin.Context) {
 		i++
 		item := make([]interface{}, 0)
 		item = append(item, val["商品名称"])
+		item = append(item, val["商品编码"])
+		item = append(item, val["货架号"])
 		item = append(item, val["规格"])
 		item = append(item, val["分类"])
 		item = append(item, val["单位"])
@@ -785,7 +795,7 @@ func GoodsSummaryList(c *gin.Context) {
 		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+i), &item)
 	}
 
-	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{fmt.Sprintf("货品汇总单-%s", typeStr)})
+	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{fmt.Sprintf("%s-货品汇总单-%s", batch.BatchName, typeStr)})
 
 	var buffer bytes.Buffer
 	_ = xFile.Write(&buffer)

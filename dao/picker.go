@@ -142,7 +142,6 @@ func ReceivingOrders(db *gorm.DB, form req.ReceivingOrdersForm) (err error, res 
 		if err != nil {
 			return
 		}
-
 		//更新拣货池 + version 防并发
 		err = model.UpdatePickByPkAndVersion(db, res.Id, res.Version, map[string]interface{}{
 			"pick_user":        form.UserName,
@@ -153,6 +152,7 @@ func ReceivingOrders(db *gorm.DB, form req.ReceivingOrdersForm) (err error, res 
 		if err != nil {
 			return
 		}
+
 		return
 	} else {
 		err = errors.New("暂无拣货单")

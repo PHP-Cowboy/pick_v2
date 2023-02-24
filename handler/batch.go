@@ -66,6 +66,39 @@ func CreateBatchByTask(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
+// 批次加单
+func AddOrder(c *gin.Context) {
+	var form req.NewCreateBatchForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	userInfo := GetUserInfo(c)
+
+	if userInfo == nil {
+		xsq_net.ErrorJSON(c, ecode.GetContextUserInfoFailed)
+		return
+	}
+
+	tx := global.DB.Begin()
+
+	err := dao.AddOrder(tx, form, userInfo)
+
+	if err != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	tx.Commit()
+
+	xsq_net.Success(c)
+}
+
 // 创建批次
 func NewBatch(c *gin.Context) {
 	var form req.NewCreateBatchForm
@@ -355,6 +388,16 @@ func GetBatchList(c *gin.Context) {
 	xsq_net.SucJson(c, res)
 }
 
+// 进行中的批次
+func OngoingList(c *gin.Context) {
+	err, list := dao.OngoingList(global.DB)
+	if err != nil {
+		return
+	}
+
+	xsq_net.SucJson(c, list)
+}
+
 // 批次池数量
 func GetBatchPoolNum(c *gin.Context) {
 	var (
@@ -474,7 +517,7 @@ func GetPrePickList(c *gin.Context) {
 
 	res.Total = result.RowsAffected
 
-	db.Where("batch_id = ?", form.BatchId).Where(model.PrePick{ShopId: form.ShopId, Line: form.Line}).Where("status = 0").Scopes(model.Paginate(form.Page, form.Size)).Find(&prePicks)
+	db.Where("batch_id = ?", form.BatchId).Where(model.PrePick{ShopId: form.ShopId, Line: form.Line}).Where("status = 0").Order("shop_code ASC").Scopes(model.Paginate(form.Page, form.Size)).Find(&prePicks)
 
 	for _, pick := range prePicks {
 		prePickIds = append(prePickIds, pick.Id)

@@ -8,6 +8,7 @@ type GoodsListRsp struct {
 }
 
 type Order struct {
+	Id                int           `json:"id"`
 	Number            string        `json:"number"`
 	PayAt             *model.MyTime `json:"pay_time"`
 	ShopCode          string        `json:"shop_code"`
@@ -172,6 +173,7 @@ type CompleteOrder struct {
 }
 
 type CompleteOrderDetailRsp struct {
+	PayAt           *model.MyTime      `json:"pay_at"`
 	ShopName        string             `json:"shop_name"`
 	ShopCode        string             `json:"shop_code"`
 	Line            string             `json:"line"`

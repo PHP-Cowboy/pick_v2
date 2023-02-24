@@ -125,6 +125,7 @@ func GetGoodsList(c *gin.Context) {
 		}
 
 		list = append(list, rsp.Order{
+			Id:                o.Id,
 			Number:            o.Number,
 			PayAt:             o.PayAt,
 			ShopCode:          o.ShopCode,
@@ -254,6 +255,28 @@ func GetOrderDetail(c *gin.Context) {
 	res.DeliveryOrderNo = deliveryOrderNoArr
 
 	xsq_net.SucJson(c, res)
+}
+
+func ChangeDistribution(c *gin.Context) {
+	var (
+		form req.ChangeDistributionForm
+	)
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err := dao.ChangeDistribution(global.DB, form)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
 }
 
 // 商品列表
@@ -440,6 +463,7 @@ func CompleteOrderDetail(c *gin.Context) {
 
 	res.Goods = detailMap
 
+	res.PayAt = completeOrder.PayAt
 	res.ShopName = completeOrder.ShopName
 	res.ShopCode = completeOrder.ShopCode
 	res.Line = completeOrder.Line

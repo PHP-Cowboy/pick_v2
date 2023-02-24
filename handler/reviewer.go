@@ -77,12 +77,13 @@ func ReviewDetail(c *gin.Context) {
 
 		userInfo := claims.(*middlewares.CustomClaims)
 
-		result = db.Model(&model.Pick{}).
-			Where("id = ? and version = ?", pick.Id, pick.Version).
-			Updates(map[string]interface{}{"review_user": userInfo.Name, "version": pick.Version + 1})
+		err := model.UpdatePickByPkAndVersion(db, pick.Id, pick.Version, map[string]interface{}{
+			"review_user": userInfo.Name,
+			"version":     pick.Version + 1,
+		})
 
-		if result.Error != nil {
-			xsq_net.ErrorJSON(c, result.Error)
+		if err != nil {
+			xsq_net.ErrorJSON(c, err)
 			return
 		}
 	}

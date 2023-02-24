@@ -111,6 +111,58 @@ func CreateBatch(tx *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.C
 	return
 }
 
+// 批次加单
+func AddOrder(tx *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.CustomClaims) (err error) {
+	var batch model.Batch
+
+	err, batch = model.GetBatchByPk(tx, form.BatchId)
+	if err != nil {
+		return
+	}
+
+	form.Typ = batch.Typ
+
+	//预拣池逻辑
+	err, orderGoodsIds, outboundGoods, _, _, _, _, _ := CreatePrePickLogic(tx, form, claims, form.BatchId)
+
+	if err != nil {
+		return
+	}
+
+	//批量更新 t_order_goods 表 batch_id
+	err = model.UpdateOrderGoodsByIds(tx, orderGoodsIds, map[string]interface{}{"batch_id": form.BatchId})
+
+	if err != nil {
+		return
+	}
+
+	//构造更新 t_outbound_order 表 order_type 数据
+	outboundOrder := make([]model.OutboundOrder, 0, len(form.Number))
+
+	//根据传递过来的任务id和订单编号生成需要被变更order_type状态为拣货中的数据
+	for _, number := range form.Number {
+		outboundOrder = append(outboundOrder, model.OutboundOrder{
+			TaskId:    form.TaskId,
+			Number:    number,
+			OrderType: model.OutboundOrderTypePicking,
+		})
+	}
+
+	//批量更新 t_outbound_order 表 order_type 状态为拣货中
+	err = model.OutboundOrderReplaceSave(tx, outboundOrder, []string{"order_type"})
+
+	if err != nil {
+		return
+	}
+
+	//批量更新 t_outbound_goods 状态 为拣货中
+	if err = model.OutboundGoodsReplaceSave(tx, &outboundGoods, []string{"batch_id", "status"}); err != nil {
+		return
+	}
+
+	return
+}
+
 // 生成批次数据逻辑
 func BatchSaveLogic(db *gorm.DB, form req.NewCreateBatchForm, claims *middlewares.CustomClaims) (err error, batch model.Batch) {
 
@@ -384,6 +436,27 @@ func BatchList(db *gorm.DB, form req.GetBatchListForm) (err error, res rsp.GetBa
 	}
 
 	res.List = list
+
+	return
+}
+
+func OngoingList(db *gorm.DB) (err error, list []rsp.Batch) {
+
+	var batchList []model.Batch
+
+	err, batchList = model.GetBatchListByStatus(db, model.BatchOngoingStatus)
+	if err != nil {
+		return
+	}
+
+	list = make([]rsp.Batch, 0, len(batchList))
+
+	for _, batch := range batchList {
+		list = append(list, rsp.Batch{
+			Id:        batch.Id,
+			BatchName: batch.BatchName,
+		})
+	}
 
 	return
 }

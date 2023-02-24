@@ -45,23 +45,28 @@ type OrderShippingRecordReq struct {
 	DeliveryOrderNo []string `json:"delivery_order_no" form:"delivery_order_no"`
 }
 
+type ChangeDistributionForm struct {
+	Ids              []int `json:"ids" binding:"required"`
+	DistributionType int   `json:"distribution_type" binding:"required"`
+}
+
 type ShippingRecordDetailReq struct {
 	Id int `json:"id" form:"id"`
 }
 
 type CompleteOrderForm struct {
 	Paging
-	Number         string `json:"number"` //订单号
-	ShopId         int    `json:"shop_id"`
-	Sku            string `json:"sku"`
-	Line           string `json:"line"`
-	DeliveryMethod int    `json:"delivery_method"`
-	ShopType       string `json:"shop_type"` //门店类型
-	Province       string `json:"province"`
-	City           string `json:"city"`
-	District       string `json:"district"`
-	IsRemark       int    `json:"is_remark"`
-	PayAt          string `json:"pay_at"`
+	Number         string `json:"number" form:"number"` //订单号
+	ShopId         int    `json:"shop_id" form:"shop_id"`
+	Sku            string `json:"sku" form:"sku"`
+	Line           string `json:"line" form:"line"`
+	DeliveryMethod int    `json:"delivery_method" form:"delivery_method"`
+	ShopType       string `json:"shop_type" form:"shop_type"` //门店类型
+	Province       string `json:"province" form:"province"`
+	City           string `json:"city" form:"city"`
+	District       string `json:"district" form:"district"`
+	IsRemark       int    `json:"is_remark" form:"is_remark"`
+	PayAt          string `json:"pay_at" form:"pay_at"`
 }
 
 type CompleteOrderDetailReq struct {

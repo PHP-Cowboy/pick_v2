@@ -9,6 +9,15 @@ type CreateBatchByTaskForm struct {
 type NewCreateBatchForm struct {
 	TaskId    int      `json:"task_id" binding:"required"`
 	Number    []string `json:"number" binding:"required"`
+	BatchId   int      `json:"batch_id"`
+	BatchName string   `json:"batch_name"`
+	Typ       int      `json:"typ"` //1:常规批次,2:快递批次,3:后台拣货
+}
+
+type AddOrderForm struct {
+	TaskId    int      `json:"task_id" binding:"required"`
+	BatchId   int      `json:"batch_id" binding:"required"`
+	Number    []string `json:"number" binding:"required"`
 	BatchName string   `json:"batch_name" binding:"required"`
 	Typ       int      `json:"typ"` //1:常规批次,2:快递批次,3:后台拣货
 }

@@ -15,6 +15,7 @@ import (
 func main() {
 
 	//topicName := "close_order"
+	//topicName := "close_order_result"
 	//topicName := "pick_batch"
 	topicName := "purchase_order"
 

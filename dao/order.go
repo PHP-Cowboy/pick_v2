@@ -362,3 +362,7 @@ func OrderShippingRecord(db *gorm.DB, form req.OrderShippingRecordReq) (err erro
 
 	return
 }
+
+func ChangeDistribution(db *gorm.DB, form req.ChangeDistributionForm) (err error) {
+	return model.UpdateOrderByIds(db, form.Ids, map[string]interface{}{"distribution_type": form.DistributionType})
+}

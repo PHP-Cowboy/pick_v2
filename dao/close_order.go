@@ -243,7 +243,7 @@ func CloseCloseOrderTask(db *gorm.DB, form req.CloseCloseOrderTaskForm) (err err
 }
 
 // 关闭预拣池
-func ClosePrePick(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId int) (err error, prePickGoodsIds []int, tips rsp.CloseTips) {
+func ClosePrePick(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId int) (err error, isCommit bool, pickGoods []model.PickGoods, tips rsp.CloseTips) {
 	var (
 		prePickGoodsJoinPrePick []model.PrePickGoodsJoinPrePick
 		prePickGoodsUpdate      []model.PrePickGoods
@@ -251,12 +251,19 @@ func ClosePrePick(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId i
 		notCloseAllPrePickIds   []int
 		batchId                 int
 		batch                   model.Batch
+		prePickGoodsIds         []int
 	)
 
 	//根据任务ID查询全部预拣池任务和预拣池商品数据
 	err, prePickGoodsJoinPrePick = model.GetPrePickGoodsJoinPrePickListByTaskId(tx, taskId, number)
 
 	if err != nil {
+		return
+	}
+
+	//没查到预拣池数据，直接返回并执行关闭逻辑
+	if len(prePickGoodsJoinPrePick) == 0 {
+		isCommit = true
 		return
 	}
 
@@ -268,9 +275,11 @@ func ClosePrePick(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId i
 		return
 	}
 
-	//不是暂停中的批次不处理[已结束的不能处理，会导致u8数据错误，进行中是处理前要把所有的批次暂停]
+	//todo 批次已结束 任务订单状态被更新为已完成了
+
+	//不是暂停中的批次不处理[已结束的不能处理，会导致u8数据错误，进行中时处理前要把所有的批次暂停]
 	if batch.Status != model.BatchSuspendStatus {
-		err = errors.New(fmt.Sprintf("批次状态异常:%d", batch.Status))
+		err = errors.New(fmt.Sprintf("批次状态异常,状态值为:%d", batch.Status))
 		return
 	}
 
@@ -315,6 +324,26 @@ func ClosePrePick(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId i
 
 	}
 
+	//TODO 这里拦截 如果已复核完成但是未结束批次，直接异常，人工处理
+	err, pickGoods = model.GetPickGoodsByOrderGoodsIds(tx, prePickGoodsIds)
+
+	if err != nil {
+		return
+	}
+
+	if len(pickGoods) == 0 {
+		//拣货池没查到数据，还未分配到拣货池
+		isCommit = true
+	}
+
+	//如果有复核完成的，则不允许修改
+	for _, good := range pickGoods {
+		if good.ReviewNum > 0 {
+			err = errors.New("订单中有复核完成的订单，不允许关闭，请修改复核数量并退回已拣物品")
+			return
+		}
+	}
+
 	err = model.PrePickGoodsReplaceSave(tx, prePickGoodsUpdate, []string{"need_num", "close_num", "status"})
 
 	if err != nil {
@@ -349,9 +378,8 @@ func CloseCentralizedPick(tx *gorm.DB) (err error) {
 }
 
 // 关闭拣货池
-func ClosePick(tx *gorm.DB, closeGoodsMp map[int]int, prePickGoodsIds []int) (err error, tips rsp.CloseTips) {
+func ClosePick(tx *gorm.DB, closeGoodsMp map[int]int, pickGoods []model.PickGoods) (err error, tips rsp.CloseTips) {
 	var (
-		pickGoods       []model.PickGoods
 		pickGoodsUpdate []model.PickGoods
 		pickIds         []int
 	)
@@ -359,12 +387,6 @@ func ClosePick(tx *gorm.DB, closeGoodsMp map[int]int, prePickGoodsIds []int) (er
 	tips = rsp.CloseTips{
 		Colour: "#67C23A",
 		Tips:   "拣货池订单关闭",
-	}
-
-	err, pickGoods = model.GetPickGoodsByOrderGoodsIds(tx, prePickGoodsIds)
-
-	if err != nil {
-		return
 	}
 
 	for _, good := range pickGoods {
@@ -443,14 +465,18 @@ func CloseOrderExecNew(db *gorm.DB, form req.CloseOrder) (err error) {
 
 		err, _, tips = CloseOrderHandle(tx, co.Id, co.Number, co.Typ, closeGoodsMp)
 
+		status := model.CloseOrderStatusComplete
+
+		//处理失败则更新失败原因到tips中
 		if err != nil {
-			tx.Rollback()
-			continue
+			status = model.CloseOrderStatusException
+			tips.Colour = "#67C23A"
+			tips.Tips = err.Error()
 		}
 
 		//更新关单任务状态
 		err = model.UpdateCloseOrderByPk(tx, co.Id, map[string]interface{}{
-			"status": model.CloseOrderStatusComplete,
+			"status": status,
 			"colour": tips.Colour,
 			"tips":   tips.Tips,
 		})
@@ -476,8 +502,10 @@ func CloseOrderExecNew(db *gorm.DB, form req.CloseOrder) (err error) {
 
 // 关单处理
 func CloseOrderHandle(tx *gorm.DB, closeOrderId int, number string, typ int, closeGoodsMp map[int]int) (err error, isCommit bool, tips rsp.CloseTips) {
+
+	//isCommit 用于判断是否提交事务，是否还需要继续执行后续流程
+
 	var (
-		//isCommit bool //用于判断是否提交事务，是否还需要继续执行后续流程
 		taskId int
 	)
 
@@ -500,9 +528,13 @@ func CloseOrderHandle(tx *gorm.DB, closeOrderId int, number string, typ int, clo
 // 订单数据处理(包括订单相关表和任务订单相关表)
 func OrderDataHandle(tx *gorm.DB, closeOrderId int, number string, typ int, closeGoodsMp map[int]int) (err error, isCommit bool, taskId int, tips rsp.CloseTips) {
 	//关闭订单&&订单商品逻辑
-	err, isCommit = CloseGoodsAndOrderLogic(tx, number, typ, closeGoodsMp)
+	err, isCommit, tips = CloseGoodsAndOrderLogic(tx, number, typ, closeGoodsMp)
 
-	if err != nil || isCommit {
+	if err != nil {
+		return
+	}
+
+	if isCommit {
 		tips = rsp.CloseTips{
 			Colour: "#67C23A",
 			Tips:   "新订单关闭完成",
@@ -526,15 +558,15 @@ func OrderDataHandle(tx *gorm.DB, closeOrderId int, number string, typ int, clos
 
 // 批次数据处理
 func BatchDataHandle(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId int) (err error, isCommit bool, tips rsp.CloseTips) {
-	var prePickGoodsIds []int
+	var pickGoods []model.PickGoods
 
-	err, prePickGoodsIds, tips = ClosePrePick(tx, closeGoodsMp, number, taskId)
+	err, isCommit, pickGoods, tips = ClosePrePick(tx, closeGoodsMp, number, taskId)
 
-	if err != nil {
+	if err != nil || isCommit {
 		return
 	}
 
-	err, tips = ClosePick(tx, closeGoodsMp, prePickGoodsIds)
+	err, tips = ClosePick(tx, closeGoodsMp, pickGoods)
 
 	if err != nil {
 		return
@@ -544,7 +576,7 @@ func BatchDataHandle(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskI
 }
 
 // 关闭订单以及订单商品逻辑
-func CloseGoodsAndOrderLogic(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]int) (err error, isCommit bool) {
+func CloseGoodsAndOrderLogic(tx *gorm.DB, number string, typ int, closeGoodsMp map[int]int) (err error, isCommit bool, tips rsp.CloseTips) {
 
 	var (
 		order            model.Order
@@ -555,6 +587,9 @@ func CloseGoodsAndOrderLogic(tx *gorm.DB, number string, typ int, closeGoodsMp m
 	err, order = model.GetOrderByNumber(tx, number)
 
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			tips.Tips = "订单不存在"
+		}
 		return
 	}
 
@@ -625,9 +660,18 @@ func CloseTaskLogic(tx *gorm.DB, closeOrderId int, number string, typ int, close
 		return
 	}
 
+	//订单所在的最新任务是已完成的，直接提交,这种情况订单还是欠货的
+	if outboundOrder.OrderType == model.OutboundOrderTypeComplete {
+		isCommit = true
+		return
+	}
+
+	//新订单，直接关闭
 	if outboundOrder.OrderType == model.OutboundOrderTypeNew {
 		isCommit = true
 	}
+
+	//TODO 如果是拣货中，需确认批次结束是否会更新任务数据
 
 	taskId = outboundOrder.TaskId
 

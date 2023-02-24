@@ -24,7 +24,7 @@ func OutboundTaskList(db *gorm.DB, form req.OutboundTaskListForm) (err error, re
 		var outboundOrderAndGoods []model.GoodsJoinOrder
 
 		orderDb := db.Table("t_outbound_goods og").
-			Select("task_id").
+			Select("og.task_id").
 			Joins("left join t_outbound_order oo on og.task_id = oo.task_id and og.number = oo.number")
 
 		if form.ShopId > 0 {
@@ -487,7 +487,7 @@ func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, 
 
 	res.Total = result.RowsAffected
 
-	result = localDb.Scopes(model.Paginate(form.Page, form.Size)).Find(&outboundOrders)
+	result = localDb.Order("shop_code ASC").Scopes(model.Paginate(form.Page, form.Size)).Find(&outboundOrders)
 
 	if result.Error != nil {
 		return result.Error, res
