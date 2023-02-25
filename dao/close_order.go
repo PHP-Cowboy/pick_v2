@@ -263,7 +263,7 @@ func ClosePrePick(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId i
 
 	//没查到预拣池数据，直接返回并执行关闭逻辑
 	if len(prePickGoodsJoinPrePick) == 0 {
-		isCommit = true
+		err = errors.New(fmt.Sprintf("任务订单进入预拣池异常:任务id:%d,number:%s", taskId, number))
 		return
 	}
 
@@ -300,7 +300,7 @@ func ClosePrePick(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId i
 			CloseNum: good.CloseNum + closeCount,
 		}
 
-		prePickGoodsIds = append(prePickGoodsIds, good.PrePickGoodsId)
+		prePickGoodsIds = append(prePickGoodsIds, good.PrePickGoodsId) //goods.PrePickGoodsId 是pre_pick_goods表id的别名
 
 		//需拣如果小于零是有问题的，说明关闭数量大于需拣数量
 		if updatePrePickGoodsData.NeedNum < 0 {
@@ -336,12 +336,29 @@ func ClosePrePick(tx *gorm.DB, closeGoodsMp map[int]int, number string, taskId i
 		isCommit = true
 	}
 
+	var pickIds []int
+
 	//如果有复核完成的，则不允许修改
 	for _, good := range pickGoods {
-		if good.ReviewNum > 0 {
-			err = errors.New("订单中有复核完成的订单，不允许关闭，请修改复核数量并退回已拣物品")
-			return
+		pickIds = append(pickIds, good.PickId)
+	}
+
+	err, picks := model.GetPickListByIds(tx, pickIds)
+	if err != nil {
+		return
+	}
+
+	var reviewedIds []int
+
+	for _, p := range picks {
+		if p.Status == model.ReviewCompletedStatus {
+			reviewedIds = append(reviewedIds, p.Id)
 		}
+	}
+
+	if len(reviewedIds) > 0 {
+		err = errors.New(fmt.Sprintf("订单中有复核完成的订单，不允许关闭，请修改复核数量并退回已拣物品,拣货任务ids:%s", slice.SliceToString(reviewedIds, ",")))
+		return
 	}
 
 	err = model.PrePickGoodsReplaceSave(tx, prePickGoodsUpdate, []string{"need_num", "close_num", "status"})
@@ -463,15 +480,17 @@ func CloseOrderExecNew(db *gorm.DB, form req.CloseOrder) (err error) {
 	for _, co := range closeOrders {
 		tx := db.Begin()
 
-		err, _, tips = CloseOrderHandle(tx, co.Id, co.Number, co.Typ, closeGoodsMp)
+		var handleErr error
+
+		handleErr, _, tips = CloseOrderHandle(tx, co.Id, co.Number, co.Typ, closeGoodsMp)
 
 		status := model.CloseOrderStatusComplete
 
 		//处理失败则更新失败原因到tips中
-		if err != nil {
+		if handleErr != nil {
 			status = model.CloseOrderStatusException
 			tips.Colour = "#67C23A"
-			tips.Tips = err.Error()
+			tips.Tips = handleErr.Error()
 		}
 
 		//更新关单任务状态
@@ -486,14 +505,18 @@ func CloseOrderExecNew(db *gorm.DB, form req.CloseOrder) (err error) {
 			continue
 		}
 
+		tx.Commit()
+
+		if handleErr != nil {
+			err = errors.New("关单异常，请注意查看异常关单列表")
+			return
+		}
+
 		err = CloseOrderResult(co.Id, 1)
 
 		if err != nil {
-			tx.Rollback()
-			continue
+			return
 		}
-
-		tx.Commit()
 
 	}
 
@@ -537,7 +560,7 @@ func OrderDataHandle(tx *gorm.DB, closeOrderId int, number string, typ int, clos
 	if isCommit {
 		tips = rsp.CloseTips{
 			Colour: "#67C23A",
-			Tips:   "新订单关闭完成",
+			Tips:   "订单关闭完成",
 		}
 		return
 	}
@@ -593,6 +616,11 @@ func CloseGoodsAndOrderLogic(tx *gorm.DB, number string, typ int, closeGoodsMp m
 		return
 	}
 
+	if order.OrderType == model.CloseOrderType {
+		err = errors.New("err:订单已经被关闭了，重复关闭")
+		return
+	}
+
 	//全单关闭
 	if typ == model.CloseOrderTypAll {
 		//全单关闭时更新订单类型为关闭
@@ -611,7 +639,7 @@ func CloseGoodsAndOrderLogic(tx *gorm.DB, number string, typ int, closeGoodsMp m
 
 	//订单商品关闭
 	for _, og := range orderGoods {
-		closeCount, closeGoodsMpOk := closeGoodsMp[og.Id]
+		closeCount, closeGoodsMpOk := closeGoodsMp[og.Id] //TODO 这里如果map没有消耗完怎么办？
 
 		if !closeGoodsMpOk {
 			//closeGoodsMp 是关闭订单中的商品信息，orderGoods是根据关闭订单的单号查询的商品
@@ -619,7 +647,7 @@ func CloseGoodsAndOrderLogic(tx *gorm.DB, number string, typ int, closeGoodsMp m
 		}
 
 		if og.LackCount < closeCount {
-			err = errors.New("欠货数量小于关闭数量")
+			err = errors.New(fmt.Sprintf("欠货数量小于关闭数量:订单id:%d", og.Id))
 			return
 		}
 
@@ -637,7 +665,8 @@ func CloseGoodsAndOrderLogic(tx *gorm.DB, number string, typ int, closeGoodsMp m
 	}
 
 	//如果是新订单，则处理完订单后可以直接提交，不做后续逻辑处理
-	if order.OrderType == model.NewOrderType {
+	//如果是欠货状态，说明批次和任务都已结束，如果不是，则是关闭任务有bug
+	if order.OrderType == model.NewOrderType || order.OrderType == model.LackOrderType {
 		isCommit = true
 	}
 
@@ -660,9 +689,12 @@ func CloseTaskLogic(tx *gorm.DB, closeOrderId int, number string, typ int, close
 		return
 	}
 
-	//订单所在的最新任务是已完成的，直接提交,这种情况订单还是欠货的
-	if outboundOrder.OrderType == model.OutboundOrderTypeComplete {
-		isCommit = true
+	taskId = outboundOrder.TaskId
+
+	//订单所在的最新任务是已完成的，应该在完成时把订单更新为欠货，如果不是，完成订单逻辑有bug
+	//如果任务订单是已关闭，保存异常信息
+	if outboundOrder.OrderType == model.OutboundOrderTypeComplete || outboundOrder.OrderType == model.OutboundOrderTypeClose {
+		err = errors.New(fmt.Sprintf("任务订单状态异常，任务id:%d,number:%s", taskId, number))
 		return
 	}
 
@@ -672,8 +704,6 @@ func CloseTaskLogic(tx *gorm.DB, closeOrderId int, number string, typ int, close
 	}
 
 	//TODO 如果是拣货中，需确认批次结束是否会更新任务数据
-
-	taskId = outboundOrder.TaskId
 
 	//全单关闭
 	if typ == model.CloseOrderTypAll {
@@ -715,7 +745,7 @@ func CloseTaskLogic(tx *gorm.DB, closeOrderId int, number string, typ int, close
 	}
 
 	for i, good := range outboundGoods {
-		closeCount, closeGoodsMpOk := closeGoodsMp[good.OrderGoodsId]
+		closeCount, closeGoodsMpOk := closeGoodsMp[good.OrderGoodsId] //考虑关闭任务的商品是否全部消耗完
 
 		if !closeGoodsMpOk {
 			err = errors.New("订单商品map异常")

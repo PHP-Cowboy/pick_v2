@@ -614,6 +614,9 @@ func BatchTask(c *gin.Context) {
 	mp := make(map[string]map[string]string, 0)
 
 	mpSum := make(map[string]int, 0)
+	skuCodeSum := make(map[string]int, 0)
+
+	codeSum := make(map[string]int, 0)
 
 	for _, good := range pickGoods {
 		shopCodes = append(shopCodes, good.ShopCode)
@@ -641,13 +644,27 @@ func BatchTask(c *gin.Context) {
 		}
 
 		for _, code := range shopCodes {
+
 			_, has := subMp[code]
 			if !has {
 				subMp[code] = ""
 			}
 
 			if code == pg.ShopCode {
-				subMp[code] = strconv.Itoa(num)
+				mpKey := fmt.Sprintf("%s%s", pg.Sku, code)
+				skuCodeSumVal, skuCodeSumOk := skuCodeSum[mpKey]
+
+				if !skuCodeSumOk {
+					skuCodeSumVal = 0
+				}
+
+				skuCodeSumVal += num
+
+				skuCodeSum[mpKey] = skuCodeSumVal
+
+				subMp[code] = strconv.Itoa(skuCodeSumVal)
+
+				//codeSum[code] += skuCodeSumVal
 			}
 		}
 
@@ -664,6 +681,8 @@ func BatchTask(c *gin.Context) {
 
 		subMp["总计"] = strconv.Itoa(mpSum[pg.Sku])
 
+		//codeSum["total"] += mpSum[pg.Sku]
+
 		mp[pg.Sku] = subMp
 	}
 
@@ -672,6 +691,21 @@ func BatchTask(c *gin.Context) {
 	shopCodes = slice.UniqueSlice(shopCodes)
 
 	column = append(column, shopCodes...)
+
+	total := 0
+	codeVal := 0
+
+	for _, sp := range mp {
+		total, _ = strconv.Atoi(sp["总计"])
+
+		codeSum["total"] += total
+
+		for _, code := range shopCodes {
+			codeVal, _ = strconv.Atoi(sp[code])
+			codeSum[code] += codeVal
+		}
+
+	}
 
 	xFile := excelize.NewFile()
 	sheet := xFile.NewSheet("sheet1")
@@ -691,6 +725,11 @@ func BatchTask(c *gin.Context) {
 	i := 0
 
 	for _, val := range mp {
+		if val["总计"] == "0" {
+			//总计为0的不输出到Excel
+			continue
+		}
+
 		i++
 		item := make([]interface{}, 0)
 		item = append(item, val["商品名称"])
@@ -703,6 +742,24 @@ func BatchTask(c *gin.Context) {
 		}
 
 		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+i), &item)
+	}
+
+	item := make([]interface{}, 0)
+	item = append(item, "")
+	item = append(item, "")
+	item = append(item, "合计")             //单位的位置写入合计
+	item = append(item, codeSum["total"]) //总计的和
+
+	for _, code := range shopCodes {
+		val, codeSumOk := codeSum[code]
+
+		if !codeSumOk {
+			val = 0
+		}
+		item = append(item, val) //分项的和
+
+		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+i+1), &item)
+
 	}
 
 	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{pick.TaskName + "拣货单导出"})

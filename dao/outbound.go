@@ -269,7 +269,7 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 	}
 
 	if len(form.GoodsType) > 0 {
-		localDb = localDb.Where("goods_type in (?) ", form.GoodsType)
+		//localDb = localDb.Where("goods_type in (?) ", form.GoodsType)
 	}
 
 	if len(form.ShopIds) > 0 {
