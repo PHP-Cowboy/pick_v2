@@ -132,6 +132,7 @@ type PickCount struct {
 type Ret struct {
 	OutC      int    `json:"out_c"`
 	NeedC     int    `json:"need_c"`
+	PrePickId int    `json:"pre_pick_id"`
 	ShopId    int    `json:"shop_id"`
 	GoodsType string `json:"goods_type"`
 }
@@ -183,6 +184,7 @@ type Remark struct {
 	Number      string `json:"number"`
 	OrderRemark string `json:"order_remark"`
 	GoodsRemark string `json:"goods_remark"`
+	PayAt       string `json:"pay_at"`
 }
 
 type GetBaseRsp struct {

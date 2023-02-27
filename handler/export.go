@@ -810,7 +810,9 @@ func GoodsSummaryList(c *gin.Context) {
 		return
 	}
 
-	err, mp, column, shopCodes := dao.GoodsSummaryList(db, form)
+	codeSum := make(map[string]int, 0)
+
+	err, mp, column, shopCodes, codeSum := dao.GoodsSummaryList(db, form)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
@@ -850,6 +852,27 @@ func GoodsSummaryList(c *gin.Context) {
 		}
 
 		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+i), &item)
+	}
+
+	item := make([]interface{}, 0)
+	item = append(item, "")
+	item = append(item, "")
+	item = append(item, "")
+	item = append(item, "")
+	item = append(item, "")
+	item = append(item, "合计")             //单位的位置写入合计
+	item = append(item, codeSum["total"]) //总计的和
+
+	for _, code := range shopCodes {
+		val, codeSumOk := codeSum[code]
+
+		if !codeSumOk {
+			val = 0
+		}
+		item = append(item, val) //分项的和
+
+		xFile.SetSheetRow("Sheet1", fmt.Sprintf("A%d", startCount+i+1), &item)
+
 	}
 
 	xFile.SetSheetRow("Sheet1", "A1", &[]interface{}{fmt.Sprintf("%s-货品汇总单-%s", batch.BatchName, typeStr)})

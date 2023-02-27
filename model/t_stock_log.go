@@ -41,3 +41,8 @@ func StockLogReplaceSave(db *gorm.DB, list *StockLog, values []string) (err erro
 		Error
 	return
 }
+
+func GerStockLogListByIds(db *gorm.DB, ids []int, fields string) (err error, list []StockLog) {
+	err = db.Model(&StockLog{}).Select(fields).Where("id in (?)", ids).Find(&list).Error
+	return
+}

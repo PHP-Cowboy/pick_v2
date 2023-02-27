@@ -89,6 +89,12 @@ func PickList(c *gin.Context) {
 		}
 	}
 
+	var lines []string
+
+	if form.Lines != "" {
+		lines = slice.StringToSlice(form.Lines, ",")
+	}
+
 	localDb := db.Table("t_pick")
 
 	if len(ids) > 0 {
@@ -96,6 +102,10 @@ func PickList(c *gin.Context) {
 	}
 
 	localDb.Where("batch_id = ? and status = ?", form.BatchId, form.Status)
+
+	if len(lines) > 0 {
+		localDb.Where("line in (?)", lines)
+	}
 
 	result = localDb.Find(&pick)
 
@@ -145,6 +155,10 @@ func PickList(c *gin.Context) {
 	}
 
 	localDb.Where("batch_id = ? and status = ?", form.BatchId, form.Status)
+
+	if len(lines) > 0 {
+		localDb.Where("line in (?)", lines)
+	}
 
 	result = localDb.Find(&pick)
 

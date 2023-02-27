@@ -14,6 +14,7 @@ import (
 	"pick_v2/model"
 	"pick_v2/utils/cache"
 	"pick_v2/utils/ecode"
+	"pick_v2/utils/slice"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
 	"strconv"
@@ -508,7 +509,18 @@ func GetPrePickList(c *gin.Context) {
 
 	db := global.DB
 
-	result := db.Where("batch_id = ?", form.BatchId).Where(model.PrePick{ShopId: form.ShopId, Line: form.Line}).Where("status = 0").Find(&prePicks)
+	var lines []string
+	if form.Lines != "" {
+		lines = slice.StringToSlice(form.Lines, ",")
+	}
+
+	localDb := db.Where("batch_id = ?", form.BatchId).Where(model.PrePick{ShopId: form.ShopId}).Where("status = 0")
+
+	if len(lines) > 0 {
+		localDb.Where("line in (?)", lines)
+	}
+
+	result := localDb.Find(&prePicks)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)
@@ -517,7 +529,7 @@ func GetPrePickList(c *gin.Context) {
 
 	res.Total = result.RowsAffected
 
-	db.Where("batch_id = ?", form.BatchId).Where(model.PrePick{ShopId: form.ShopId, Line: form.Line}).Where("status = 0").Order("shop_code ASC").Scopes(model.Paginate(form.Page, form.Size)).Find(&prePicks)
+	localDb.Order("shop_code ASC").Scopes(model.Paginate(form.Page, form.Size)).Find(&prePicks)
 
 	for _, pick := range prePicks {
 		prePickIds = append(prePickIds, pick.Id)
@@ -526,16 +538,16 @@ func GetPrePickList(c *gin.Context) {
 	retCount := []rsp.Ret{}
 
 	result = db.Model(&model.PrePickGoods{}).
-		Select("SUM(out_count) as out_c, SUM(need_num) AS need_c, shop_id, goods_type").
+		Select("SUM(out_count) as out_c, SUM(need_num) AS need_c, shop_id,pre_pick_id, goods_type").
 		Where("pre_pick_id in (?)", prePickIds).
 		Where("status = 0"). //状态:0:未处理,1:已进入拣货池
-		Group("shop_id, goods_type").
+		Group("pre_pick_id, goods_type").
 		Find(&retCount)
 
 	typeMap := make(map[int]map[string]rsp.PickCount, 0)
 
 	for _, r := range retCount {
-		mp, ok := typeMap[r.ShopId]
+		mp, ok := typeMap[r.PrePickId]
 
 		if !ok {
 			mp = make(map[string]rsp.PickCount, 0)
@@ -546,7 +558,7 @@ func GetPrePickList(c *gin.Context) {
 			PickedCount: r.OutC,
 		}
 
-		typeMap[r.ShopId] = mp
+		typeMap[r.PrePickId] = mp
 	}
 
 	list := make([]*rsp.PrePick, 0, len(prePicks))
@@ -558,7 +570,7 @@ func GetPrePickList(c *gin.Context) {
 			ShopName:     pick.ShopName,
 			Line:         pick.Line,
 			Status:       pick.Status,
-			CategoryInfo: typeMap[pick.ShopId],
+			CategoryInfo: typeMap[pick.Id],
 		})
 	}
 

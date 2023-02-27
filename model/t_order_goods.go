@@ -214,6 +214,16 @@ func GetOrderGoodsListByNumbers(db *gorm.DB, numbers []string) (err error, list 
 	return
 }
 
+// 根据skus获取待处理订单商品数据
+func GetOrderGoodsListBySku(db *gorm.DB, fields string, skus []string, status int) (err error, list []OrderGoods) {
+	err = db.Model(&OrderGoods{}).
+		Select(fields).
+		Where("sku in (?) and `status` = ?", skus, status).
+		Find(&list).
+		Error
+	return
+}
+
 // 获取出库任务订单 商品相关数量
 func OrderGoodsNumsStatisticalByNumbers(db *gorm.DB, query string, number []string) (err error, mp map[string]OrderGoodsNumsStatistical) {
 	var nums []OrderGoodsNumsStatistical

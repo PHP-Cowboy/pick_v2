@@ -204,13 +204,18 @@ func CompleteOrder(db *gorm.DB, form req.CompleteOrderForm) (err error, res rsp.
 		Where(&model.CompleteOrder{
 			ShopId:         form.ShopId,
 			Number:         form.Number,
-			Line:           form.Line,
 			DeliveryMethod: form.DeliveryMethod,
 			ShopType:       form.ShopType,
 			Province:       form.Province,
 			City:           form.City,
 			District:       form.District,
 		})
+
+	if form.Lines != "" {
+		lines := slice.StringToSlice(form.Lines, ",")
+
+		local.Where("line in (?)", lines)
+	}
 
 	if len(numbers) > 0 {
 		local.Where("number in (?)", numbers)

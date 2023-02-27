@@ -31,7 +31,7 @@ type OutboundOrderListForm struct {
 	ShopId           int    `json:"shop_id" form:"shop_id" `
 	Number           string `json:"number" form:"number" `
 	Sku              string `json:"sku" form:"sku" `
-	Line             string `json:"line" form:"line" `
+	Lines            string `json:"lines" form:"lines" `
 	DistributionType int    `json:"distribution_type" form:"distribution_type" `
 	ShopType         string `json:"shop_type" form:"shop_type" `
 	Province         string `json:"province" form:"province" `

@@ -7,6 +7,7 @@ type PickListForm struct {
 	GoodsName string `json:"goods_name" form:"goods_name"`
 	GoodsType string `json:"goods_type" form:"goods_type"`
 	Number    string `json:"number" form:"number"`
+	Lines     string `json:"lines" form:"lines"`
 	Status    *int   `json:"status" form:"status"`
 	HasRemark int    `json:"has_remark" form:"has_remark"` //0:全部;1:有备注;2:无备注
 }

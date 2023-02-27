@@ -33,10 +33,7 @@ func CreateOutboundTask(c *gin.Context) {
 
 	//执行完成后删除锁定时间
 	defer func(key string) {
-		_, err = cache.Del(key)
-		if err != nil {
-
-		}
+		_, _ = cache.Del(key)
 	}(rdsKey)
 
 	db := global.DB

@@ -15,6 +15,7 @@ import (
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
 	"pick_v2/utils/xsq_net"
+	"time"
 )
 
 // u8推送日志列表
@@ -95,7 +96,24 @@ func BatchSupplement(c *gin.Context) {
 		return
 	}
 
-	second, err := cache.TTL(constant.BATCH_SUPPLEMENT)
+	err, logList := model.GerStockLogListByIds(global.DB, form.Ids, "id,status")
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	for _, log := range logList {
+		if log.Status == model.StockLogPushSucceededStatus {
+			err = errors.New(fmt.Sprintf("ID为:%d 的日志记录不允许补单", log.Id))
+			xsq_net.ErrorJSON(c, err)
+			return
+		}
+	}
+
+	var second time.Duration
+
+	second, err = cache.TTL(constant.BATCH_SUPPLEMENT)
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)
 		return

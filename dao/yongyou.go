@@ -40,6 +40,11 @@ func PushYongYou(id int) {
 		return
 	}
 
+	//已推送成功的，不推u8了
+	if stockLog.Status == model.StockLogPushSucceededStatus {
+		return
+	}
+
 	shopXml, err := SendShopXml(stockLog.RequestXml)
 
 	doc := etree.NewDocument()
@@ -57,9 +62,9 @@ func PushYongYou(id int) {
 
 			if code == "0" { //成功
 				stockLog.ResponseNo = item.SelectAttr("u8key").Value
-				stockLog.Status = 1
+				stockLog.Status = model.StockLogPushSucceededStatus
 			} else {
-				stockLog.Status = 2
+				stockLog.Status = model.StockLogPushFailedStatus
 			}
 
 			stockLog.Msg = item.SelectAttr("dsc").Value

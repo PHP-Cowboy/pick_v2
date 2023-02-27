@@ -239,37 +239,58 @@ func OutboundOrderCount(db *gorm.DB, form req.OutboundOrderCountForm) (error, rs
 }
 
 // 出库订单相关保存
-func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int) error {
+func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int) (err error) {
 
 	var (
+		orderGoods     []model.OrderGoods
 		orderJoinGoods []model.GoodsJoinOrder
 		mp             = make(map[string]int, 0) //空map，共用逻辑时使用，这里没什么用途
+		numbers        []string
 	)
 
+	//如果根据sku查询，则把sku对应的订单整单加入任务中
+	if len(form.Sku) > 0 {
+
+		err, orderGoods = model.GetOrderGoodsListBySku(db, "number", form.Sku, model.OrderGoodsUnhandledStatus)
+
+		if err != nil {
+			return
+		}
+
+		if len(orderGoods) == 0 {
+			err = errors.New("暂无相关商品订单")
+			return
+		}
+
+		for _, og := range orderGoods {
+			numbers = append(numbers, og.Number)
+		}
+
+		numbers = slice.UniqueSlice(numbers)
+	}
+
+	//
 	localDb := db.Table("t_order_goods og").
 		Joins("left join t_order o on og.number = o.number").
-		Select("og.*,og.id as order_goods_id,o.*,o.id as order_id").
-		Where("o.order_type in (?) and o.distribution_type = ? and o.pay_at <= ? and o.delivery_at <= ? ",
-			[]int{model.NewOrderType, model.LackOrderType},
-			form.DistributionType,
-			form.PayTime,
-			form.DeliveryEndTime,
-		)
+		Select("og.*,og.id as order_goods_id,o.*,o.id as order_id")
+
+	if len(numbers) > 0 {
+		localDb.Where("og.number in (?)", numbers)
+	}
+
+	localDb.Where("o.order_type in (?) and o.distribution_type = ? and o.pay_at <= ? and o.delivery_at <= ? ",
+		[]int{model.NewOrderType, model.LackOrderType},
+		form.DistributionType,
+		form.PayTime,
+		form.DeliveryEndTime,
+	)
 
 	if form.DeliveryStartTime != "" {
 		localDb = localDb.Where("o.delivery_at >= ?", form.DeliveryStartTime)
 	}
 
-	if len(form.Sku) > 0 {
-		localDb = localDb.Where("og.sku in (?)", form.Sku)
-	}
-
 	if len(form.Lines) > 0 {
 		localDb = localDb.Where("o.line in (?) ", form.Lines)
-	}
-
-	if len(form.GoodsType) > 0 {
-		//localDb = localDb.Where("goods_type in (?) ", form.GoodsType)
 	}
 
 	if len(form.ShopIds) > 0 {
@@ -288,7 +309,7 @@ func OutboundOrderBatchSave(db *gorm.DB, form req.CreateOutboundForm, taskId int
 		return errors.New("暂无相关订单")
 	}
 
-	err := OutboundOrderBatchSaveLogic(db, taskId, orderJoinGoods, mp)
+	err = OutboundOrderBatchSaveLogic(db, taskId, orderJoinGoods, mp)
 
 	if err != nil {
 		return err
@@ -465,12 +486,17 @@ func OutboundOrderList(db *gorm.DB, form req.OutboundOrderListForm) (err error, 
 		ShopId:           form.ShopId,
 		ShopType:         form.ShopType,
 		DistributionType: form.DistributionType,
-		Line:             form.Line,
 		Province:         form.Province,
 		City:             form.City,
 		District:         form.District,
 		HasRemark:        form.HasRemark,
 	})
+
+	if len(form.Lines) > 0 {
+		lines := slice.StringToSlice(form.Lines, ",")
+
+		localDb.Where("line in (?)", lines)
+	}
 
 	if form.OrderType > 0 {
 		localDb.Where("order_type = ?", form.OrderType)

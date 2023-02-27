@@ -1,20 +1,30 @@
 package dao
 
 import (
+	"fmt"
 	"gorm.io/gorm"
 	"pick_v2/forms/req"
 	"pick_v2/global"
 	"pick_v2/model"
 	"pick_v2/utils/slice"
+	"sort"
 	"strconv"
 )
 
 // 货品汇总单
-func GoodsSummaryList(db *gorm.DB, form req.GoodsSummaryListForm) (err error, mp map[string]map[string]string, column, shopCodes []string) {
+func GoodsSummaryList(db *gorm.DB, form req.GoodsSummaryListForm) (err error, mp map[string]map[string]string, column, shopCodes []string, codeSum map[string]int) {
 
 	var list []model.PrePickGoodsJoinPrePick
 
 	err, list = model.GetPrePickGoodsJoinPrePickListByBatchId(db, form.BatchId, form.GoodsTypes)
+
+	mp = make(map[string]map[string]string, 0)
+
+	mpSum := make(map[string]int, 0)
+
+	skuCodeSum := make(map[string]int, 0)
+
+	codeSum = make(map[string]int, 0)
 
 	for _, l := range list {
 		shopCodes = append(shopCodes, l.ShopCode)
@@ -22,9 +32,7 @@ func GoodsSummaryList(db *gorm.DB, form req.GoodsSummaryListForm) (err error, mp
 
 	shopCodes = slice.UniqueSlice(shopCodes)
 
-	mp = make(map[string]map[string]string, 0)
-
-	mpSum := make(map[string]int, 0)
+	sort.Strings(shopCodes)
 
 	for _, pg := range list {
 
@@ -42,7 +50,18 @@ func GoodsSummaryList(db *gorm.DB, form req.GoodsSummaryListForm) (err error, mp
 			}
 
 			if code == pg.ShopCode {
-				subMp[code] = strconv.Itoa(pg.NeedNum)
+				mpKey := fmt.Sprintf("%s%s", pg.Sku, code)
+				skuCodeSumVal, skuCodeSumOk := skuCodeSum[mpKey]
+
+				if !skuCodeSumOk {
+					skuCodeSumVal = 0
+				}
+
+				skuCodeSumVal += pg.NeedNum
+
+				skuCodeSum[mpKey] = skuCodeSumVal
+
+				subMp[code] = strconv.Itoa(skuCodeSumVal)
 			}
 		}
 
@@ -65,9 +84,22 @@ func GoodsSummaryList(db *gorm.DB, form req.GoodsSummaryListForm) (err error, mp
 		mp[pg.Sku] = subMp
 	}
 
-	column = []string{"商品名称", "商品编码", "货架号", "规格", "分类", "单位", "总计"}
+	codeVal := 0
+	total := 0
 
-	shopCodes = slice.UniqueSlice(shopCodes)
+	for _, sp := range mp {
+		total, _ = strconv.Atoi(sp["总计"])
+
+		codeSum["total"] += total
+
+		for _, code := range shopCodes {
+			codeVal, _ = strconv.Atoi(sp[code])
+			codeSum[code] += codeVal
+		}
+
+	}
+
+	column = []string{"商品名称", "商品编码", "货架号", "规格", "分类", "单位", "总计"}
 
 	column = append(column, shopCodes...)
 

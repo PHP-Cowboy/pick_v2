@@ -51,7 +51,8 @@ type ChangeDistributionForm struct {
 }
 
 type ShippingRecordDetailReq struct {
-	Id int `json:"id" form:"id"`
+	Id     int    `json:"id" form:"id"`
+	Number string `json:"number" form:"number"`
 }
 
 type CompleteOrderForm struct {
@@ -59,7 +60,7 @@ type CompleteOrderForm struct {
 	Number         string `json:"number" form:"number"` //订单号
 	ShopId         int    `json:"shop_id" form:"shop_id"`
 	Sku            string `json:"sku" form:"sku"`
-	Line           string `json:"line" form:"line"`
+	Lines          string `json:"lines" form:"lines"`
 	DeliveryMethod int    `json:"delivery_method" form:"delivery_method"`
 	ShopType       string `json:"shop_type" form:"shop_type"` //门店类型
 	Province       string `json:"province" form:"province"`

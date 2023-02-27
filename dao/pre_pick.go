@@ -429,10 +429,14 @@ func GetPrePickDetail(db *gorm.DB, form req.GetPrePickDetailForm) (err error, re
 
 	orderNumMp := make(map[string]struct{}, 0)
 
+	var number = make([]string, 0, len(prePickGoods))
+
 	//相同sku合并处理
 	for _, goods := range prePickGoods {
 
 		orderNumMp[goods.Number] = struct{}{}
+
+		number = append(number, goods.Number)
 
 		goodsNum += goods.NeedNum
 
@@ -464,6 +468,18 @@ func GetPrePickDetail(db *gorm.DB, form req.GetPrePickDetailForm) (err error, re
 			val.ParamsId = append(val.ParamsId, paramsId)
 			prePickGoodsSkuMp[goods.Sku] = val
 		}
+	}
+
+	number = slice.UniqueSlice(number)
+
+	err, orderList := model.GetOrderListByNumbers(db, number)
+	if err != nil {
+		return
+	}
+
+	payAtMp := make(map[string]string, 0)
+	for _, ol := range orderList {
+		payAtMp[ol.Number] = ol.PayAt.String()
 	}
 
 	//订单数
@@ -502,6 +518,7 @@ func GetPrePickDetail(db *gorm.DB, form req.GetPrePickDetailForm) (err error, re
 
 	list := []rsp.Remark{}
 	for _, remark := range prePickRemark {
+
 		remarkMap[remark.Number] = rsp.Remark{
 			Number:      remark.Number,
 			OrderRemark: remark.OrderRemark,
@@ -512,11 +529,20 @@ func GetPrePickDetail(db *gorm.DB, form req.GetPrePickDetailForm) (err error, re
 	for n := range orderNumMp {
 		remark, remarkMapOk := remarkMap[n]
 
+		payAt, payAtMpOk := payAtMp[n]
+
+		if !payAtMpOk {
+			payAt = ""
+		}
+
+		remark.PayAt = payAt
+
 		if !remarkMapOk {
 			list = append(list, rsp.Remark{
 				Number:      n,
 				OrderRemark: "",
 				GoodsRemark: "",
+				PayAt:       payAt,
 			})
 		} else {
 			list = append(list, remark)

@@ -338,7 +338,7 @@ func ShippingRecordDetail(c *gin.Context) {
 
 	var pickGoods []model.PickGoods
 
-	result := global.DB.Where("pick_id in (?) and review_num > 0", form.Id).Find(&pickGoods)
+	result := global.DB.Where("pick_id in (?) and review_num > 0", form.Id).Where(model.PickGoods{Number: form.Number}).Find(&pickGoods)
 
 	if result.Error != nil {
 		xsq_net.ErrorJSON(c, result.Error)

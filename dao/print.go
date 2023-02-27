@@ -129,6 +129,12 @@ func Print(form req.PrintCallGetReq) (err error, ret []rsp.PrintCallGetRsp) {
 			}
 		}
 
+		var lackCount int
+
+		if info.LackCount > 0 {
+			lackCount = info.LackCount - pgs.ReviewNum
+		}
+
 		item3 := rsp.CallGetGoods{
 			GoodsName:    info.GoodsName,
 			GoodsSpe:     info.GoodsSpe,
@@ -136,7 +142,7 @@ func Print(form req.PrintCallGetReq) (err error, ret []rsp.PrintCallGetRsp) {
 			RealOutCount: pgs.ReviewNum,
 			GoodsUnit:    info.GoodsUnit,
 			Price:        int64(info.DiscountPrice) * int64(pgs.ReviewNum),
-			LackCount:    info.PayCount - pgs.ReviewNum,
+			LackCount:    lackCount,
 		}
 		item2val.List = append(item2val.List, item3)
 
