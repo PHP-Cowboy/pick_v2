@@ -90,7 +90,7 @@ func Print(form req.PrintCallGetReq) (err error, ret []rsp.PrintCallGetRsp) {
 	}
 
 	item := rsp.PrintCallGetRsp{
-		ShopName:    pick.ShopName,
+		ShopName:    orderJoinGoods[0].ShopName,
 		JHNumber:    strconv.Itoa(pick.Id),
 		PickName:    pick.PickUser, //拣货人
 		ShopType:    orderJoinGoods[0].ShopType,

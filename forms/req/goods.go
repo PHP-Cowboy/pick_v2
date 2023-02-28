@@ -91,3 +91,7 @@ type CountFrom struct {
 	HasRemark        int    `json:"has_remark" form:"has_remark"` ////是否存在备注  0-默认全部 1-有备注 2-无备注
 	PayEndTime       string `json:"pay_end_time" form:"pay_end_time"`
 }
+
+type OrderRepairForm struct {
+	Numbers []string `json:"numbers" form:"numbers" binding:"required"`
+}

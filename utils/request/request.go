@@ -18,6 +18,74 @@ type HttpRsp struct {
 	Data    interface{} `json:"data"`
 }
 
+func NewCall(url string, params interface{}, res interface{}) (err error) {
+	var (
+		body []byte
+	)
+
+	body, err = NewPost(url, params)
+
+	if err != nil {
+		return
+	}
+
+	err = json.Unmarshal(body, &res)
+
+	if err != nil {
+		return
+	}
+
+	rspCode, rspMsg := getRspCode(res)
+
+	if rspCode != 200 {
+		return errors.New(rspMsg)
+	}
+
+	return
+}
+
+func NewPost(url string, responseData interface{}) ([]byte, error) {
+
+	client := &http.Client{}
+
+	jData, err := json.Marshal(responseData)
+	if err != nil {
+		return nil, err
+	}
+
+	rq, err := http.NewRequest("POST", url, bytes.NewReader(jData))
+
+	if err != nil {
+		global.Logger["err"].Infof("url:%s,params:%s,err:%s", url, string(jData), err.Error())
+		return nil, err
+	}
+
+	sign := middlewares.Generate()
+
+	rq.Header.Add("Content-Type", "application/json")
+	rq.Header.Add("x-sign", sign)
+
+	res, err := client.Do(rq)
+
+	if err != nil {
+		global.Logger["err"].Infof("url:%s,params:%s,err:%s", url, string(jData), err.Error())
+		return nil, err
+	}
+
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+
+	if err != nil {
+		global.Logger["err"].Infof("url:%s,params:%s,err:%s", url, string(jData), err.Error())
+		return nil, err
+	}
+
+	global.Logger["info"].Infof("url:%s,params:%s,body:%s", url, string(jData), string(body))
+
+	return body, nil
+}
+
 func Post(path string, responseData interface{}) ([]byte, error) {
 
 	cfg := global.ServerConfig

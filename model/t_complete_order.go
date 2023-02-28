@@ -40,8 +40,18 @@ func CompleteOrderBatchSave(db *gorm.DB, list *[]CompleteOrder) (err error) {
 	return
 }
 
+func DeleteCompOrderByNumbers(db *gorm.DB, numbers []string) (err error) {
+	err = db.Delete(&CompleteOrder{}, "number in (?)", numbers).Error
+	return
+}
+
 func GetCompleteOrderList(db *gorm.DB, cond *CompleteOrder) (err error, list []CompleteOrder) {
 	err = db.Model(&CompleteOrder{}).Where(cond).Find(&list).Error
+	return
+}
+
+func GetCompleteOrderListByNumbers(db *gorm.DB, numbers []string) (err error, list []CompleteOrder) {
+	err = db.Model(&CompleteOrder{}).Where("number in (?)", numbers).Find(&list).Error
 	return
 }
 

@@ -6,13 +6,17 @@ import (
 	"errors"
 	"github.com/apache/rocketmq-client-go/v2/consumer"
 	"github.com/apache/rocketmq-client-go/v2/primitive"
+	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"gorm.io/gorm"
 	"pick_v2/dao"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
 	"pick_v2/global"
 	"pick_v2/model"
+	"pick_v2/utils/ecode"
 	"pick_v2/utils/request"
+	"pick_v2/utils/xsq_net"
 )
 
 func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.ConsumeResult, error) {
@@ -81,10 +85,12 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 
 	err, closeOrder = model.GetCloseOrderByPk(db, form.OccId)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		global.Logger["err"].Infof(err.Error())
 		return consumer.ConsumeRetryLater, err
 	}
 
 	if closeOrder.Id > 0 {
+		global.Logger["err"].Infof("对应的关单任务已存在")
 		return consumer.ConsumeSuccess, errors.New("对应的关单任务已存在")
 	}
 
@@ -101,10 +107,12 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 	goodsInfo := closeOrderRes.GoodsInfo
 
 	if closeOrderRes.Number == "" {
+		global.Logger["err"].Infof("订货系统查询订单数据不存在")
 		return consumer.ConsumeSuccess, errors.New("订货系统查询订单数据不存在")
 	}
 
 	if len(goodsInfo) == 0 {
+		global.Logger["err"].Infof("订货系统查询订单商品数据不存在")
 		return consumer.ConsumeSuccess, errors.New("订货系统查询订单商品数据不存在")
 	}
 
@@ -119,6 +127,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 	err, order = model.GetOrderByNumber(tx, closeOrderRes.Number)
 
 	if err != nil {
+		global.Logger["err"].Infof(err.Error())
 		return
 	}
 
@@ -141,6 +150,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 		err, isCommit, _, tips = dao.OrderDataHandle(tx, closeOrderRes.OccId, closeOrderRes.Number, closeOrderRes.Typ, closeGoodsMp)
 		if err != nil {
 			tx.Rollback()
+			global.Logger["err"].Infof(err.Error())
 			return consumer.ConsumeRetryLater, err
 		}
 
@@ -151,6 +161,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 		err, outboundOrder = model.GetOutboundOrderByNumberFirstSortByTaskId(tx, closeOrderRes.Number)
 
 		if err != nil {
+			global.Logger["err"].Infof(err.Error())
 			return
 		}
 
@@ -171,6 +182,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 			err, isCommit, _, tips = dao.OrderDataHandle(tx, closeOrderRes.OccId, closeOrderRes.Number, closeOrderRes.Typ, closeGoodsMp)
 			if err != nil {
 				tx.Rollback()
+				global.Logger["err"].Infof(err.Error())
 				return consumer.ConsumeRetryLater, err
 			}
 
@@ -186,6 +198,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 
 	if err != nil {
 		tx.Rollback()
+		global.Logger["err"].Infof(err.Error())
 		return consumer.ConsumeRetryLater, err
 	}
 
@@ -195,6 +208,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 
 	if err != nil {
 		tx.Rollback()
+		global.Logger["err"].Infof(err.Error())
 		return consumer.ConsumeRetryLater, err
 	}
 
@@ -203,6 +217,7 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 
 		if err != nil {
 			tx.Rollback()
+			global.Logger["err"].Infof(err.Error())
 			return consumer.ConsumeRetryLater, err
 		}
 	}
@@ -261,4 +276,97 @@ func GetModelCloseOrderGoodsData(closeGoodsInfo []rsp.CloseGoodsInfo, closeOrder
 	}
 
 	return
+}
+
+func OrderRepair(c *gin.Context) {
+	var (
+		responseData req.OrderRepairForm
+		orderRsp     rsp.OrderRsp
+	)
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&responseData, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err := request.NewCall("http://127.0.0.1:20020/temp/api/order/number", responseData, &orderRsp)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	db := global.DB
+
+	var (
+		compOrders []model.CompleteOrder
+	)
+
+	length := len(responseData.Numbers)
+
+	err, compOrders = model.GetCompleteOrderListByNumbers(db, responseData.Numbers)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	if len(compOrders) != length {
+		xsq_net.ErrorJSON(c, errors.New("完成订单数量与传递数量不一致"))
+		return
+	}
+
+	var orders []model.Order
+
+	for _, info := range orderRsp.Data {
+		hasRemark := 1
+
+		if info.OrderRemark != "" {
+			hasRemark = 2
+		}
+
+		orders = append(orders, model.Order{
+			Id:               info.OrderID,
+			ShopId:           info.ShopID,
+			ShopName:         info.ShopName,
+			ShopType:         info.ShopType,
+			ShopCode:         info.ShopCode,
+			Number:           info.Number,
+			HouseCode:        info.HouseCode,
+			Line:             info.Line,
+			DistributionType: info.DistributionType,
+			OrderRemark:      info.OrderRemark,
+			PayAt:            info.PayAt,
+			DeliveryAt:       info.DeliveryAt,
+			Province:         info.Province,
+			City:             info.City,
+			District:         info.District,
+			Address:          info.Address,
+			ConsigneeName:    info.ConsigneeName,
+			ConsigneeTel:     info.ConsigneeTel,
+			HasRemark:        hasRemark,
+		})
+	}
+
+	tx := db.Begin()
+
+	err = model.OrderBatchSave(tx, orders)
+	if err != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	err = model.DeleteCompOrderByNumbers(tx, responseData.Numbers)
+	if err != nil {
+		tx.Rollback()
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	tx.Commit()
+
+	xsq_net.Success(c)
 }
