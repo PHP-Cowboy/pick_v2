@@ -14,7 +14,7 @@ import (
 )
 
 // 关闭订单
-func CloseOrder(c *gin.Context) {
+func CloseOrderDiscard(c *gin.Context) {
 	var form req.CloseOrderForm
 
 	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)

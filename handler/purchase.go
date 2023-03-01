@@ -67,10 +67,7 @@ func GetOrderInfo(responseData interface{}) (result rsp.OrderRsp, err error) {
 func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (consumeRes consumer.ConsumeResult, err error) {
 
 	var (
-		form       req.CloseOrderInfo
-		result     rsp.CloseOrderRsp
-		isCommit   bool
-		closeOrder model.CloseOrder
+		form req.CloseOrderInfo
 	)
 
 	for i := range messages {
@@ -80,6 +77,41 @@ func NewCloseOrder(ctx context.Context, messages ...*primitive.MessageExt) (cons
 			return consumer.ConsumeRetryLater, nil
 		}
 	}
+
+	logic, err := NewCloseOrderLogic(form)
+	if err != nil {
+		return logic, err
+	}
+
+	return
+}
+
+func CloseOrder(c *gin.Context) {
+	var form req.CloseOrderInfo
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	_, err := NewCloseOrderLogic(form)
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.Success(c)
+}
+
+// 关单逻辑
+func NewCloseOrderLogic(form req.CloseOrderInfo) (consumeRes consumer.ConsumeResult, err error) {
+	var (
+		result     rsp.CloseOrderRsp
+		isCommit   bool
+		closeOrder model.CloseOrder
+	)
 
 	db := global.DB
 

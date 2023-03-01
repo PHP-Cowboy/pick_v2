@@ -15,7 +15,7 @@ func OpenRoute(g *gin.RouterGroup) {
 	openGroup := g.Group("open", middlewares.SignAuth())
 	{
 		//关闭订单
-		openGroup.POST("/closeOrder", handler.CloseOrder)
+		openGroup.POST("/closeOrderDiscard", handler.CloseOrderDiscard)
 		//关闭商品
 		openGroup.POST("/closeOrderGoods", handler.CloseOrderGoods)
 		//批次出库订单和商品明细

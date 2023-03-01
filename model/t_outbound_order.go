@@ -12,7 +12,7 @@ type OutboundOrder struct {
 	TaskId            int       `gorm:"primaryKey;type:int(11);not null;comment:t_outbound_task表ID"`
 	Number            string    `gorm:"primaryKey;type:varchar(64);index;comment:订单编号"`
 	CreateTime        time.Time `gorm:"autoCreateTime;type:datetime;comment:创建时间"`
-	UpdateTime        time.Time `gorm:"autoCreateTime;type:datetime;comment:更新时间"`
+	UpdateTime        time.Time `gorm:"autoUpdateTime;type:datetime;comment:更新时间"`
 	DeleteTime        time.Time `gorm:"type:datetime;default:null;comment:删除时间"`
 	OrderId           int       `gorm:"type:int(11);comment:订单id"`
 	PayAt             *MyTime   `gorm:"type:datetime;comment:支付时间"`

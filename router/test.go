@@ -10,6 +10,8 @@ func TestRoute(g *gin.RouterGroup) {
 	{
 		//列表
 		taskGroup.GET("/sAdd", handler.SAdd)
-		taskGroup.POST("/orderRepair", handler.OrderRepair)
+		//taskGroup.POST("/orderRepair", handler.OrderRepair)
+		//关闭订单
+		taskGroup.POST("/closeOrder", handler.CloseOrder)
 	}
 }

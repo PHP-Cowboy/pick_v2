@@ -381,9 +381,15 @@ func BatchList(db *gorm.DB, form req.GetBatchListForm) (err error, res rsp.GetBa
 
 	res.Total = result.RowsAffected
 
-	result = local.Scopes(model.Paginate(form.Page, form.Size)).
-		Order("sort desc, id desc").
-		Find(&batches)
+	local.Scopes(model.Paginate(form.Page, form.Size))
+
+	if *form.Status == 0 {
+		local.Order("sort desc, id desc")
+	} else {
+		local.Order("id desc")
+	}
+
+	result = local.Find(&batches)
 
 	err = result.Error
 
