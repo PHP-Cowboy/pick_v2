@@ -43,3 +43,17 @@ type GoodsJoinOrder struct {
 	DeliveryOrderNo   GormList `json:"delivery_order_no"`
 	DeliveryAt        MyTime   `json:"delivery_at"`
 }
+
+type GoodsJoinOrderSort []GoodsJoinOrder
+
+func (og GoodsJoinOrderSort) Len() int {
+	return len(og)
+}
+
+func (og GoodsJoinOrderSort) Less(i, j int) bool {
+	return og[i].ShopCode < og[j].ShopCode
+}
+
+func (og GoodsJoinOrderSort) Swap(i, j int) {
+	og[i], og[j] = og[j], og[i]
+}

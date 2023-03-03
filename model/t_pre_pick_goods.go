@@ -215,12 +215,16 @@ func GetPrePickGoodsByPrePickIdAndStatus(db *gorm.DB, ids []int, status int) (er
 	return
 }
 
-func GetPrePickGoodsByPrePickIdAndStatusAndGoodsType(db *gorm.DB, ids []int, status int, goodsType []string) (err error, list []PrePickGoods) {
+func GetPrePickGoodsByPrePickIdAndStatusAndGoodsType(db *gorm.DB, ids []int, status int, typ int, typeParam []string) (err error, list []PrePickGoods) {
 	localDb := db.Model(&PrePickGoods{}).
 		Where("pre_pick_id in (?) and status = ? ", ids, status)
 
-	if len(goodsType) > 0 {
-		localDb.Where("goods_type in (?)", goodsType)
+	if len(typeParam) > 0 {
+		if typ == 2 { //按分类
+			localDb.Where("goods_type in (?)", typeParam)
+		} else if typ == 3 { //按商品
+			localDb.Where("sku in (?)", typeParam)
+		}
 	}
 
 	err = localDb.Find(&list).

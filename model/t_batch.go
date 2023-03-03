@@ -98,6 +98,15 @@ func GetBatchListByTyp(db *gorm.DB, typ int) (err error, list []Batch) {
 	return
 }
 
+func GetBatchListByIds(db *gorm.DB, ids []int) (err error, list []Batch) {
+	err = db.Model(&Batch{}).
+		Where("id in (?)", ids).
+		Find(&list).
+		Error
+
+	return
+}
+
 func GetBatchList(db *gorm.DB, cond *Batch) (err error, list []Batch) {
 	err = db.Model(&Batch{}).
 		Where(cond).

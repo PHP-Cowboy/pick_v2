@@ -1,6 +1,7 @@
 package dao
 
 import (
+	"errors"
 	"pick_v2/common/constant"
 	"pick_v2/forms/req"
 	"pick_v2/forms/rsp"
@@ -8,6 +9,7 @@ import (
 	"pick_v2/model"
 	"pick_v2/utils/ecode"
 	"pick_v2/utils/timeutil"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -44,6 +46,11 @@ func Print(form req.PrintCallGetReq) (err error, ret []rsp.PrintCallGetRsp) {
 
 	length := len(pickGoods) //有多少条pickGoods就有多少条OrderInfo数据，map数也是
 
+	if length == 0 {
+		err = errors.New("门店商品未拣货或复核数全为0")
+		return
+	}
+
 	orderGoodsIds := make([]int, 0, length)
 
 	goodsMp := make(map[int]model.PickGoods, length)
@@ -59,24 +66,28 @@ func Print(form req.PrintCallGetReq) (err error, ret []rsp.PrintCallGetRsp) {
 		return
 	}
 
-	var (
-		compOrderJoinGoods []model.GoodsJoinOrder
-	)
+	if len(orderJoinGoods) == 0 {
+		var (
+			compOrderJoinGoods []model.GoodsJoinOrder
+		)
 
-	err, compOrderJoinGoods = model.GetCompleteOrderJoinGoodsByOrderGoodsId(db, orderGoodsIds)
+		err, compOrderJoinGoods = model.GetCompleteOrderJoinGoodsByOrderGoodsId(db, orderGoodsIds)
 
-	if err != nil {
-		return
+		if err != nil {
+			return
+		}
+
+		for _, good := range compOrderJoinGoods {
+			orderJoinGoods = append(orderJoinGoods, good)
+		}
+
+		if len(orderJoinGoods) <= 0 {
+			err = ecode.OrderDataNotFound //订单数据未找到
+			return
+		}
 	}
 
-	for _, good := range compOrderJoinGoods {
-		orderJoinGoods = append(orderJoinGoods, good)
-	}
-
-	if len(orderJoinGoods) <= 0 {
-		err = ecode.OrderDataNotFound
-		return
-	}
+	sort.Sort(model.GoodsJoinOrderSort(orderJoinGoods))
 
 	packages := pick.Num
 

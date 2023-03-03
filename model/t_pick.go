@@ -137,6 +137,12 @@ func GetPickList(db *gorm.DB, cond *Pick) (err error, list []Pick) {
 	return
 }
 
+func GetPickListByBatchId(db *gorm.DB, batchId int) (err error, list []Pick) {
+	err = db.Model(&Pick{}).Where("batch_id = ?", batchId).Find(&list).Error
+
+	return
+}
+
 // 查询当前拣货员被分配的任务或已经接单 且未完成拣货 的数据
 func GetPickListByPickUserAndStatusAndTyp(db *gorm.DB, pickUser string, status int, typ int) (err error, list []Pick) {
 	err = db.Model(&Pick{}).

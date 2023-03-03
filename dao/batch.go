@@ -810,6 +810,147 @@ func GetBatchOrderAndGoods(db *gorm.DB, form req.GetBatchOrderAndGoodsForm) (err
 	return
 }
 
+func GetBatchPickData(db *gorm.DB, form req.GetBatchOrderAndGoodsForm) (err error, res rsp.GetBatchOrderAndGoodsRsp) {
+	var (
+		batch model.Batch
+		//orders         []model.Order
+		outOrder       []model.OutboundOrder
+		goodsJoinOrder []model.GoodsJoinOrder
+		picks          []model.Pick
+		pickGoods      []model.PickGoods
+		orderMp        = make(map[string][]rsp.OutGoods)
+	)
+
+	err, batch = model.GetBatchByPk(db, form.Id)
+
+	if err != nil {
+		return
+	}
+
+	//状态:0:进行中,1:已结束,2:暂停
+	if batch.Status != 1 {
+		err = errors.New("批次未结束")
+		return
+	}
+
+	err, picks = model.GetPickListByBatchId(db, batch.Id)
+
+	if err != nil {
+		return
+	}
+
+	pickMp := make(map[int]model.Pick, 0)
+
+	for _, p := range picks {
+		pickMp[p.Id] = p
+	}
+
+	err, pickGoods = model.GetPickGoodsByBatchId(db, batch.Id)
+	if err != nil {
+		return
+	}
+
+	var numbers []string
+
+	for _, pg := range pickGoods {
+		numbers = append(numbers, pg.Number)
+	}
+
+	numbers = slice.UniqueSlice(numbers)
+
+	err, goodsJoinOrder = model.GetOrderJoinGoodsListByNumbers(db, numbers)
+	if err != nil {
+		return
+	}
+
+	goodsJoinOrderSkuMp := make(map[string]model.GoodsJoinOrder, 0)
+
+	for _, order := range goodsJoinOrder {
+		goodsJoinOrderSkuMp[order.Sku] = order
+	}
+
+	totalGoodsNum := 0
+
+	numbers = make([]string, 0)
+
+	for _, good := range pickGoods {
+		//出库为0的不推送
+		if good.ReviewNum == 0 {
+			continue
+		}
+
+		pick, pickMpOk := pickMp[good.PickId]
+
+		if !pickMpOk {
+			err = errors.New("pick err")
+			return
+		}
+
+		orderGoods, goodsJoinOrderSkuMpOk := goodsJoinOrderSkuMp[good.Sku]
+
+		if !goodsJoinOrderSkuMpOk {
+			err = errors.New("sku err:" + orderGoods.Sku)
+		}
+
+		totalGoodsNum++
+
+		numbers = append(numbers, good.Number)
+
+		_, ok := orderMp[good.Number]
+
+		if !ok {
+			orderMp[good.Number] = make([]rsp.OutGoods, 0)
+		}
+
+		orderMp[good.Number] = append(orderMp[good.Number], rsp.OutGoods{
+			Id:            good.OrderGoodsId,
+			Name:          good.GoodsName,
+			Sku:           good.Sku,
+			GoodsType:     good.GoodsType,
+			GoodsSpe:      good.GoodsSpe,
+			DiscountPrice: good.DiscountPrice,
+			GoodsUnit:     good.Unit,
+			SaleUnit:      orderGoods.SaleUnit,
+			SaleCode:      orderGoods.SaleCode,
+			OutCount:      good.ReviewNum,
+			OutAt:         good.UpdateTime.Format(timeutil.TimeFormat),
+			Number:        good.Number,
+			CkNumber:      pick.DeliveryNo,
+		})
+
+	}
+
+	list := make([]rsp.OutOrder, 0, len(outOrder))
+
+	//err, outOrder = model.GetOrderListByNumbersGet(db, numbers)
+	err, outOrder = model.GetOutboundOrderByTaskIdAndNumbers(db, batch.TaskId, numbers)
+
+	if err != nil {
+		return
+	}
+
+	for _, order := range outOrder {
+		goodsInfo, ok := orderMp[order.Number]
+
+		if !ok {
+			err = errors.New("订单不存在")
+			return
+		}
+
+		list = append(list, rsp.OutOrder{
+			DistributionType: order.DistributionType,
+			PayAt:            *order.PayAt,
+			OrderId:          order.OrderId,
+			GoodsInfo:        goodsInfo,
+		})
+	}
+
+	res.Count = totalGoodsNum
+
+	res.List = list
+	return
+}
+
 // 批次结束 || 确认出库 订货系统MQ交互逻辑
 func SendBatchMsgToPurchase(batchId int, pickId int, picks []model.Pick) (err error) {
 

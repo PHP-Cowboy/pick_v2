@@ -13,8 +13,8 @@ redis:
   expire: 1
   password: 'testservice123'
 goods_api:
-  url: 'http://192.168.1.40'
-  port: 10001
+  url: 'http://121.196.60.92'
+  port: 19090
 yong_sender: "999"
 rocket_mq: "192.168.1.40:9876"
 u8_api:

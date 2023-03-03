@@ -100,7 +100,7 @@ func AddOrder(c *gin.Context) {
 	xsq_net.Success(c)
 }
 
-// 创建批次
+// 创建批次 [批量生成批次]
 func NewBatch(c *gin.Context) {
 	var form req.NewCreateBatchForm
 
@@ -294,6 +294,27 @@ func GetBatchOrderAndGoods(c *gin.Context) {
 	}
 
 	err, res := dao.GetBatchOrderAndGoods(global.DB, form)
+
+	if err != nil {
+		xsq_net.ErrorJSON(c, err)
+		return
+	}
+
+	xsq_net.SucJson(c, res)
+}
+
+// 批次bug修复接口
+func GetBatchPickData(c *gin.Context) {
+	var form req.GetBatchOrderAndGoodsForm
+
+	bindingBody := binding.Default(c.Request.Method, c.ContentType()).(binding.BindingBody)
+
+	if err := c.ShouldBindBodyWith(&form, bindingBody); err != nil {
+		xsq_net.ErrorJSON(c, ecode.ParamInvalid)
+		return
+	}
+
+	err, res := dao.GetBatchPickData(global.DB, form)
 
 	if err != nil {
 		xsq_net.ErrorJSON(c, err)

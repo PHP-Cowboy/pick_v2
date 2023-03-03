@@ -265,12 +265,17 @@ func OutboundTaskAddOrder(c *gin.Context) {
 		return
 	}
 
-	err := dao.OutboundTaskAddOrder(global.DB, form)
+	tx := global.DB.Begin()
+
+	err := dao.OutboundTaskAddOrder(tx, form)
 
 	if err != nil {
+		tx.Rollback()
 		xsq_net.ErrorJSON(c, err)
 		return
 	}
+
+	tx.Commit()
 
 	xsq_net.Success(c)
 }

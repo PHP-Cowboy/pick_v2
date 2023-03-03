@@ -57,6 +57,39 @@ func Order(ctx context.Context, messages ...*primitive.MessageExt) (consumer.Con
 	return consumer.ConsumeRetryLater, errors.New("异常")
 }
 
+func PullOrder(c *gin.Context) {
+	var form req.PurchaseOrderForm
+
+	orderRsp, err := GetOrderInfo(form)
+
+	if err != nil {
+		global.Logger["err"].Infof("获取订单信息失败,错误信息:%s", err.Error())
+		xsq_net.ErrorJSON(c, err)
+	}
+
+	db := global.DB
+
+	for _, info := range orderRsp.Data {
+
+		if info.DistributionType == 6 { //无需出库
+			_, err = dao.NoShipping(db, form, info)
+			if err != nil {
+				xsq_net.ErrorJSON(c, err)
+				return
+			}
+		} else {
+			_, err = dao.Shipping(db, form, info)
+			if err != nil {
+				xsq_net.ErrorJSON(c, err)
+				return
+			}
+		}
+
+	}
+
+	xsq_net.Success(c)
+}
+
 func GetOrderInfo(responseData interface{}) (result rsp.OrderRsp, err error) {
 
 	err = request.Call("api/v1/remote/get/goods/by/id", responseData, &result)

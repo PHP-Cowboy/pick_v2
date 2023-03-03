@@ -311,7 +311,7 @@ func MergePickByParams(db *gorm.DB, form req.MergePickForm, taskId int) (err err
 	)
 
 	//根据商品分类获取预拣池数据
-	err, prePickGoods = model.GetPrePickGoodsByPrePickIdAndStatusAndGoodsType(db, form.Ids, model.PrePickGoodsStatusUnhandled, form.TypeParam)
+	err, prePickGoods = model.GetPrePickGoodsByPrePickIdAndStatusAndGoodsType(db, form.Ids, model.PrePickGoodsStatusUnhandled, form.Type, form.TypeParam)
 
 	if err != nil {
 		return err

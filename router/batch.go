@@ -22,7 +22,7 @@ func BatchRoute(g *gin.RouterGroup) {
 		batchGroup.GET("/ongoingList", handler.OngoingList)
 		//批次加单
 		batchGroup.POST("/addOrder", handler.AddOrder)
-		//新创建批次
+		//新创建批次 [批量生成批次]
 		batchGroup.POST("/newBatch", handler.NewBatch)
 		// 全量拣货 -按任务创建批次
 		batchGroup.POST("/createBatchByTask", handler.CreateBatchByTask)
