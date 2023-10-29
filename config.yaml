@@ -1,6 +1,6 @@
 port: 8081
 mysql:
-  host: "121.196.60.92"
+  host: "127.0.0.1"
   port: 3306
   name: "pick_v2"
   user: "root"
@@ -8,12 +8,12 @@ mysql:
 jwt:
   key: 'ghlasdfkgbnkadfjbgnksdfjsdfgnbjk'
 redis:
-  host: 121.196.60.92
+  host: 127.0.0.1
   port: 6379
   expire: 1
   password: 'testservice123'
 goods_api:
-  url: 'http://121.196.60.92'
+  url: 'http://127.0.0.1'
   port: 19090
 yong_sender: "999"
 rocket_mq: "192.168.1.40:9876"
